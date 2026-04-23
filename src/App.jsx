@@ -10,7 +10,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import PublierPage from "./pages/PublierPage";
 import Notifications from "./pages/Notifications";
 import Navbar from "./components/Navbar";
-import ProtectedRoute from "./components/protectedRoute";
+import ProtectedRoute from "./components/ProtectedRoute";
 import "./index.css";
 
 const ProtectedAdminRoute = ({ children }) => {
