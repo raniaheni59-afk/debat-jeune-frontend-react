@@ -1,0 +1,11 @@
+.publication-feed {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.loading,
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}

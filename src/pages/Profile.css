@@ -1,0 +1,237 @@
+/* ===== PROFILE PAGE ===== */
+.profile-page {
+  min-height: 100vh;
+  height: auto;                /* ← هاذا مهم */
+  background: linear-gradient(135deg, #6f5ccf, #8a74e8);
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  padding: 16px;
+  overflow-y: auto;            /* ← هاذا يحل مشكلة الـ scroll */
+  box-sizing: border-box;
+}
+
+.profile-left {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  height: fit-content;         /* ← ما يتمددش أكثر من محتواه */
+}
+
+.profile-small-card,
+.info-card {
+  background: white;
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.profile-small-card img {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  margin-bottom: 12px;
+  object-fit: cover;
+}
+
+.profile-small-card h4 {
+  font-size: 16px;
+  color: #333;
+}
+
+.profile-small-card p {
+  font-size: 13px;
+  color: #999;
+  margin-bottom: 20px;
+}
+
+.profile-left-menu {
+  border-top: 1px solid #eee;
+  padding-top: 16px;
+}
+
+.profile-left-menu p {
+  margin: 12px 0;
+  cursor: pointer;
+  color: #555;
+  transition: color 0.2s;
+}
+
+.profile-left-menu p:hover {
+  color: #6f5ccf;
+}
+
+.info-card h4 {
+  text-align: center;
+  margin-bottom: 16px;
+  color: #444;
+}
+
+.info-card p {
+  font-size: 14px;
+  color: #555;
+  margin: 10px 0;
+}
+
+/* ===== MAIN CARD ===== */
+.profile-main-card {
+  background: white;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  height: fit-content;         /* ← ما يتمددش */
+  margin-bottom: 16px;         /* ← spacing في الأسفل */
+}
+
+.profile-title {
+  font-size: 32px;
+  color: #445b7c;
+  margin-bottom: 24px;
+  text-transform: lowercase;
+}
+
+.profile-top-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  gap: 20px;
+}
+
+.profile-user-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.profile-user-head img {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.profile-user-head h3 {
+  color: #445b7c;
+  margin-bottom: 6px;
+}
+
+.profile-user-head p {
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.profile-user-head span {
+  color: #9aa5b5;
+  font-size: 14px;
+}
+
+/* ===== FORM ===== */
+.profile-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  margin-bottom: 8px;
+  color: #444;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.form-group input {
+  padding: 14px;
+  border: none;
+  border-radius: 8px;
+  background: #f8f8f8;
+  outline: none;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.form-group input:focus {
+  background: #ede9ff;         /* ← highlight عند الكتابة */
+}
+
+.full-width {
+  grid-column: span 2;
+}
+
+/* ===== BUTTONS ===== */
+.upload-btn,
+.delete-btn,
+.save-btn {
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.upload-btn:hover,
+.delete-btn:hover,
+.save-btn:hover {
+  opacity: 0.85;
+}
+
+.upload-btn {
+  background: #d9cfd0;
+  color: white;
+  border: 1px solid #64748b;
+}
+
+.delete-btn {
+  background: white;
+  color: #111;
+  border: 1px solid #64748b;
+}
+
+.save-btn {
+  width: 220px;
+  background: #6f5ccf;         /* ← لون أحلى */
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  margin-top: 10px;
+  grid-column: span 2;         /* ← يتمدد على العرض كامل */
+  transition: background 0.2s;
+}
+
+.save-btn:hover {
+  background: #5a4abf;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 992px) {
+  .profile-page {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  .profile-form {
+    grid-template-columns: 1fr;
+  }
+
+  .full-width {
+    grid-column: span 1;
+  }
+
+  .save-btn {
+    grid-column: span 1;
+    width: 100%;
+  }
+
+  .profile-top-section {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
