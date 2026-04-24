@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://debat-jeune-production.up.railway.app/api", 
+ baseURL: "https://debat-jeune-production.up.railway.app/api", 
   timeout: 10000, // 10 secondes max
   headers: {
     "Content-Type": "application/json",
