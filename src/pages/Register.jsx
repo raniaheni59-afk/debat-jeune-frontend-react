@@ -21,26 +21,27 @@ export default function Register() {
   const [codeSent, setCodeSent] = useState(false);
   const [isParentRedirect, setIsParentRedirect] = useState(false);
 
-  // Calcul Age
+ 
   useEffect(() => {
-    if (form.date_naissance) {
-      const birth = new Date(form.date_naissance);
-      const today = new Date();
-      let calculatedAge = today.getFullYear() - birth.getFullYear();
-      if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) {
-        calculatedAge--;
-      }
-      setAge(calculatedAge);
-
-      if (calculatedAge < 12) {
-        setIsParentRedirect(true);
-        setMessage({ type: "error", text: "⚠️ Tu as moins de 12 ans. Redirection vers l'Espace Parent..." });
-      } else {
-        setIsParentRedirect(false);
-        setMessage({ type: "", text: "" });
-      }
-    }
-  }, [form.date_naissance]);
+  const params = new URLSearchParams(window.location.search);
+  const stepParam = params.get("step");
+  const emailParam = params.get("email");
+  
+  if (stepParam === "3" && emailParam) {
+    setForm(prev => ({ ...prev, email_user: emailParam }));
+    setOwnerConfirmed(true);
+    setStep(3);
+    // بعث الكود تلقائياً
+    API.post("/auth/send-password-code", { email: emailParam })
+      .then(res => {
+        setCodeSent(true);
+        setMessage({ type: "success", text: "✅ Code secret envoyé à votre email !" });
+      })
+      .catch(err => {
+        setMessage({ type: "error", text: "Erreur envoi code." });
+      });
+  }
+}, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -113,21 +114,25 @@ export default function Register() {
   };
 
   const handleFinalSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.mot_de_passe_user) return alert("Veuillez coller le code reçu.");
-    setLoading(true);
-    try {
-      const res = await API.post("/auth/register-final", { ...form });
-      localStorage.setItem("token", res.data.token);
-      localStorage.setItem("user", JSON.stringify(res.data.user));
-      alert("🎉 Inscription réussie !");
-      navigate("/jeune");
-    } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.message || "Erreur inscription." });
-    }
-    setLoading(false);
-  };
-
+  e.preventDefault();
+  if (!form.mot_de_passe_user) return alert("Veuillez coller le code reçu.");
+  setLoading(true);
+  try {
+    await API.post("/auth/register-final", { ...form });
+    // بعد الإنسكريبشن، دخّلو مباشرة
+    const loginRes = await API.post("/auth/login", {
+      email_user: form.email_user,
+      mot_de_passe_user: form.mot_de_passe_user
+    });
+    localStorage.setItem("token", loginRes.data.token);
+    localStorage.setItem("user", JSON.stringify(loginRes.data.user));
+    alert("🎉 Inscription réussie !");
+    navigate("/jeune");
+  } catch (err) {
+    setMessage({ type: "error", text: err.response?.data?.message || "Erreur inscription." });
+  }
+  setLoading(false);
+};
   return (
     <div className="register-page">
       <div className="register-bg-shape register-shape-top-left"></div>
@@ -242,60 +247,51 @@ export default function Register() {
 
             {/* STEP 2 */}
             {step === 2 && (
-              <div className="step-content">
-                <p>Entrez votre email. Nous allons vérifier que c'est bien vous.</p>
-                <div className="input-group full-width">
-                  <label>Email *</label>
-                  <input type="email" name="email_user" value={form.email_user} onChange={handleChange} placeholder="votre@email.com" />
-                </div>
-                
-                {!ownerConfirmed ? (
-                  <>
-                    <button onClick={sendOwnerCheck} className="register-submit-btn full-width" disabled={loading}>
-                      {loading ? "Envoi..." : "Envoyer Vérification"}
-                    </button>
-                    <button onClick={checkOwnerStatus} className="secondary-btn full-width" style={{marginTop: 10}}>
-                      J'ai cliqué sur OUI dans l'email
-                    </button>
-                  </>
-                ) : (
-                  <div className="success-box">Propriétaire confirmé !</div>
-                )}
-              </div>
-            )}
+  <div className="step-content">
+    <p>Entrez votre email. Nous allons vérifier que c'est bien vous.</p>
+    <div className="input-group full-width">
+      <label>Email *</label>
+      <input type="email" name="email_user" value={form.email_user} onChange={handleChange} placeholder="votre@email.com" />
+    </div>
+    <button onClick={sendOwnerCheck} className="register-submit-btn full-width" disabled={loading}>
+      {loading ? "Envoi..." : "Envoyer Vérification"}
+    </button>
+    <p style={{marginTop: 15, color: "#666", fontSize: 14}}>
+      ✉️ Cliquez sur "OUI" dans l'email pour continuer automatiquement.
+    </p>
+  </div>
+)}
 
             {/* STEP 3 */}
             {step === 3 && (
-              <form onSubmit={handleFinalSubmit} className="step-content">
-                <p>Nous avons envoyé un <strong>Code Secret</strong> à votre email. Copiez-le et collez-le ici.</p>
-                
-                {!codeSent && (
-                  <button type="button" onClick={sendPasswordCode} className="register-submit-btn full-width">
-                    Recevoir le Code
-                  </button>
-                )}
+  <form onSubmit={handleFinalSubmit} className="step-content">
+    <p>Nous avons envoyé un <strong>Code Secret</strong> à votre email. Copiez-le et collez-le ici.</p>
+    
+    {!codeSent && (
+      <p style={{color: "#667eea"}}>⏳ Envoi du code en cours...</p>
+    )}
 
-                {codeSent && (
-                  <>
-                    <div className="input-group full-width">
-                      <label>Code Secret (Mot de passe) *</label>
-                      <input 
-                        type="text" 
-                        name="mot_de_passe_user" 
-                        value={form.mot_de_passe_user} 
-                        onChange={handleChange} 
-                        placeholder="Collez le code ici..." 
-                        autoComplete="off"
-                        required 
-                      />
-                    </div>
-                    <button type="submit" className="register-submit-btn full-width" disabled={loading}>
-                      {loading ? "Création..." : "Confirmer & Accéder"}
-                    </button>
-                  </>
-                )}
-              </form>
-            )}
+    {codeSent && (
+      <>
+        <div className="input-group full-width">
+          <label>Code Secret (Mot de passe) *</label>
+          <input 
+            type="text" 
+            name="mot_de_passe_user" 
+            value={form.mot_de_passe_user} 
+            onChange={handleChange} 
+            placeholder="Collez le code ici..." 
+            autoComplete="off"
+            required 
+          />
+        </div>
+        <button type="submit" className="register-submit-btn full-width" disabled={loading}>
+          {loading ? "Création..." : "Confirmer & Accéder"}
+        </button>
+      </>
+    )}
+  </form>
+)}
 
             <div className="register-login-link">
               Déjà inscrit ? <Link to="/login">Se connecter</Link>
