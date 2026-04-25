@@ -1,29 +1,32 @@
-// src/services/api.js
 import axios from "axios";
 
+const baseURL =
+  // Vite
+  import.meta?.env?.VITE_API_URL ||
+  // CRA
+  process?.env?.REACT_APP_API_URL ||
+  // fallback
+  "https://debat-jeune-production.up.railway.app/api";
+
 const API = axios.create({
- baseURL: "https://debat-jeune-production.up.railway.app/api", 
-  timeout: 10000, // 10 secondes max
-  headers: {
-    "Content-Type": "application/json",
-  },
+  baseURL,
+  timeout: 10000,
+  headers: { "Content-Type": "application/json" },
 });
 
-// Interceptor bech nzidou token automatiquement
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
-  if (token) {
-    req.headers.Authorization = `Bearer ${token}`;
-  }
+  if (token) req.headers.Authorization = `Bearer ${token}`;
   return req;
 });
 
-// Optionnel : Gérer les erreurs de réponse globalement (ex: redirection si token expiré)
 API.interceptors.response.use(
-  (response) => response,
+  (res) => res,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Logique de déconnexion si nécessaire
+    if (error.response?.status === 401) {
+      // optional: logout / clear token
+      // localStorage.removeItem("token");
+      // window.location.href = "/login";
     }
     return Promise.reject(error);
   }
