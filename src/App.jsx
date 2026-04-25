@@ -11,6 +11,7 @@ import PublierPage from "./pages/PublierPage";
 import Notifications from "./pages/Notifications";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Accueil from "./pages/Accueil";
 import "./index.css";
 
 const ProtectedAdminRoute = ({ children }) => {
@@ -31,49 +32,46 @@ const ProtectedAdminRoute = ({ children }) => {
 
  function App() {
   return (
-    <>
-      <Navbar />
-      <Routes>
-        {/* Routes Publiques */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/verify-code" element={<VerifyCode />} />
+    <Routes>
+      {/* Routes Publiques - بدون Navbar */}
+      <Route path="/" element={<Accueil />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/verify-code" element={<VerifyCode />} />
 
-        {/* Espace Jeune */}
-        <Route path="/jeune" element={
-          <ProtectedRoute>
-            <JeuneLayout />
-          </ProtectedRoute>
-        } />
-        <Route path="/profile" element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        } />
-        <Route path="/publier" element={
-          <ProtectedRoute>
-            <PublierPage />
-          </ProtectedRoute>
-        } />
-        <Route path="/notifications" element={
-          <ProtectedRoute>
-            <Notifications />
-          </ProtectedRoute>
-        } />
+      {/* Espace Jeune */}
+      <Route path="/jeune" element={
+        <ProtectedRoute>
+          <JeuneLayout />
+        </ProtectedRoute>
+      } />
+      <Route path="/profile" element={
+        <ProtectedRoute>
+          <Profile />
+        </ProtectedRoute>
+      } />
+      <Route path="/publier" element={
+        <ProtectedRoute>
+          <PublierPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/notifications" element={
+        <ProtectedRoute>
+          <Notifications />
+        </ProtectedRoute>
+      } />
 
-        {/* Espace Admin */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/dashboard" element={
-          <ProtectedAdminRoute>
-            <AdminDashboard />
-          </ProtectedAdminRoute>
-        } />
+      {/* Espace Admin */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/admin/dashboard" element={
+        <ProtectedAdminRoute>
+          <AdminDashboard />
+        </ProtectedAdminRoute>
+      } />
 
-        {/* 404 */}
-        <Route path="*" element={<h2>404 - Page non trouvée</h2>} />
-      </Routes>
-    </>
+      {/* 404 */}
+      <Route path="*" element={<h2>404 - Page non trouvée</h2>} />
+    </Routes>
   );
 }
 
