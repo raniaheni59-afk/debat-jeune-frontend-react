@@ -23,6 +23,26 @@ export default function Register() {
 
  
   useEffect(() => {
+  if (form.date_naissance) {
+    const birth = new Date(form.date_naissance);
+    const today = new Date();
+    let calculatedAge = today.getFullYear() - birth.getFullYear();
+    if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) {
+      calculatedAge--;
+    }
+    setAge(calculatedAge);
+    if (calculatedAge < 12) {
+      setIsParentRedirect(true);
+      setMessage({ type: "error", text: "⚠️ Tu as moins de 12 ans. Redirection vers l'Espace Parent..." });
+    } else {
+      setIsParentRedirect(false);
+      setMessage({ type: "", text: "" });
+    }
+  }
+}, [form.date_naissance]);
+
+// useEffect 2: redirect من email OUI
+useEffect(() => {
   const params = new URLSearchParams(window.location.search);
   const stepParam = params.get("step");
   const emailParam = params.get("email");
@@ -31,13 +51,12 @@ export default function Register() {
     setForm(prev => ({ ...prev, email_user: emailParam }));
     setOwnerConfirmed(true);
     setStep(3);
-    // بعث الكود تلقائياً
     API.post("/auth/send-password-code", { email: emailParam })
-      .then(res => {
+      .then(() => {
         setCodeSent(true);
         setMessage({ type: "success", text: "✅ Code secret envoyé à votre email !" });
       })
-      .catch(err => {
+      .catch(() => {
         setMessage({ type: "error", text: "Erreur envoi code." });
       });
   }
@@ -56,7 +75,7 @@ export default function Register() {
   // STEP 1: Validation Info
   const handleNextToEmail = (e) => {
     e.preventDefault();
-    if (age < 12) return alert("Accès refusé : Moins de 12 ans.");
+    if (age !== null && age < 12) return alert("Accès refusé : Moins de 12 ans.");
     if (!form.nom_user || !form.prenom_user || !form.date_naissance || !form.sexe || !form.statut ||
         !form.gouvernorat || !form.delegation || !form.ville || !form.etablissement) {
       return alert("Veuillez remplir tous les champs obligatoires.");
