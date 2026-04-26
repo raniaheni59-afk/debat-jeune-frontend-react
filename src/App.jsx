@@ -11,6 +11,7 @@ import PublierPage from "./pages/PublierPage";
 import Notifications from "./pages/Notifications";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
+import PublicationDetail from "./pages/PublicationDetail";
 import Accueil from "./pages/Accueil";
 import Swafy from "./pages/Swafy";
 import "./index.css";
@@ -62,7 +63,7 @@ const ProtectedAdminRoute = ({ children }) => {
           <Notifications />
         </ProtectedRoute>
       } />
-
+      <Route path="/publication/:id" element={<ProtectedRoute><PublicationDetail /></ProtectedRoute>} />
       {/* Espace Admin */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/dashboard" element={

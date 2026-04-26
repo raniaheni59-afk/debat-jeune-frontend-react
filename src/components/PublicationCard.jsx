@@ -563,8 +563,8 @@ function KuiColumn({ publicationId, side, onCountChange }) {
 /* ─────────────────────────────────────────────
    Main PublicationCard
 ───────────────────────────────────────────── */
-export default function PublicationCard({ publication, onUpdate }) {
-  const [showComments, setShowComments] = useState(false);
+export default function PublicationCard({ publication, onUpdate, defaultShowComments = false }) {
+  const [showComments, setShowComments] = useState(defaultShowComments);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [showReactions, setShowReactions] = useState(false);

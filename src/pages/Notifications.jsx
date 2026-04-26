@@ -25,8 +25,8 @@ const Notifications = () => {
   if (!n.is_read) {
     await API.put(`/notifications/${n.id_notification}/read`);
   }
-  if (n.entity_id) {
-    navigate(`/jeune?publication=${n.entity_id}`);
+  if (n.entity_id && n.entity_type === 'publication') {
+    navigate(`/publication/${n.entity_id}`);
   }
 };
 
