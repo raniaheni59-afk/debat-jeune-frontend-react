@@ -12,6 +12,7 @@ const JeuneLayout = () => {
 
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [highlightedPub, setHighlightedPub] = useState(null);
 
   // ✅ Charger publications au démarrage
   const fetchPublications = async () => {
@@ -25,6 +26,18 @@ const JeuneLayout = () => {
       setLoading(false);
     }
   };
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const pubId = params.get("publication");
+  if (pubId) {
+    setHighlightedPub(parseInt(pubId));
+    // scroll للـ publication بعد ما تتحمّل
+    setTimeout(() => {
+      const el = document.getElementById(`pub-${pubId}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 1000);
+  }
+}, []);
 
   useEffect(() => {
     fetchPublications();
