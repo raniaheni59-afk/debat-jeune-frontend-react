@@ -737,11 +737,17 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 )}
 
                   {media.type_media === "pdf" && (
-                    <a href={getMediaUrl(media.url_media)} target="_blank" rel="noopener noreferrer" className="pdf-link">
-                      <span className="pdf-icon">📄</span>
-                      <span>{media.nom_original || "Ouvrir le PDF"}</span>
-                    </a>
-                  )}
+  <a 
+    href={getMediaUrl(media.url_media)} 
+    target="_blank" 
+    rel="noopener noreferrer" 
+    className="pdf-link"
+    download  // ← زيد هذا
+  >
+    <span className="pdf-icon">📄</span>
+    <span>{media.nom_original || "Télécharger le PDF"}</span>
+  </a>
+)}
                 </div>
               ))}
             </div>
