@@ -1,24 +1,33 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "./Notifications.css";
+import API from "../services/api";  // ← استعمل API بدل axios مباشرة
 
 const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
   const token = localStorage.getItem("token");
+  const backendUrl = import.meta.env.VITE_API_URL || "https://debat-jeune-production.up.railway.app";
 
   useEffect(() => {
     const fetchNotifs = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/api/notifications", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setNotifications(res.data.notifications);
+        const res = await API.get("/notifications");
+        setNotifications(res.data.notifications || []);
       } catch (err) {
         console.error("Erreur", err);
       }
     };
     fetchNotifs();
   }, []);
+
+  const handleClick = async (n) => {
+    if (!n.is_read) {
+      await API.put(`/notifications/${n.id_notification}/read`);
+    }
+    if (n.id_publication) {
+      window.location.href = `/publication/${n.id_publication}`;
+    }
+  };
 
   return (
     <div className="notif-page-container">
@@ -27,10 +36,16 @@ const Notifications = () => {
           <h2>Notifications</h2>
         </div>
         <div className="notif-list">
+          {notifications.length === 0 && <p style={{textAlign:'center', color:'#999'}}>Aucune notification</p>}
           {notifications.map((n) => (
-            <div key={n.id_notification} className={`notif-item ${n.is_read ? "read" : "unread"}`}>
+            <div 
+              key={n.id_notification} 
+              className={`notif-item ${n.is_read ? "read" : "unread"}`}
+              onClick={() => handleClick(n)}
+              style={{cursor: 'pointer'}}
+            >
               <img 
-                src={n.photo_user ? `http://localhost:5000/${n.photo_user}` : "/default-avatar.png"} 
+                src={n.photo_user ? `${backendUrl}/${n.photo_user}` : "/default-avatar.png"} 
                 alt="user" 
                 className="notif-img"
               />
