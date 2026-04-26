@@ -57,9 +57,10 @@ export default function PublierPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  e.preventDefault();
+  setLoading(true);
+  setError("");
+  console.log("🚀 Submit clicked, activeType:", activeType, "files:", formData.files);
 
     const dataToSend = new FormData();
     dataToSend.append("type_publication", activeType);
