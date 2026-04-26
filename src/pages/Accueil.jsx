@@ -76,7 +76,10 @@ function Navbar() {
     <header className={styles.navWrap}>
       <div className={styles.container}>
         <nav className={styles.nav}>
-          <Brand />
+          
+          <Link to="/swafy" className={styles.brandLink}>
+            <Brand />
+          </Link>
 
           <div className={styles.navLinks}>
             <a href="#accueil">accueil</a>

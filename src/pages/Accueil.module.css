@@ -550,3 +550,7 @@
   .phoneB{ display:none; }
   .phoneStack{ height: auto; }
 }
+.brandLink{
+  text-decoration: none;
+  display: inline-flex;
+}
