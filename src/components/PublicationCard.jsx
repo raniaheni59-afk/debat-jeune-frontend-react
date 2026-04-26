@@ -816,19 +816,26 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
           </p>
 
           <form onSubmit={handleComment} className="comment-root-form">
-            <img src="https://via.placeholder.com/36" alt="me" className="comment-avatar" />
-            <div className="comment-input-wrap">
-              <input
-                type="text"
-                placeholder="Écrire un commentaire..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-              />
-              <button type="submit" disabled={!newComment.trim()}>
-                ➤
-              </button>
-            </div>
-          </form>
+  <img 
+    src={JSON.parse(localStorage.getItem("user"))?.photo_user 
+      ? getMediaUrl(JSON.parse(localStorage.getItem("user")).photo_user)
+      : "https://via.placeholder.com/36"} 
+    alt="me" 
+    className="comment-avatar"
+    onError={(e) => (e.target.src = "https://via.placeholder.com/36")}
+  />
+  <div className="comment-input-wrap">
+    <input
+      type="text"
+      placeholder="Écrire un commentaire..."
+      value={newComment}
+      onChange={(e) => setNewComment(e.target.value)}
+    />
+    <button type="submit" disabled={!newComment.trim()}>
+      ➤
+    </button>
+  </div>
+</form>
 
           <div className="comments-tree">
             {comments.length === 0 ? (
