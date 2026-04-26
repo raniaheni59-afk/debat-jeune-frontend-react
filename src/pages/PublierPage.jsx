@@ -11,12 +11,11 @@ export default function PublierPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const [formData, setFormData] = useState({
-    titre_publication: "",
-    contenu: "",
-    question_debat: "",
-    files: []
-  });
+ const [formData, setFormData] = useState({
+  titre_publication: "",
+  contenu: "",
+  question_debat: "",
+});
 
   const [previews, setPreviews] = useState([]);
 
@@ -25,7 +24,7 @@ export default function PublierPage() {
       titre_publication: "",
       contenu: "",
       question_debat: "",
-      files: []
+      
     });
     setPreviews([]);
   };
@@ -33,8 +32,6 @@ export default function PublierPage() {
   const handleFileChange = (e) => {
     const selectedFiles = Array.from(e.target.files);
     if (selectedFiles.length === 0) return;
-
-    setFormData(prev => ({ ...prev, files: selectedFiles }));
 
     const newPreviews = selectedFiles.map(file => ({
       url: URL.createObjectURL(file),
@@ -56,37 +53,40 @@ export default function PublierPage() {
     }));
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
   setError("");
-  console.log("🚀 Submit clicked, activeType:", activeType, "files:", formData.files);
 
-    const dataToSend = new FormData();
-    dataToSend.append("type_publication", activeType);
+  const dataToSend = new FormData();
+  dataToSend.append("type_publication", activeType);
 
-    if (activeType === "debat") {
-  dataToSend.append("question_debat", formData.question_debat);
-  dataToSend.append("contenu", formData.contenu || "");
-} else {
-  dataToSend.append("contenu", formData.contenu);
-  dataToSend.append("titre_publication", formData.titre_publication || "");
-}
+  if (activeType === "debat") {
+    dataToSend.append("question_debat", formData.question_debat);
+    dataToSend.append("contenu", formData.contenu || "");
+  } else {
+    dataToSend.append("contenu", formData.contenu);
+    dataToSend.append("titre_publication", formData.titre_publication || "");
+  }
 
-    formData.files.forEach((file) => {
+  // ✅ خذ الـ files مباشرة من الـ input
+  const fileInput = document.getElementById("fileInput");
+  if (fileInput && fileInput.files.length > 0) {
+    Array.from(fileInput.files).forEach((file) => {
       dataToSend.append("files", file);
     });
+  }
 
-    try {
-      await api.post("/publications", dataToSend);
-      alert("Publication créée avec succès !");
-      navigate("/jeune");
-    } catch (error) {
-      setError(error.response?.data?.message || "Erreur serveur");
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    await api.post("/publications", dataToSend);
+    alert("Publication créée avec succès !");
+    navigate("/jeune");
+  } catch (err) {
+    setError(err.response?.data?.message || "Erreur serveur");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="publier-page" style={{ overflowY: "scroll", height: "100vh" }}>
