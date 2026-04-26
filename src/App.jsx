@@ -12,6 +12,7 @@ import Notifications from "./pages/Notifications";
 import Navbar from "./components/Navbar";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Accueil from "./pages/Accueil";
+import Swafy from "./pages/Swafy";
 import "./index.css";
 
 const ProtectedAdminRoute = ({ children }) => {
@@ -35,6 +36,7 @@ const ProtectedAdminRoute = ({ children }) => {
     <Routes>
       {/* Routes Publiques - بدون Navbar */}
       <Route path="/" element={<Accueil />} />
+      <Route path="/swafy" element={<Swafy />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/verify-code" element={<VerifyCode />} />
