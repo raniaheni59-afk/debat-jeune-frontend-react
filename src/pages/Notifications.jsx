@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Notifications.css";
 import API from "../services/api";  // ← استعمل API بدل axios مباشرة
@@ -19,15 +20,15 @@ const Notifications = () => {
     };
     fetchNotifs();
   }, []);
-
+  const navigate = useNavigate();
   const handleClick = async (n) => {
-    if (!n.is_read) {
-      await API.put(`/notifications/${n.id_notification}/read`);
-    }
-    if (n.id_publication) {
-      window.location.href = `/publication/${n.id_publication}`;
-    }
-  };
+  if (!n.is_read) {
+    await API.put(`/notifications/${n.id_notification}/read`);
+  }
+  if (n.entity_id) {
+    navigate(`/jeune?publication=${n.entity_id}`);
+  }
+};
 
   return (
     <div className="notif-page-container">
