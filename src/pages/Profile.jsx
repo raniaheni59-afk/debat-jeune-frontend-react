@@ -345,9 +345,9 @@ export default function Profile() {
             ) : (
               <div style={{display:'flex', flexDirection:'column', gap:12}}>
                 {pdfs.map(pdf => (
-  <a
-    key={pdf.id_media}
-    href={`https://docs.google.com/viewer?url=${encodeURIComponent(pdf.url_media)}&embedded=true`}
+                  <a
+                    key={pdf.id_media}
+                    href={`https://docs.google.com/viewer?url=${encodeURIComponent(pdf.url_media)}&embedded=true`}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
