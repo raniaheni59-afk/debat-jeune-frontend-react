@@ -848,4 +848,41 @@ const styles = {
     objectFit: "contain", borderRadius: 12,
     boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
   },
+  pubCard: {
+    background: "#fff",
+    borderRadius: "12px",
+    padding: "16px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+    border: "1px solid #f0f0f0"
+  },
+  pubHeader: { display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" },
+  pubAvatar: { width: "45px", height: "45px", borderRadius: "50%", objectFit: "cover" },
+  pubAuthor: { fontWeight: "600", fontSize: "1rem", margin: 0, color: "#1a1a1a" },
+  pubDate: { fontSize: "0.82rem", color: "#888", margin: 0 },
+  pubContent: { margin: "15px 0" },
+  pubImage: { width: "100%", borderRadius: "8px", marginTop: "10px" },
+  pubStats: { 
+    display: "flex", 
+    justifyContent: "space-between", 
+    padding: "10px 0", 
+    fontSize: "0.9rem",
+    borderTop: "1px solid #f9f9f9"
+  },
+  pubActionButtons: { display: "flex", justifyContent: "space-around", padding: "5px 0" },
+  actionBtn: { 
+    background: "none", border: "none", color: "#65676b", 
+    fontWeight: "600", cursor: "pointer", padding: "8px", borderRadius: "4px",
+    transition: "background 0.2s"
+  },
+  commentSection: { display: "flex", alignItems: "center", gap: "10px", marginTop: "12px" },
+  smallAvatar: { width: "32px", height: "32px", borderRadius: "50%" },
+  commentInput: {
+    flex: 1,
+    background: "#f0f2f5",
+    border: "none",
+    padding: "10px 15px",
+    borderRadius: "20px",
+    fontSize: "0.9rem",
+    outline: "none"
+  }
 };
