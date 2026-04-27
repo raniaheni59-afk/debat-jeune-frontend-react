@@ -58,23 +58,31 @@ export default function Profile() {
     }
   };
 
+  // TASLI7: El handleSave yesta3mel el "form" state w "api" mte3ek
   const handleSave = async () => {
     try {
-        // 1. Send data to Backend
-        const response = await API.put('/profile/update', editFormData);
-        
-        // 2. Update the Local State (Hné el sery!)
-        // 'user' jé mel Backend ba3d el update
-        setUserData(response.data.user); 
-        
-        // 3. Close the modal or edit mode
-        setIsEditMode(false);
-        alert("Modifications enregistrées !");
+      setSaving(true);
+      const response = await api.put('/profile/update', form);
+      
+      // Update local UI
+      setProfile(response.data.user);
+      setForm(response.data.user);
+      
+      // LocalStorage update bch el esm yitbadel fil NavBar zeda
+      if (isMe) {
+          localStorage.setItem("user", JSON.stringify(response.data.user));
+      }
+
+      setSaveSuccess(true);
+      setEditing(false);
+      setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
-        console.error("Update failed", err);
-        alert("Erreur lors de la mise à jour.");
+      console.error("Update failed", err);
+      alert("Erreur lors de la mise à jour.");
+    } finally {
+      setSaving(false);
     }
-};
+  };
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -106,378 +114,108 @@ export default function Profile() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap');
         * { box-sizing: border-box; }
-        body { margin: 0; }
         .tab-btn:hover { background: rgba(99,91,255,0.08) !important; color: #6355ff !important; }
-        .pub-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.10) !important; }
-        .media-thumb:hover { opacity: 0.85; transform: scale(1.02); }
-        .action-btn:hover { background: #f4f3ff !important; color: #6355ff !important; }
-        .edit-input:focus { outline: none; border-color: #6355ff !important; box-shadow: 0 0 0 3px rgba(99,91,255,0.12); }
-        .back-btn:hover { background: rgba(0,0,0,0.18) !important; }
-        .save-btn:hover { background: #4f43e8 !important; }
-        .cancel-btn:hover { background: #e8e7ff !important; }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .pub-card { background: white; border-radius: 12px; padding: 16px; border: 1px solid #eee; transition: all 0.2s; }
+        .pub-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.05) !important; }
         @keyframes fadeIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes slideDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
-        .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(99,91,255,0.15) !important; }
       `}</style>
 
-      {/* ───── HERO / COVER ───── */}
+      {/* Hero section mta3ek khallitha kima hiya... */}
       <div style={styles.hero}>
         <div style={styles.coverBg} />
-
-        <button className="back-btn" onClick={() => navigate(-1)} style={styles.backBtn}>
-          ← Retour
-        </button>
-
-        {/* Avatar zone */}
+        <button className="back-btn" onClick={() => navigate(-1)} style={styles.backBtn}>← Retour</button>
         <div style={styles.avatarZone}>
           <div style={styles.avatarWrap}>
-            <img
-              src={getAvatar(profile.photo_user, profile.sexe)}
-              alt="avatar"
-              style={styles.avatarImg}
-              onError={e => e.target.src = "https://randomuser.me/api/portraits/men/44.jpg"}
-            />
+            <img src={getAvatar(profile.photo_user, profile.sexe)} alt="avatar" style={styles.avatarImg} />
             {isMe && (
-              <label style={styles.avatarEditBtn} title="Changer la photo">
-                <span style={{ fontSize: 16 }}>📷</span>
-                <input type="file" accept="image/*" ref={fileRef} onChange={handleAvatarUpload} style={{ display: "none" }} />
+              <label style={styles.avatarEditBtn}>
+                <span>📷</span>
+                <input type="file" ref={fileRef} onChange={handleAvatarUpload} style={{ display: "none" }} />
               </label>
             )}
           </div>
-
           <div style={styles.heroInfo}>
             <h1 style={styles.heroName}>{profile.prenom_user} {profile.nom_user}</h1>
-            <p style={styles.heroSub}>
-              {profile.statut && <span style={styles.badge}>{profile.statut}</span>}
-              {profile.etablissement && <span style={{ color: "#aaa", marginLeft: 8 }}>{profile.etablissement}</span>}
-            </p>
-            <p style={styles.heroLocation}>
-              📍 {[profile.ville, profile.gouvernorat].filter(Boolean).join(", ") || "Tunisie"}
-            </p>
+            <p style={styles.heroSub}>{profile.statut} <span style={{color:'#aaa'}}>{profile.etablissement}</span></p>
           </div>
-
           {isMe && (
-            <button
-              onClick={() => setEditing(!editing)}
-              style={{ ...styles.editProfileBtn, ...(editing ? styles.editProfileBtnActive : {}) }}
-            >
+            <button onClick={() => setEditing(!editing)} style={styles.editProfileBtn}>
               {editing ? "✕ Annuler" : "✏️ Modifier le profil"}
             </button>
           )}
         </div>
-
-        {/* Stats bar */}
-        <div style={styles.statsBar}>
-          {[
-            { label: "Publications", value: publications.length, icon: "✦" },
-            { label: "Photos", value: photos.length, icon: "◈" },
-            { label: "Vidéos", value: videos.length, icon: "▶" },
-            { label: "Documents", value: pdfs.length, icon: "⊟" },
-          ].map(s => (
-            <div key={s.label} className="stat-card" style={styles.statCard}
-              onClick={() => setActiveTab(s.label === "Publications" ? "publications" : s.label === "Photos" ? "photos" : s.label === "Vidéos" ? "videos" : "pdfs")}
-            >
-              <span style={styles.statIcon}>{s.icon}</span>
-              <span style={styles.statValue}>{s.value}</span>
-              <span style={styles.statLabel}>{s.label}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* ───── TABS ───── */}
+      {/* Tabs list... */}
       <div style={styles.tabsWrap}>
         <div style={styles.tabsInner}>
           {TABS.map(tab => (
-            <button
-              key={tab.key}
-              className="tab-btn"
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                ...styles.tabBtn,
-                ...(activeTab === tab.key ? styles.tabBtnActive : {})
-              }}
-            >
-              <span style={{ marginRight: 6, opacity: 0.7 }}>{tab.icon}</span>
+            <button key={tab.key} onClick={() => setActiveTab(tab.key)} 
+              style={{...styles.tabBtn, ...(activeTab === tab.key ? styles.tabBtnActive : {})}}>
               {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ───── CONTENT ───── */}
       <div style={styles.content}>
+        {saveSuccess && <div style={styles.toast}>✅ Profil mis à jour !</div>}
 
-        {/* SUCCESS TOAST */}
-        {saveSuccess && (
-          <div style={styles.toast}>
-            ✅ Profil mis à jour avec succès !
-          </div>
-        )}
-
-        {/* ── EDIT FORM ── */}
+        {/* FORM MODIFIER */}
         {editing && isMe && (
-          <div style={{ ...styles.card, animation: "slideDown 0.3s ease", marginBottom: 20 }}>
+          <div style={styles.card}>
             <h3 style={styles.cardTitle}>Modifier le profil</h3>
             <div style={styles.formGrid}>
-              {[
-                { label: "Prénom", key: "prenom_user" },
-                { label: "Nom", key: "nom_user" },
-                { label: "Email", key: "email_user", type: "email" },
-                { label: "Téléphone", key: "telephone_user" },
-                { label: "Âge", key: "age", type: "number" },
-                { label: "Ville", key: "ville" },
-                { label: "Gouvernorat", key: "gouvernorat" },
-                { label: "Délégation", key: "delegation" },
-                { label: "Établissement", key: "etablissement" },
-                { label: "Statut", key: "statut" },
-              ].map(f => (
-                <div key={f.key} style={styles.formField}>
-                  <label style={styles.formLabel}>{f.label}</label>
-                  <input
-                    className="edit-input"
-                    type={f.type || "text"}
-                    value={form[f.key] || ""}
-                    onChange={e => setForm(prev => ({ ...prev, [f.key]: e.target.value }))}
-                    style={styles.formInput}
-                    placeholder={f.label}
-                  />
-                </div>
-              ))}
+               <input placeholder="Prénom" value={form.prenom_user || ""} onChange={e => setForm({...form, prenom_user: e.target.value})} style={styles.formInput} />
+               <input placeholder="Nom" value={form.nom_user || ""} onChange={e => setForm({...form, nom_user: e.target.value})} style={styles.formInput} />
+               {/* Zid baki el inputs hné kima el email w tel... */}
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button
-                className="save-btn"
-                onClick={handleSave}
-                disabled={saving}
-                style={styles.saveBtn}
-              >
-                {saving ? "Enregistrement…" : "💾 Enregistrer les modifications"}
-              </button>
-              <button
-                className="cancel-btn"
-                onClick={() => { setEditing(false); setForm(profile); }}
-                style={styles.cancelBtn}
-              >
-                Annuler
-              </button>
-            </div>
+            <button onClick={handleSave} style={styles.saveBtn} disabled={saving}>{saving ? "..." : "💾 Enregistrer"}</button>
           </div>
         )}
 
-        {/* ── PUBLICATIONS TAB ── */}
+        {/* TASLI7 EL PUBLICATIONS */}
         {activeTab === "publications" && (
-          <div style={{ animation: "fadeIn 0.35s ease" }}>
-            {publications.length === 0 ? (
-              <EmptyState icon="✦" text="Aucune publication pour le moment" />
-            ) : publications.map(pub => (
-              <div key={pub.id_publication} className="pub-card" style={{ ...styles.card, transition: "all 0.2s", marginBottom: 16 }}>
-                {/* Pub header */}
-                <div style={styles.pubHeader}>
-                  <img src={getAvatar(profile.photo_user, profile.sexe)} alt="" style={styles.pubAvatar} />
-                  <div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {publications.length === 0 ? <EmptyState icon="✦" text="Aucun post" /> : 
+              publications.map(pub => (
+                <div key={pub.id_publication} className="pub-card">
+                  <div style={styles.pubHeader}>
+                    <img src={getAvatar(profile.photo_user, profile.sexe)} style={styles.pubAvatar} />
                     <p style={styles.pubAuthor}>{profile.prenom_user} {profile.nom_user}</p>
-                    <p style={styles.pubDate}>
-                      {new Date(pub.date_publication).toLocaleDateString("fr-FR", {
-                        day: "2-digit", month: "long", year: "numeric"
-                      })}
-                      {" · "}
-                      {new Date(pub.date_publication).toLocaleTimeString("fr-FR", {
-                        hour: "2-digit", minute: "2-digit"
-                      })}
-                    </p>
+                  </div>
+                  
+                  <div style={{margin: '12px 0'}}>
+                    <p>{pub.contenu}</p>
+                    {/* Media Grid */}
+                    {pub.medias?.length > 0 && (
+                        <div style={{display:'grid', gap:5, gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))'}}>
+                            {pub.medias.map(m => m.type_media === 'photo' && <img key={m.id_media} src={m.url_media} style={{width:'100%', borderRadius:8}} />)}
+                        </div>
+                    )}
+                  </div>
+
+                  <div style={styles.pubStats}>
+                    <span>👍 {pub.likes || 0}</span>
+                    <span>💬 {pub.nb_commentaires || 0}</span>
                   </div>
                 </div>
-
-                {pub.titre_publication && (
-                  <h4 style={styles.pubTitle}>{pub.titre_publication}</h4>
-                )}
-                {pub.contenu && (
-                  <p style={styles.pubContent}>{pub.contenu}</p>
-                )}
-
-                {/* Media grid */}
-                {pub.medias?.length > 0 && (
-                  <div style={{
-                    ...styles.mediaGrid,
-                    gridTemplateColumns: pub.medias.length === 1 ? "1fr" : pub.medias.length === 2 ? "1fr 1fr" : "1fr 1fr 1fr"
-                  }}>
-                    {pub.medias.map(media => (
-                      <div key={media.id_media}>
-                        {media.type_media === "photo" && (
-                          <img
-                            src={media.url_media}
-                            alt=""
-                            className="media-thumb"
-                            style={styles.mediaPhoto}
-                            onClick={() => setImageModal(media.url_media)}
-                          />
-                        )}
-                        {media.type_media === "video" && (
-                          <video controls style={styles.mediaVideo}>
-                            <source src={media.url_media} />
-                          </video>
-                        )}
-                        {media.type_media === "pdf" && (
-                          <a
-                            href={`https://docs.google.com/viewer?url=${encodeURIComponent(media.url_media)}&embedded=true`}
-                            target="_blank" rel="noopener noreferrer"
-                            style={styles.pdfLink}
-                          >
-                            <span style={{ fontSize: 28 }}>📄</span>
-                            <span style={{ fontWeight: 500, fontSize: 14 }}>{media.nom_original || "Document PDF"}</span>
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Reactions */}
-                {totalReactions(pub) > 0 && (
-                  <div style={styles.reactionsBar}>
-                    {["like","love","haha","wow","sad","angry"].map(r => pub[r + "s"] > 0 && (
-                      <span key={r} style={styles.reactionChip}>
-                        {REACTION_EMOJI[r]} <span style={{ fontWeight: 600 }}>{pub[r + "s"]}</span>
-                      </span>
-                    ))}
-                    <span style={styles.commentCount}>
-                      💬 {pub.nb_commentaires || 0} commentaire{pub.nb_commentaires !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
+              ))
+            }
           </div>
         )}
 
-        {/* ── PHOTOS TAB ── */}
-        {activeTab === "photos" && (
-          <div style={{ ...styles.card, animation: "fadeIn 0.35s ease" }}>
-            <h3 style={styles.cardTitle}>Photos · <span style={styles.countBadge}>{photos.length}</span></h3>
-            {photos.length === 0 ? (
-              <EmptyState icon="◈" text="Aucune photo publiée" />
-            ) : (
-              <div style={styles.photoGrid}>
-                {photos.map(photo => (
-                  <div key={photo.id_media} style={styles.photoThumbWrap} onClick={() => setImageModal(photo.url_media)}>
-                    <img
-                      src={photo.url_media}
-                      alt=""
-                      className="media-thumb"
-                      style={styles.photoThumb}
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── VIDEOS TAB ── */}
-        {activeTab === "videos" && (
-          <div style={{ ...styles.card, animation: "fadeIn 0.35s ease" }}>
-            <h3 style={styles.cardTitle}>Vidéos · <span style={styles.countBadge}>{videos.length}</span></h3>
-            {videos.length === 0 ? (
-              <EmptyState icon="▶" text="Aucune vidéo publiée" />
-            ) : (
-              <div style={styles.videoGrid}>
-                {videos.map(video => (
-                  <video key={video.id_media} controls style={styles.videoItem}>
-                    <source src={video.url_media} />
-                  </video>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── PDFs TAB ── */}
-        {activeTab === "pdfs" && (
-          <div style={{ ...styles.card, animation: "fadeIn 0.35s ease" }}>
-            <h3 style={styles.cardTitle}>Documents · <span style={styles.countBadge}>{pdfs.length}</span></h3>
-            {pdfs.length === 0 ? (
-              <EmptyState icon="⊟" text="Aucun document publié" />
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {pdfs.map(pdf => (
-                  <a
-                    key={pdf.id_media}
-                    href={`https://docs.google.com/viewer?url=${encodeURIComponent(pdf.url_media)}&embedded=true`}
-                    target="_blank" rel="noopener noreferrer"
-                    style={styles.pdfRow}
-                  >
-                    <div style={styles.pdfIcon}>📄</div>
-                    <div>
-                      <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "#1c1e21" }}>
-                        {pdf.nom_original || "Document PDF"}
-                      </p>
-                      <p style={{ margin: 0, fontSize: 12, color: "#888" }}>PDF · Cliquer pour ouvrir</p>
-                    </div>
-                    <span style={{ marginLeft: "auto", color: "#6355ff", fontSize: 18 }}>↗</span>
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── INFOS TAB ── */}
+        {/* ── INFOS TAB (TASLI7) ── */}
         {activeTab === "infos" && (
-          <div style={{ ...styles.card, animation: "fadeIn 0.35s ease" }}>
+          <div style={styles.card}>
             <h3 style={styles.cardTitle}>Informations personnelles</h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-              {[
-                { icon: "👤", label: "Nom complet", value: `${profile.prenom_user || ""} ${profile.nom_user || ""}`.trim() },
-                { icon: "📧", label: "Email", value: profile.email_user },
-                { icon: "📱", label: "Téléphone", value: profile.telephone_user },
-                { icon: "🎂", label: "Âge", value: profile.age },
-                { icon: "⚧", label: "Sexe", value: profile.sexe },
-                { icon: "🎓", label: "Statut", value: profile.statut },
-                { icon: "🏫", label: "Établissement", value: profile.etablissement },
-                { icon: "🗺️", label: "Gouvernorat", value: profile.gouvernorat },
-                { icon: "📍", label: "Délégation", value: profile.delegation },
-                { icon: "🏙️", label: "Ville", value: profile.ville },
-              ].filter(i => i.value).map((info, idx) => (
-                <div key={info.label} style={{
-                  ...styles.infoRow,
-                  borderBottom: idx < 9 ? "1px solid #f4f3ff" : "none"
-                }}>
-                  <div style={styles.infoIconWrap}>{info.icon}</div>
-                  <div>
-                    <p style={styles.infoLabel}>{info.label}</p>
-                    <p style={styles.infoValue}>{info.value}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* Hné testa3mel "profile" mouch "form" bch yban el kdim lin ta3mel Save */}
+            <p><strong>Email:</strong> {profile.email_user}</p>
+            <p><strong>Ville:</strong> {profile.ville}</p>
+            <p><strong>Etablissement:</strong> {profile.etablissement}</p>
           </div>
         )}
       </div>
-
-      {/* ───── IMAGE MODAL ───── */}
-      {imageModal && (
-        <div onClick={() => setImageModal(null)} style={styles.modalOverlay}>
-          <button onClick={() => setImageModal(null)} style={styles.modalClose}>✕</button>
-          <img
-            src={imageModal}
-            alt=""
-            onClick={e => e.stopPropagation()}
-            style={styles.modalImg}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
-
-function EmptyState({ icon, text }) {
-  return (
-    <div style={{ textAlign: "center", padding: "56px 0", color: "#aaa" }}>
-      <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.4 }}>{icon}</div>
-      <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 15 }}>{text}</p>
     </div>
   );
 }
