@@ -60,21 +60,21 @@ export default function Profile() {
 
   const handleSave = async () => {
     try {
-      setSaving(true);
-      await api.put("/profile/update", form);
-      const res = await api.get("/profile/me");
-      setProfile(res.data);
-      setForm(res.data);
-      localStorage.setItem("user", JSON.stringify(res.data));
-      setEditing(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
+        // 1. Send data to Backend
+        const response = await API.put('/profile/update', editFormData);
+        
+        // 2. Update the Local State (Hné el sery!)
+        // 'user' jé mel Backend ba3d el update
+        setUserData(response.data.user); 
+        
+        // 3. Close the modal or edit mode
+        setIsEditMode(false);
+        alert("Modifications enregistrées !");
     } catch (err) {
-      alert("Erreur lors de la mise à jour");
-    } finally {
-      setSaving(false);
+        console.error("Update failed", err);
+        alert("Erreur lors de la mise à jour.");
     }
-  };
+};
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -154,7 +154,7 @@ export default function Profile() {
               {profile.etablissement && <span style={{ color: "#aaa", marginLeft: 8 }}>{profile.etablissement}</span>}
             </p>
             <p style={styles.heroLocation}>
-              📍 {[profile.ville_jeune, profile.gouvernorat_jeune].filter(Boolean).join(", ") || "Tunisie"}
+              📍 {[profile.ville, profile.gouvernorat].filter(Boolean).join(", ") || "Tunisie"}
             </p>
           </div>
 
@@ -228,9 +228,9 @@ export default function Profile() {
                 { label: "Email", key: "email_user", type: "email" },
                 { label: "Téléphone", key: "telephone_user" },
                 { label: "Âge", key: "age", type: "number" },
-                { label: "Ville", key: "ville_jeune" },
-                { label: "Gouvernorat", key: "gouvernorat_jeune" },
-                { label: "Délégation", key: "delegation_jeune" },
+                { label: "Ville", key: "ville" },
+                { label: "Gouvernorat", key: "gouvernorat" },
+                { label: "Délégation", key: "delegation" },
                 { label: "Établissement", key: "etablissement" },
                 { label: "Statut", key: "statut" },
               ].map(f => (
@@ -437,9 +437,9 @@ export default function Profile() {
                 { icon: "⚧", label: "Sexe", value: profile.sexe },
                 { icon: "🎓", label: "Statut", value: profile.statut },
                 { icon: "🏫", label: "Établissement", value: profile.etablissement },
-                { icon: "🗺️", label: "Gouvernorat", value: profile.gouvernorat_jeune },
-                { icon: "📍", label: "Délégation", value: profile.delegation_jeune },
-                { icon: "🏙️", label: "Ville", value: profile.ville_jeune },
+                { icon: "🗺️", label: "Gouvernorat", value: profile.gouvernorat },
+                { icon: "📍", label: "Délégation", value: profile.delegation },
+                { icon: "🏙️", label: "Ville", value: profile.ville },
               ].filter(i => i.value).map((info, idx) => (
                 <div key={info.label} style={{
                   ...styles.infoRow,
