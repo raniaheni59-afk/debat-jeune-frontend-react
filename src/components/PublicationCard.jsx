@@ -693,13 +693,11 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
                 />
                 <div className="kui-q-meta">
   <strong 
-    style={{cursor:'pointer'}}
-    onClick={() => navigate(`/profile/${publication.user_id}`)}
-    onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
-    onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
-  >
-    {[publication.nom_user, publication.prenom_user].filter(Boolean).join(" ") || "User"}
-  </strong>
+  style={{cursor:'pointer'}} 
+  onClick={() => navigate(`/profile/${publication.user_id}`)}
+>
+  {publication.nom_user}
+</strong>
 </div>
               </div>
 
