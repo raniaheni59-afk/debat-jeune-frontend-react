@@ -34,6 +34,12 @@ const Notifications = () => {
     <div className="notif-page-container">
       <div className="notif-card">
         <div className="notif-header">
+          <button 
+          onClick={() => navigate(-1)}
+          style={{background:'none', border:'none', cursor:'pointer', fontSize:16, color:'#6f5ccf', marginRight:10}}
+        >
+          ← Retour
+        </button>
           <h2>Notifications</h2>
         </div>
         <div className="notif-list">
