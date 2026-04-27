@@ -1,14 +1,17 @@
-import React, { useEffect, useState, useRef } from "react";
+
+  import React, { useEffect, useState, useRef } from "react";
 import api from "../services/api";
 import { useNavigate, useParams } from "react-router-dom";
 
 const BACKEND = "https://debat-jeune-production.up.railway.app";
 
 const getAvatar = (photo, sexe) => {
-  if (photo) return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;
-  return sexe === "femme"
-    ? "https://randomuser.me/api/portraits/women/44.jpg"
-    : "https://randomuser.me/api/portraits/men/44.jpg";
+  // Ken fama photo fil base, nasta3mloha
+  if (photo && photo !== "" && photo !== "null") {
+    return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;
+  }
+  // Ken mafamech, nraja3 wejha feragh (UI Placeholder)
+  return "https://www.w3schools.com/howto/img_avatar.png"; 
 };
 
 const TABS = [
@@ -61,16 +64,25 @@ export default function Profile() {
   const handleSave = async () => {
     try {
       setSaving(true);
-      await api.put("/profile/update", form);
-      const res = await api.get("/profile/me");
-      setProfile(res.data);
-      setForm(res.data);
-      localStorage.setItem("user", JSON.stringify(res.data));
-      setEditing(false);
+      // 1. Update fil Base de données via API
+      const response = await api.put('/profile/update', form);
+      
+      // 2. Update el state mta el profile bch el UI tetbadel toul
+      setProfile(response.data.user);
+      
+      // 3. Update el LocalStorage bch el esm w el info yebkaw s7a7 fil site kamel
+      if (isMe) {
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+      }
+
       setSaveSuccess(true);
+      setEditing(false); // Nsakro el mode edition
+      
+      // Toast message bch ya3ref el user eli tbadlet
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
-      alert("Erreur lors de la mise à jour");
+      console.error("Erreur lors de l'enregistrement", err);
+      alert("Désolé, la mise à jour a échoué.");
     } finally {
       setSaving(false);
     }
@@ -79,10 +91,22 @@ export default function Profile() {
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const fd = new FormData();
     fd.append("avatar", file);
-    await api.put("/profile/avatar", fd);
-    fetchData();
+
+    try {
+      setLoading(true);
+      // Upload lel base / server
+      const res = await api.put("/profile/avatar", fd);
+      
+      // Ba3d el upload, na3mlu refresh lel data bch tban el taswira el jdida
+      fetchData(); 
+    } catch (err) {
+      console.error("Erreur upload avatar", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) return (
@@ -122,13 +146,24 @@ export default function Profile() {
         .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(99,91,255,0.15) !important; }
       `}</style>
 
-      {/* ───── HERO / COVER ───── */}
-      <div style={styles.hero}>
-        <div style={styles.coverBg} />
-
-        <button className="back-btn" onClick={() => navigate(-1)} style={styles.backBtn}>
-          ← Retour
-        </button>
+      <div style={styles.avatarWrap}>
+        <img
+          src={getAvatar(profile.photo_user, profile.sexe)}
+          alt="avatar"
+          style={styles.avatarImg}
+        />
+        {isMe && (
+          <label style={styles.avatarEditBtn} title="Changer la photo">
+            <span style={{ fontSize: 16 }}>📷</span>
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleAvatarUpload} 
+              style={{ display: "none" }} 
+            />
+          </label>
+        )}
+      
 
         {/* Avatar zone */}
         <div style={styles.avatarZone}>
@@ -154,7 +189,7 @@ export default function Profile() {
               {profile.etablissement && <span style={{ color: "#aaa", marginLeft: 8 }}>{profile.etablissement}</span>}
             </p>
             <p style={styles.heroLocation}>
-              📍 {[profile.ville, profile.gouvernorat].filter(Boolean).join(", ") || "Tunisie"}
+              📍 {[profile.ville_jeune, profile.gouvernorat_jeune].filter(Boolean).join(", ") || "Tunisie"}
             </p>
           </div>
 
@@ -228,9 +263,9 @@ export default function Profile() {
                 { label: "Email", key: "email_user", type: "email" },
                 { label: "Téléphone", key: "telephone_user" },
                 { label: "Âge", key: "age", type: "number" },
-                { label: "Ville", key: "ville" },
-                { label: "Gouvernorat", key: "gouvernorat" },
-                { label: "Délégation", key: "delegation" },
+                { label: "Ville", key: "ville_jeune" },
+                { label: "Gouvernorat", key: "gouvernorat_jeune" },
+                { label: "Délégation", key: "delegation_jeune" },
                 { label: "Établissement", key: "etablissement" },
                 { label: "Statut", key: "statut" },
               ].map(f => (
@@ -247,27 +282,24 @@ export default function Profile() {
                 </div>
               ))}
             </div>
-            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-              <button
-                className="save-btn"
-                onClick={handleSave}
-                disabled={saving}
-                style={styles.saveBtn}
-              >
-                {saving ? "Enregistrement…" : "💾 Enregistrer les modifications"}
-              </button>
-              <button
-                className="cancel-btn"
-                onClick={() => { setEditing(false); setForm(profile); }}
-                style={styles.cancelBtn}
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
+            {editing && (
+        <div style={styles.card}>
+           {/* Hné t7ot el bouton Enregistrer mta3ek */}
+           <button 
+             onClick={handleSave} 
+             style={styles.saveBtn} 
+             disabled={saving}
+           >
+             {saving ? "Enregistrement..." : "💾 Enregistrer les modifications"}
+           </button>
+        </div>
+      )}
+    </div>
+
         )}
 
-        {activeTab === "publications" && (
+        {/* ── PUBLICATIONS TAB ── */}
+{activeTab === "publications" && (
   <div style={{ animation: "fadeIn 0.35s ease", display: "flex", flexDirection: "column", gap: "20px" }}>
     {publications.length === 0 ? (
       <EmptyState icon="✦" text="Aucune publication pour le moment" />
@@ -470,9 +502,9 @@ export default function Profile() {
                 { icon: "⚧", label: "Sexe", value: profile.sexe },
                 { icon: "🎓", label: "Statut", value: profile.statut },
                 { icon: "🏫", label: "Établissement", value: profile.etablissement },
-                { icon: "🗺️", label: "Gouvernorat", value: profile.gouvernorat },
-                { icon: "📍", label: "Délégation", value: profile.delegation },
-                { icon: "🏙️", label: "Ville", value: profile.ville },
+                { icon: "🗺️", label: "Gouvernorat", value: profile.gouvernorat_jeune },
+                { icon: "📍", label: "Délégation", value: profile.delegation_jeune },
+                { icon: "🏙️", label: "Ville", value: profile.ville_jeune },
               ].filter(i => i.value).map((info, idx) => (
                 <div key={info.label} style={{
                   ...styles.infoRow,
@@ -848,118 +880,6 @@ const styles = {
     objectFit: "contain", borderRadius: 12,
     boxShadow: "0 24px 80px rgba(0,0,0,0.5)",
   },
-  pubCard: {
-    backgroundColor: "#fff",
-    borderRadius: "12px",
-    padding: "16px",
-    border: "1px solid #e0e0e0",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.04)",
-    transition: "all 0.3s ease",
-  },
-  pubHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "12px",
-    marginBottom: "14px",
-  },
-  pubAvatar: {
-    width: "48px",
-    height: "48px",
-    borderRadius: "50%",
-    objectFit: "cover",
-    border: "2px solid #f0f0f0",
-  },
-  pubAuthor: {
-    margin: 0,
-    fontWeight: "600",
-    fontSize: "1rem",
-    color: "#1c1e21",
-  },
-  pubDate: {
-    margin: 0,
-    fontSize: "0.85rem",
-    color: "#65676b",
-  },
-  pubTitle: {
-    margin: "0 0 8px 0",
-    fontSize: "1.2rem",
-    color: "#1c1e21",
-    fontFamily: "'Playfair Display', serif",
-  },
-  pubContent: {
-    marginBottom: "12px",
-  },
-  mediaGrid: {
-    margin: "12px 0",
-    borderRadius: "8px",
-    overflow: "hidden",
-  },
-  mediaPhoto: {
-    width: "100%",
-    maxHeight: "450px",
-    objectFit: "cover",
-    backgroundColor: "#f8f9fa",
-  },
-  pdfLink: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "12px",
-    backgroundColor: "#f8f9fa",
-    borderRadius: "8px",
-    textDecoration: "none",
-    color: "#333",
-    border: "1px solid #eee",
-  },
-  pubStats: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "8px 4px",
-    fontSize: "0.9rem",
-    color: "#65676b",
-  },
-  pubActionButtons: {
-    display: "flex",
-    justifyContent: "space-around",
-    padding: "4px 0",
-  },
-  actionBtn: {
-    flex: 1,
-    padding: "10px",
-    border: "none",
-    backgroundColor: "transparent",
-    borderRadius: "6px",
-    cursor: "pointer",
-    fontSize: "0.95rem",
-    fontWeight: "500",
-    color: "#65676b",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "6px",
-    transition: "background 0.2s",
-  },
-  commentSection: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    marginTop: "12px",
-  },
-  smallAvatar: {
-    width: "32px",
-    height: "32px",
-    borderRadius: "50%",
-    objectFit: "cover",
-  },
-  commentInput: {
-    flex: 1,
-    backgroundColor: "#f0f2f5",
-    border: "none",
-    borderRadius: "20px",
-    padding: "10px 16px",
-    fontSize: "0.9rem",
-    outline: "none",
-  },
-  
+
+
 };
