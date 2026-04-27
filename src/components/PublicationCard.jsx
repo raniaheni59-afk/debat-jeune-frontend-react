@@ -737,17 +737,17 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 )}
 
 {media.type_media === "pdf" && (
-  <div className="pdf-container" style={{border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden'}}>
+  <div style={{border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden'}}>
     <div style={{background: '#f5f5f5', padding: '12px', display: 'flex', alignItems: 'center', gap: '10px'}}>
-      <span style={{fontSize: '24px'}}>📄</span>
+      <span>📄</span>
       <span style={{fontWeight: 'bold'}}>{media.nom_original || "Document PDF"}</span>
       <a 
-        href={getMediaUrl(media.url_media)}
+        href={`https://docs.google.com/viewer?url=${encodeURIComponent(getMediaUrl(media.url_media))}&embedded=true`}
         target="_blank"
         rel="noopener noreferrer"
-        style={{marginLeft: 'auto', background: '#667eea', color: 'white', padding: '6px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '14px'}}
+        style={{marginLeft: 'auto', background: '#667eea', color: 'white', padding: '6px 12px', borderRadius: '6px', textDecoration: 'none'}}
       >
-        Ouvrir ↗
+        Voir le PDF ↗
       </a>
     </div>
   </div>
