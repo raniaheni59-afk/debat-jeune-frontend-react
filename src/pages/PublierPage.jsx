@@ -11,6 +11,8 @@ export default function PublierPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
  const [formData, setFormData] = useState({
   titre_publication: "",
   contenu: "",
@@ -78,10 +80,15 @@ const handleSubmit = async (e) => {
   }
 
   try {
-    await api.post("/publications", dataToSend);
-    alert("Publication créée avec succès !");
-    navigate("/jeune");
-  } catch (err) {
+  await api.post("/publications", dataToSend, {
+    onUploadProgress: (progressEvent) => {
+      const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      setUploadProgress(percent);
+    }
+  });
+  alert("Publication créée avec succès !");
+  navigate("/jeune");
+} catch (err) {
     setError(err.response?.data?.message || "Erreur serveur");
   } finally {
     setLoading(false);
@@ -225,6 +232,22 @@ const handleSubmit = async (e) => {
               </p>
             )}
 
+            {loading && uploadProgress > 0 && (
+  <div style={{margin: '10px 0'}}>
+    <div style={{background: '#e0e0e0', borderRadius: '10px', height: '10px'}}>
+      <div style={{
+        background: '#667eea', 
+        width: `${uploadProgress}%`, 
+        height: '10px', 
+        borderRadius: '10px',
+        transition: 'width 0.3s'
+      }}/>
+    </div>
+    <p style={{textAlign: 'center', marginTop: '5px', color: '#667eea'}}>
+      {uploadProgress < 100 ? `⬆️ Upload: ${uploadProgress}%` : '⏳ Traitement Cloudinary...'}
+    </p>
+  </div>
+)}
             {/* SUBMIT */}
             <button type="submit" className="btn-submit" disabled={loading}>
               {loading ? "Publication en cours..." : "Publier maintenant"}
