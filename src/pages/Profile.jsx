@@ -30,11 +30,9 @@ export default function Profile() {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+ const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
   const currentUserId = currentUser.id_user || currentUser.id || currentUser.userId;
   const isMe = !id || String(id) === String(currentUserId);
-
-  const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
 
   const [profile, setProfile] = useState(null);
@@ -55,11 +53,21 @@ export default function Profile() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const fetchData = async () => {
-  const userId = id || currentUserId;
+  const getStoredUserId = () => {
+  const u = JSON.parse(localStorage.getItem("user") || "{}");
+  return u.id_user || u.id || u.userId || null;
+};
 
-  if (!userId) {
-    console.error("User ID introuvable");
+const fetchData = async () => {
+  const storedId = getStoredUserId();
+  const userId = id || storedId;
+
+  console.log("URL id =", id);
+  console.log("storedId =", storedId);
+  console.log("final userId =", userId);
+  console.log("isMe =", isMe);
+
+  if (!userId && !isMe) {
     setProfile(null);
     setLoading(false);
     return;
@@ -68,27 +76,40 @@ export default function Profile() {
   try {
     setLoading(true);
 
-    // 1) Profile
     let profileRes;
+
+    // إذا user ychouf profil mte3ou
     if (isMe) {
-      profileRes = await api.get("/profile/me");
+      try {
+        profileRes = await api.get("/profile/me");
+      } catch (e) {
+        console.log("GET /profile/me error:", e.response?.status, e.response?.data);
+
+        // fallback: ken /me ما خدمش, جرّب by id
+        if (storedId) {
+          profileRes = await api.get(`/profile/${storedId}`);
+        } else {
+          throw e;
+        }
+      }
     } else {
       profileRes = await api.get(`/profile/${userId}`);
     }
 
-    setProfile(profileRes.data);
-    setForm(profileRes.data);
+    const profileData = profileRes.data;
+    setProfile(profileData);
+    setForm(profileData);
 
-    // 2) Publications
+    // publications ما يطيّحوش profil
     try {
       const pubRes = await api.get(`/profile/${userId}/publications`);
       setPublications(pubRes.data || []);
     } catch (pubErr) {
-      console.error("Erreur publications:", pubErr.response?.data || pubErr.message);
+      console.log("publications error:", pubErr.response?.status, pubErr.response?.data);
       setPublications([]);
     }
   } catch (err) {
-    console.error("Erreur profil:", err.response?.data || err.message);
+    console.log("PROFILE ERROR:", err.response?.status, err.response?.data || err.message);
     setProfile(null);
   } finally {
     setLoading(false);
