@@ -32,6 +32,9 @@ export default function Profile() {
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
   const isMe = !id || parseInt(id) === currentUser.id_user;
 
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+
   const [profile, setProfile] = useState(null);
   const [publications, setPublications] = useState([]);
   const [activeTab, setActiveTab] = useState("publications");
@@ -64,25 +67,54 @@ export default function Profile() {
   };
 
   const handleSave = async () => {
-    try {
-      // إرسال البيانات للـ backend
-      const response = await api.put("/profile/update", form);
-      
-      // تحديث الـ profile من الـ response
-      const updatedProfile = response.data;
-      setProfile(updatedProfile);
-      
-      // تحديث الـ localStorage
-      localStorage.setItem("user", JSON.stringify(updatedProfile));
-      
-      setEditing(false);
-      alert("✅ Profil mis à jour avec succès!");
-    } catch (err) {
-      console.error("Erreur:", err);
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || "Erreur lors de la mise à jour";
-      alert("❌ " + errorMsg);
+  try {
+    const fd = new FormData();
+
+    Object.entries(form).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        fd.append(key, value);
+      }
+    });
+
+    if (avatarFile) {
+      fd.append("avatar", avatarFile);
     }
-  };
+
+    const response = await api.put("/profile/update", fd);
+
+    const updatedProfile = response.data;
+    setProfile(updatedProfile);
+    setForm(updatedProfile);
+    localStorage.setItem("user", JSON.stringify(updatedProfile));
+
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    setEditing(false);
+
+    alert("✅ Profil mis à jour avec succès");
+  } catch (err) {
+    console.error(err);
+    alert(err.response?.data?.message || err.response?.data?.error || "Erreur update");
+  }
+};
+
+const handleDeleteAvatar = async () => {
+  try {
+    await api.delete("/profile/avatar");
+
+    const updated = { ...profile, photo_user: null };
+    setProfile(updated);
+    setForm(updated);
+    localStorage.setItem("user", JSON.stringify(updated));
+
+    setAvatarPreview(null);
+    setAvatarFile(null);
+
+    alert("✅ Photo supprimée");
+  } catch (err) {
+    alert("❌ Erreur suppression photo");
+  }
+};
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -168,16 +200,10 @@ export default function Profile() {
             {/* Avatar */}
             <div style={{position:'relative'}}>
               <img
-                src={getAvatar(profile.photo_user, profile.sexe)}
-                alt="avatar"
-                style={{
-                  width:160, height:160, borderRadius:'50%',
-                  border:'4px solid white',
-                  objectFit:'cover',
-                  boxShadow:'0 4px 12px rgba(0,0,0,0.2)'
-                }}
-                onError={e => e.target.src = "https://randomuser.me/api/portraits/men/44.jpg"}
-              />
+  src={avatarPreview || getAvatar(profile.photo_user, profile.sexe)}
+  alt="avatar"
+  style={{ width: 160, height: 160, borderRadius: "50%" }}
+/>
               {isMe && (
                 <label style={{
                   position:'absolute', bottom:8, right:8,
@@ -188,7 +214,16 @@ export default function Profile() {
                   boxShadow:'0 2px 4px rgba(0,0,0,0.2)'
                 }}>
                   📷
-                  <input type="file" accept="image/*" onChange={handleAvatarUpload} style={{display:'none'}} />
+                  <input
+  type="file"
+  accept="image/*"
+  onChange={(e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+  }}
+/>
                 </label>
               )}
             </div>
@@ -295,7 +330,7 @@ export default function Profile() {
             </button>
           </div>
         )}
-
+        <button onClick={handleDeleteAvatar}>supprimer</button>
         {/* Publications Tab */}
         {activeTab === 'publications' && (
           <div style={{display:'flex', flexDirection:'column', gap:16}}>
