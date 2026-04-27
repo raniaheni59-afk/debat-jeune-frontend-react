@@ -48,11 +48,8 @@ const ProtectedAdminRoute = ({ children }) => {
           <JeuneLayout />
         </ProtectedRoute>
       } />
-      <Route path="/profile" element={
-        <ProtectedRoute>
-          <Profile />
-        </ProtectedRoute>
-      } />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/publier" element={
         <ProtectedRoute>
           <PublierPage />

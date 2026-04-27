@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../services/api";
+import { useNavigate } from "react-router-dom"; 
 import "./PublicationCard.css";
 
 const REACTIONS = [
@@ -564,6 +565,7 @@ function KuiColumn({ publicationId, side, onCountChange }) {
    Main PublicationCard
 ───────────────────────────────────────────── */
 export default function PublicationCard({ publication, onUpdate, defaultShowComments = false }) {
+  const navigate = useNavigate();  
   const [showComments, setShowComments] = useState(defaultShowComments);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -660,9 +662,16 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
           onError={(e) => (e.target.src = "https://via.placeholder.com/46")}
         />
         <div className="pub-user-info">
-          <strong>{[publication.nom_user, publication.prenom_user].filter(Boolean).join(" ") || "Utilisateur"}</strong>
-          <span>{formatDate(publication.date_publication || publication.created_at)}</span>
-        </div>
+  <strong 
+    style={{cursor:'pointer', color: '#1c1e21'}}
+    onClick={() => navigate(`/profile/${publication.user_id}`)}
+    onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+    onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+  >
+    {[publication.nom_user, publication.prenom_user].filter(Boolean).join(" ") || "Utilisateur"}
+  </strong>
+  <span>{formatDate(publication.date_publication || publication.created_at)}</span>
+</div>
 
         {publication.type_publication === "debat" && <span className="pub-badge badge-debat">⚖️ Débat</span>}
         {publication.type_publication === "photo" && <span className="pub-badge badge-photo">📷 Photo</span>}
@@ -683,8 +692,15 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
                   onError={(e) => (e.target.src = "https://via.placeholder.com/36")}
                 />
                 <div className="kui-q-meta">
-                  <strong>{[publication.nom_user, publication.prenom_user].filter(Boolean).join(" ") || "User"}</strong>
-                </div>
+  <strong 
+    style={{cursor:'pointer'}}
+    onClick={() => navigate(`/profile/${publication.user_id}`)}
+    onMouseEnter={(e) => e.target.style.textDecoration = 'underline'}
+    onMouseLeave={(e) => e.target.style.textDecoration = 'none'}
+  >
+    {[publication.nom_user, publication.prenom_user].filter(Boolean).join(" ") || "User"}
+  </strong>
+</div>
               </div>
 
               <div className="kui-q-bluebar" aria-hidden="true">
