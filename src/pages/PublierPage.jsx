@@ -12,7 +12,27 @@ export default function PublierPage() {
   const [success, setSuccess] = useState(false);
 
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+const progressIntervalRef = React.useRef(null);
+
+const startFakeProgress = () => {
+  setUploadProgress(0);
+  progressIntervalRef.current = setInterval(() => {
+    setUploadProgress(prev => {
+      if (prev >= 90) {
+        clearInterval(progressIntervalRef.current);
+        return 90;
+      }
+      return prev + Math.random() * 8;
+    });
+  }, 400);
+};
+
+const finishProgress = () => {
+  clearInterval(progressIntervalRef.current);
+  setUploadProgress(100);
+  setTimeout(() => setUploadProgress(0), 500);
+};
+
  const [formData, setFormData] = useState({
   titre_publication: "",
   contenu: "",
@@ -59,6 +79,7 @@ const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
   setError("");
+  startFakeProgress();
 
   const dataToSend = new FormData();
   dataToSend.append("type_publication", activeType);
@@ -71,7 +92,6 @@ const handleSubmit = async (e) => {
     dataToSend.append("titre_publication", formData.titre_publication || "");
   }
 
-  // ✅ خذ الـ files مباشرة من الـ input
   const fileInput = document.getElementById("fileInput");
   if (fileInput && fileInput.files.length > 0) {
     Array.from(fileInput.files).forEach((file) => {
@@ -80,15 +100,15 @@ const handleSubmit = async (e) => {
   }
 
   try {
-  await api.post("/publications", dataToSend, {
-    onUploadProgress: (progressEvent) => {
-      const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-      setUploadProgress(percent);
-    }
-  });
-  alert("Publication créée avec succès !");
-  navigate("/jeune");
-} catch (err) {
+    await api.post("/publications", dataToSend);
+    finishProgress();
+    setTimeout(() => {
+      alert("Publication créée avec succès !");
+      navigate("/jeune");
+    }, 500);
+  } catch (err) {
+    clearInterval(progressIntervalRef.current);
+    setUploadProgress(0);
     setError(err.response?.data?.message || "Erreur serveur");
   } finally {
     setLoading(false);
@@ -232,19 +252,33 @@ const handleSubmit = async (e) => {
               </p>
             )}
 
-            {loading && uploadProgress > 0 && (
-  <div style={{margin: '10px 0'}}>
-    <div style={{background: '#e0e0e0', borderRadius: '10px', height: '10px'}}>
+            {loading && (
+  <div style={{margin: '15px 0'}}>
+    <div style={{
+      background: '#e8e8f0', 
+      borderRadius: '20px', 
+      height: '8px',
+      overflow: 'hidden'
+    }}>
       <div style={{
-        background: '#667eea', 
+        background: 'linear-gradient(90deg, #667eea, #764ba2)',
         width: `${uploadProgress}%`, 
-        height: '10px', 
-        borderRadius: '10px',
-        transition: 'width 0.3s'
+        height: '8px', 
+        borderRadius: '20px',
+        transition: 'width 0.4s ease',
+        boxShadow: '0 0 10px rgba(102,126,234,0.5)'
       }}/>
     </div>
-    <p style={{textAlign: 'center', marginTop: '5px', color: '#667eea'}}>
-      {uploadProgress < 100 ? `⬆️ Upload: ${uploadProgress}%` : '⏳ Traitement Cloudinary...'}
+    <p style={{
+      textAlign: 'center', 
+      marginTop: '8px', 
+      color: '#667eea',
+      fontSize: '14px',
+      fontWeight: '500'
+    }}>
+      {Math.round(uploadProgress) < 100 
+        ? `Publication en cours... ${Math.round(uploadProgress)}%`
+        : '✅ Presque terminé !'}
     </p>
   </div>
 )}
