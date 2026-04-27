@@ -29,11 +29,18 @@ export default function PublicationDetail() {
   return (
     <div style={{ maxWidth: 700, margin: "40px auto", padding: "0 16px" }}>
       <button 
-        onClick={() => navigate(-1)}
-        style={{ marginBottom: 20, background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#6f5ccf' }}
-      >
-        ← Retour
-      </button>
+  onClick={() => navigate(-1)}
+  style={{ 
+    marginBottom: 20, 
+    background: 'none', 
+    border: 'none', 
+    cursor: 'pointer', 
+    fontSize: 16, 
+    color: '#6f5ccf' 
+  }}
+>
+  ← Retour
+</button>
       <PublicationCard 
         publication={publication} 
         onUpdate={() => {}} 
