@@ -56,31 +56,44 @@ export default function Profile() {
   }, [id]);
 
   const fetchData = async () => {
-    try {
-      setLoading(true);
+  const userId = id || currentUserId;
 
-      const userId = id || currentUserId;
-      if (!userId) {
-        console.error("User ID introuvable");
-        setProfile(null);
-        return;
-      }
+  if (!userId) {
+    console.error("User ID introuvable");
+    setProfile(null);
+    setLoading(false);
+    return;
+  }
 
-      const [profileRes, pubRes] = await Promise.all([
-        isMe ? api.get("/profile/me") : api.get(`/profile/${userId}`),
-        api.get(`/profile/${userId}/publications`),
-      ]);
+  try {
+    setLoading(true);
 
-      setProfile(profileRes.data);
-      setForm(profileRes.data);
-      setPublications(pubRes.data);
-    } catch (err) {
-      console.error("fetchData error:", err.response?.data || err.message);
-      setProfile(null);
-    } finally {
-      setLoading(false);
+    // 1) Profile
+    let profileRes;
+    if (isMe) {
+      profileRes = await api.get("/profile/me");
+    } else {
+      profileRes = await api.get(`/profile/${userId}`);
     }
-  };
+
+    setProfile(profileRes.data);
+    setForm(profileRes.data);
+
+    // 2) Publications
+    try {
+      const pubRes = await api.get(`/profile/${userId}/publications`);
+      setPublications(pubRes.data || []);
+    } catch (pubErr) {
+      console.error("Erreur publications:", pubErr.response?.data || pubErr.message);
+      setPublications([]);
+    }
+  } catch (err) {
+    console.error("Erreur profil:", err.response?.data || err.message);
+    setProfile(null);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSave = async () => {
     try {
