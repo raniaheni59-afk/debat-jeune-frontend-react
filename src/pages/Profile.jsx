@@ -30,10 +30,8 @@ export default function Profile() {
   const navigate = useNavigate();
   const { id } = useParams();
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const isMe = !id || parseInt(id) === currentUser.id_user;
-
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
+  const userId = currentUser.id_user || currentUser.id;
+  const isMe = !id || parseInt(id) === userId;
 
   const [profile, setProfile] = useState(null);
   const [publications, setPublications] = useState([]);
@@ -51,70 +49,33 @@ export default function Profile() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const userId = id || currentUser.id_user;
+      const targetId = id || userId;
       const [profileRes, pubRes] = await Promise.all([
-        isMe ? api.get("/profile/me") : api.get(`/profile/${userId}`),
-        api.get(`/profile/${userId}/publications`)
+        isMe ? api.get("/profile/me") : api.get(`/profile/${targetId}`),
+        api.get(`/profile/${targetId}/publications`)
       ]);
       setProfile(profileRes.data);
       setForm(profileRes.data);
       setPublications(pubRes.data);
     } catch (err) {
-      console.error(err);
+      console.error("Erreur fetch profile:", err);
     } finally {
       setLoading(false);
     }
   };
 
   const handleSave = async () => {
-  try {
-    const fd = new FormData();
-
-    Object.entries(form).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        fd.append(key, value);
-      }
-    });
-
-    if (avatarFile) {
-      fd.append("avatar", avatarFile);
+    try {
+      const res = await api.put("/profile/update", form);
+      setProfile(res.data);
+      localStorage.setItem("user", JSON.stringify({ ...currentUser, ...res.data }));
+      setEditing(false);
+      alert("✅ Profil mis à jour !");
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || "Erreur mise à jour");
     }
-
-    const response = await api.put("/profile/update", fd);
-
-    const updatedProfile = response.data;
-    setProfile(updatedProfile);
-    setForm(updatedProfile);
-    localStorage.setItem("user", JSON.stringify(updatedProfile));
-
-    setAvatarFile(null);
-    setAvatarPreview(null);
-    setEditing(false);
-
-    alert("✅ Profil mis à jour avec succès");
-  } catch (err) {
-    console.error(err);
-    alert(err.response?.data?.message || err.response?.data?.error || "Erreur update");
-  }
-};
-
-const handleDeleteAvatar = async () => {
-  try {
-    await api.delete("/profile/avatar");
-
-    const updated = { ...profile, photo_user: null };
-    setProfile(updated);
-    setForm(updated);
-    localStorage.setItem("user", JSON.stringify(updated));
-
-    setAvatarPreview(null);
-    setAvatarFile(null);
-
-    alert("✅ Photo supprimée");
-  } catch (err) {
-    alert("❌ Erreur suppression photo");
-  }
-};
+  };
 
   const handleAvatarUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -124,9 +85,8 @@ const handleDeleteAvatar = async () => {
     try {
       await api.put("/profile/avatar", fd);
       fetchData();
-      alert("✅ Photo mise à jour!");
     } catch (err) {
-      alert("❌ Erreur upload photo");
+      alert("Erreur upload photo");
     }
   };
 
@@ -137,7 +97,7 @@ const handleDeleteAvatar = async () => {
         type_reaction: type,
       });
       setShowReactions(prev => ({ ...prev, [pubId]: false }));
-      fetchData(); // Refresh publications
+      fetchData();
     } catch (err) {
       console.error(err);
     }
@@ -171,8 +131,6 @@ const handleDeleteAvatar = async () => {
       
       {/* Cover + Avatar */}
       <div style={{background:'white', boxShadow:'0 2px 4px rgba(0,0,0,0.1)', marginBottom:16}}>
-        
-        {/* Cover Photo */}
         <div style={{
           height: 300,
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
@@ -188,22 +146,18 @@ const handleDeleteAvatar = async () => {
               padding:'8px 16px', cursor:'pointer',
               fontWeight:600, fontSize:14
             }}
-          >
-            ← Retour
-          </button>
+          >← Retour</button>
         </div>
 
-        {/* Profile Info */}
         <div style={{maxWidth:1000, margin:'0 auto', padding:'0 16px'}}>
           <div style={{display:'flex', alignItems:'flex-end', gap:16, marginTop:-60, paddingBottom:16, flexWrap:'wrap'}}>
-            
-            {/* Avatar */}
             <div style={{position:'relative'}}>
               <img
-  src={avatarPreview || getAvatar(profile.photo_user, profile.sexe)}
-  alt="avatar"
-  style={{ width: 160, height: 160, borderRadius: "50%" }}
-/>
+                src={getAvatar(profile.photo_user, profile.sexe)}
+                alt="avatar"
+                style={{width:160, height:160, borderRadius:'50%', border:'4px solid white', objectFit:'cover', boxShadow:'0 4px 12px rgba(0,0,0,0.2)'}}
+                onError={e => e.target.src = "https://randomuser.me/api/portraits/men/44.jpg"}
+              />
               {isMe && (
                 <label style={{
                   position:'absolute', bottom:8, right:8,
@@ -214,21 +168,11 @@ const handleDeleteAvatar = async () => {
                   boxShadow:'0 2px 4px rgba(0,0,0,0.2)'
                 }}>
                   📷
-                  <input
-  type="file"
-  accept="image/*"
-  onChange={(e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
-  }}
-/>
+                  <input type="file" accept="image/*" onChange={handleAvatarUpload} style={{display:'none'}} />
                 </label>
               )}
             </div>
 
-            {/* Name + Info */}
             <div style={{flex:1, paddingBottom:8}}>
               <h1 style={{margin:'0 0 4px', fontSize:28, fontWeight:700, color:'#1c1e21'}}>
                 {profile.nom_user} {profile.prenom_user}
@@ -241,7 +185,6 @@ const handleDeleteAvatar = async () => {
               </p>
             </div>
 
-            {/* Buttons */}
             {isMe && (
               <div style={{display:'flex', gap:8, paddingBottom:8}}>
                 <button
@@ -253,15 +196,12 @@ const handleDeleteAvatar = async () => {
                     padding:'8px 16px', cursor:'pointer',
                     fontWeight:600, fontSize:14
                   }}
-                >
-                  {editing ? '✕ Annuler' : '✏️ Modifier le profil'}
-                </button>
+                >{editing ? '✕ Annuler' : '✏️ Modifier le profil'}</button>
               </div>
             )}
           </div>
 
-          {/* Tabs */}
-          <div style={{display:'flex', borderTop:'1px solid #e4e6eb', gap:4}}>
+          <div style={{display:'flex', borderTop:'1px solid #e4e6eb', gap:4, overflowX:'auto'}}>
             {['publications', 'photos', 'videos', 'pdfs', 'infos'].map(tab => (
               <button
                 key={tab}
@@ -272,7 +212,7 @@ const handleDeleteAvatar = async () => {
                   fontWeight: activeTab === tab ? 700 : 500,
                   color: activeTab === tab ? '#1877f2' : '#65676b',
                   borderBottom: activeTab === tab ? '3px solid #1877f2' : '3px solid transparent',
-                  fontSize:15, textTransform:'capitalize'
+                  fontSize:15, textTransform:'capitalize', whiteSpace:'nowrap'
                 }}
               >
                 {tab === 'publications' ? '📝 Publications' :
@@ -286,14 +226,13 @@ const handleDeleteAvatar = async () => {
         </div>
       </div>
 
-      {/* Content */}
       <div style={{maxWidth:1000, margin:'0 auto', padding:'0 16px 40px'}}>
 
         {/* Edit Form */}
         {editing && isMe && (
           <div style={{background:'white', borderRadius:8, padding:24, marginBottom:16, boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}}>
             <h3 style={{marginTop:0, color:'#1c1e21'}}>✏️ Modifier le profil</h3>
-            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:16}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(250px, 1fr))', gap:16}}>
               {[
                 {label:'Nom', key:'nom_user'},
                 {label:'Prénom', key:'prenom_user'},
@@ -325,12 +264,10 @@ const handleDeleteAvatar = async () => {
                 border:'none', borderRadius:6, padding:'10px 24px',
                 cursor:'pointer', fontWeight:600, fontSize:15
               }}
-            >
-              💾 Enregistrer les modifications
-            </button>
+            >💾 Enregistrer les modifications</button>
           </div>
         )}
-        <button onClick={handleDeleteAvatar}>supprimer</button>
+
         {/* Publications Tab */}
         {activeTab === 'publications' && (
           <div style={{display:'flex', flexDirection:'column', gap:16}}>
@@ -340,11 +277,9 @@ const handleDeleteAvatar = async () => {
                 <p>Aucune publication</p>
               </div>
             ) : publications.map(pub => {
-              const totalReactions = (pub.likes || 0) + (pub.loves || 0) + (pub.hahas || 0) + (pub.wows || 0) + (pub.sads || 0) + (pub.angrys || 0);
-              
+              const totalReactions = (pub.likes||0)+(pub.loves||0)+(pub.hahas||0)+(pub.wows||0)+(pub.sads||0)+(pub.angrys||0);
               return (
                 <div key={pub.id_publication} style={{background:'white', borderRadius:8, padding:20, boxShadow:'0 2px 4px rgba(0,0,0,0.05)'}}>
-                  {/* Header */}
                   <div style={{display:'flex', alignItems:'center', gap:12, marginBottom:12}}>
                     <img src={getAvatar(profile.photo_user, profile.sexe)} alt="" style={{width:40,height:40,borderRadius:'50%',objectFit:'cover'}} />
                     <div>
@@ -355,28 +290,19 @@ const handleDeleteAvatar = async () => {
                     </div>
                   </div>
 
-                  {/* Content */}
                   {pub.titre_publication && <h4 style={{margin:'0 0 8px', color:'#1c1e21'}}>{pub.titre_publication}</h4>}
                   {pub.contenu && <p style={{margin:'0 0 12px', color:'#1c1e21', lineHeight:1.5}}>{pub.contenu}</p>}
                   
-                  {/* Medias */}
                   {pub.medias?.map(media => (
                     <div key={media.id_media} style={{marginTop:8}}>
                       {media.type_media === 'photo' && (
-                        <img 
-                          src={getMediaUrl(media.url_media)} alt="" 
-                          style={{width:'100%', maxHeight:400, objectFit:'cover', borderRadius:8, cursor:'pointer'}}
-                          onClick={() => setImageModal(getMediaUrl(media.url_media))}
-                        />
+                        <img src={getMediaUrl(media.url_media)} alt="" style={{width:'100%', maxHeight:400, objectFit:'cover', borderRadius:8, cursor:'pointer'}} onClick={() => setImageModal(getMediaUrl(media.url_media))} />
                       )}
                       {media.type_media === 'video' && (
-                        <video controls style={{width:'100%', maxHeight:400, borderRadius:8}}>
-                          <source src={getMediaUrl(media.url_media)} />
-                        </video>
+                        <video controls style={{width:'100%', maxHeight:400, borderRadius:8}}><source src={getMediaUrl(media.url_media)} /></video>
                       )}
                       {media.type_media === 'pdf' && (
-                        <a href={`https://docs.google.com/viewer?url=${encodeURIComponent(getMediaUrl(media.url_media))}&embedded=true`} target="_blank" rel="noopener noreferrer"
-                          style={{display:'flex', alignItems:'center', gap:8, background:'#f0f2f5', padding:'12px 16px', borderRadius:8, textDecoration:'none', color:'#1c1e21'}}>
+                        <a href={`https://docs.google.com/viewer?url=${encodeURIComponent(getMediaUrl(media.url_media))}&embedded=true`} target="_blank" rel="noopener noreferrer" style={{display:'flex', alignItems:'center', gap:8, background:'#f0f2f5', padding:'12px 16px', borderRadius:8, textDecoration:'none', color:'#1c1e21'}}>
                           <span style={{fontSize:24}}>📄</span>
                           <span>{media.nom_original || 'Document PDF'}</span>
                         </a>
@@ -391,46 +317,22 @@ const handleDeleteAvatar = async () => {
                         {['like','love','haha','wow','sad','angry'].filter(t => pub[`${t}s`] > 0).slice(0,3).map(t => REACTIONS.find(r => r.type === t)?.emoji).join('')} {totalReactions}
                       </span>
                     )}
-                    {pub.nb_commentaires > 0 && (
-                      <span style={{fontSize:14, color:'#65676b'}}>💬 {pub.nb_commentaires}</span>
-                    )}
+                    {pub.nb_commentaires > 0 && <span style={{fontSize:14, color:'#65676b'}}>💬 {pub.nb_commentaires}</span>}
                   </div>
 
                   {/* React Button */}
                   <div style={{marginTop:8, paddingTop:8, borderTop:'1px solid #e4e6eb'}}>
-                    <div 
-                      style={{position:'relative', display:'inline-block'}}
+                    <div style={{position:'relative', display:'inline-block'}}
                       onMouseEnter={() => setShowReactions(prev => ({...prev, [pub.id_publication]: true}))}
                       onMouseLeave={() => setShowReactions(prev => ({...prev, [pub.id_publication]: false}))}
                     >
                       <button style={{background:'none', border:'none', cursor:'pointer', fontSize:14, color: pub.userReaction ? '#1877f2' : '#65676b', fontWeight:600}}>
                         {pub.userReaction ? `${REACTIONS.find(r => r.type === pub.userReaction)?.emoji} ${REACTIONS.find(r => r.type === pub.userReaction)?.label}` : '👍 Réagir'}
                       </button>
-
                       {showReactions[pub.id_publication] && (
-                        <div style={{
-                          position:'absolute', bottom:'100%', left:0,
-                          background:'white', borderRadius:25,
-                          padding:'4px 8px', marginBottom:8,
-                          boxShadow:'0 2px 12px rgba(0,0,0,0.15)',
-                          display:'flex', gap:4, zIndex:10
-                        }}>
+                        <div style={{position:'absolute', bottom:'100%', left:0, background:'white', borderRadius:25, padding:'4px 8px', marginBottom:8, boxShadow:'0 2px 12px rgba(0,0,0,0.15)', display:'flex', gap:4, zIndex:10}}>
                           {REACTIONS.map(r => (
-                            <button
-                              key={r.type}
-                              onClick={() => handleReact(pub.id_publication, r.type)}
-                              title={r.label}
-                              style={{
-                                background:'none', border:'none',
-                                fontSize:20, cursor:'pointer',
-                                padding:'4px 8px', borderRadius:'50%',
-                                transition:'transform 0.2s'
-                              }}
-                              onMouseEnter={e => e.target.style.transform = 'scale(1.3)'}
-                              onMouseLeave={e => e.target.style.transform = 'scale(1)'}
-                            >
-                              {r.emoji}
-                            </button>
+                            <button key={r.type} onClick={() => handleReact(pub.id_publication, r.type)} title={r.label} style={{background:'none', border:'none', fontSize:20, cursor:'pointer', padding:'4px 8px', borderRadius:'50%', transition:'transform 0.2s'}} onMouseEnter={e => e.target.style.transform='scale(1.3)'} onMouseLeave={e => e.target.style.transform='scale(1)'}>{r.emoji}</button>
                           ))}
                         </div>
                       )}
@@ -446,20 +348,11 @@ const handleDeleteAvatar = async () => {
         {activeTab === 'photos' && (
           <div style={{background:'white', borderRadius:8, padding:20, boxShadow:'0 2px 4px rgba(0,0,0,0.05)'}}>
             {photos.length === 0 ? (
-              <div style={{textAlign:'center', padding:40, color:'#65676b'}}>
-                <div style={{fontSize:40}}>📷</div>
-                <p>Aucune photo</p>
-              </div>
+              <div style={{textAlign:'center', padding:40, color:'#65676b'}}><div style={{fontSize:40}}>📷</div><p>Aucune photo</p></div>
             ) : (
               <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4}}>
                 {photos.map(photo => (
-                  <img
-                    key={photo.id_media}
-                    src={getMediaUrl(photo.url_media)}
-                    alt=""
-                    style={{width:'100%', aspectRatio:'1', objectFit:'cover', borderRadius:4, cursor:'pointer'}}
-                    onClick={() => setImageModal(getMediaUrl(photo.url_media))}
-                  />
+                  <img key={photo.id_media} src={getMediaUrl(photo.url_media)} alt="" style={{width:'100%', aspectRatio:'1', objectFit:'cover', borderRadius:4, cursor:'pointer'}} onClick={() => setImageModal(getMediaUrl(photo.url_media))} />
                 ))}
               </div>
             )}
@@ -470,16 +363,11 @@ const handleDeleteAvatar = async () => {
         {activeTab === 'videos' && (
           <div style={{background:'white', borderRadius:8, padding:20, boxShadow:'0 2px 4px rgba(0,0,0,0.05)'}}>
             {videos.length === 0 ? (
-              <div style={{textAlign:'center', padding:40, color:'#65676b'}}>
-                <div style={{fontSize:40}}>🎥</div>
-                <p>Aucune vidéo</p>
-              </div>
+              <div style={{textAlign:'center', padding:40, color:'#65676b'}}><div style={{fontSize:40}}>🎥</div><p>Aucune vidéo</p></div>
             ) : (
               <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:12}}>
                 {videos.map(video => (
-                  <video key={video.id_media} controls style={{width:'100%', borderRadius:8}}>
-                    <source src={getMediaUrl(video.url_media)} />
-                  </video>
+                  <video key={video.id_media} controls style={{width:'100%', borderRadius:8}}><source src={getMediaUrl(video.url_media)} /></video>
                 ))}
               </div>
             )}
@@ -490,25 +378,11 @@ const handleDeleteAvatar = async () => {
         {activeTab === 'pdfs' && (
           <div style={{background:'white', borderRadius:8, padding:20, boxShadow:'0 2px 4px rgba(0,0,0,0.05)'}}>
             {pdfs.length === 0 ? (
-              <div style={{textAlign:'center', padding:40, color:'#65676b'}}>
-                <div style={{fontSize:40}}>📄</div>
-                <p>Aucun PDF</p>
-              </div>
+              <div style={{textAlign:'center', padding:40, color:'#65676b'}}><div style={{fontSize:40}}>📄</div><p>Aucun PDF</p></div>
             ) : (
               <div style={{display:'flex', flexDirection:'column', gap:12}}>
                 {pdfs.map(pdf => (
-                  <a
-                    key={pdf.id_media}
-                    href={`https://docs.google.com/viewer?url=${encodeURIComponent(getMediaUrl(pdf.url_media))}&embedded=true`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display:'flex', alignItems:'center', gap:12,
-                      background:'#f0f2f5', padding:'16px', borderRadius:8,
-                      textDecoration:'none', color:'#1c1e21',
-                      boxShadow:'0 1px 2px rgba(0,0,0,0.1)'
-                    }}
-                  >
+                  <a key={pdf.id_media} href={`https://docs.google.com/viewer?url=${encodeURIComponent(getMediaUrl(pdf.url_media))}&embedded=true`} target="_blank" rel="noopener noreferrer" style={{display:'flex', alignItems:'center', gap:12, background:'#f0f2f5', padding:'16px', borderRadius:8, textDecoration:'none', color:'#1c1e21', boxShadow:'0 1px 2px rgba(0,0,0,0.1)'}}>
                     <span style={{fontSize:32}}>📄</span>
                     <span style={{fontWeight:500}}>{pdf.nom_original || 'Document PDF'}</span>
                   </a>
@@ -523,7 +397,7 @@ const handleDeleteAvatar = async () => {
           <div style={{background:'white', borderRadius:8, padding:24, boxShadow:'0 2px 4px rgba(0,0,0,0.05)'}}>
             <h3 style={{marginTop:0, color:'#1c1e21'}}>ℹ️ Informations</h3>
             {[
-              {icon:'👤', label:'Nom complet', value:`${profile.nom_user} ${profile.prenom_user || ''}`},
+              {icon:'👤', label:'Nom complet', value:`${profile.nom_user || ''} ${profile.prenom_user || ''}`},
               {icon:'📧', label:'Email', value:profile.email_user},
               {icon:'📱', label:'Téléphone', value:profile.telephone_user},
               {icon:'🎂', label:'Âge', value:profile.age},
@@ -548,10 +422,7 @@ const handleDeleteAvatar = async () => {
 
       {/* Image Modal */}
       {imageModal && (
-        <div 
-          onClick={() => setImageModal(null)}
-          style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.9)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'}}
-        >
+        <div onClick={() => setImageModal(null)} style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.9)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'}}>
           <button onClick={() => setImageModal(null)} style={{position:'absolute', top:16, right:16, background:'none', border:'none', color:'white', fontSize:30, cursor:'pointer'}}>✕</button>
           <img src={imageModal} alt="" style={{maxWidth:'90vw', maxHeight:'90vh', objectFit:'contain'}} />
         </div>
