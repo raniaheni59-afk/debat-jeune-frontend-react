@@ -267,91 +267,124 @@ export default function Profile() {
           </div>
         )}
 
-        {/* ── PUBLICATIONS TAB ── */}
         {activeTab === "publications" && (
-          <div style={{ animation: "fadeIn 0.35s ease" }}>
-            {publications.length === 0 ? (
-              <EmptyState icon="✦" text="Aucune publication pour le moment" />
-            ) : publications.map(pub => (
-              <div key={pub.id_publication} className="pub-card" style={{ ...styles.card, transition: "all 0.2s", marginBottom: 16 }}>
-                {/* Pub header */}
-                <div style={styles.pubHeader}>
-                  <img src={getAvatar(profile.photo_user, profile.sexe)} alt="" style={styles.pubAvatar} />
-                  <div>
-                    <p style={styles.pubAuthor}>{profile.prenom_user} {profile.nom_user}</p>
-                    <p style={styles.pubDate}>
-                      {new Date(pub.date_publication).toLocaleDateString("fr-FR", {
-                        day: "2-digit", month: "long", year: "numeric"
-                      })}
-                      {" · "}
-                      {new Date(pub.date_publication).toLocaleTimeString("fr-FR", {
-                        hour: "2-digit", minute: "2-digit"
-                      })}
-                    </p>
-                  </div>
-                </div>
-
-                {pub.titre_publication && (
-                  <h4 style={styles.pubTitle}>{pub.titre_publication}</h4>
-                )}
-                {pub.contenu && (
-                  <p style={styles.pubContent}>{pub.contenu}</p>
-                )}
-
-                {/* Media grid */}
-                {pub.medias?.length > 0 && (
-                  <div style={{
-                    ...styles.mediaGrid,
-                    gridTemplateColumns: pub.medias.length === 1 ? "1fr" : pub.medias.length === 2 ? "1fr 1fr" : "1fr 1fr 1fr"
-                  }}>
-                    {pub.medias.map(media => (
-                      <div key={media.id_media}>
-                        {media.type_media === "photo" && (
-                          <img
-                            src={media.url_media}
-                            alt=""
-                            className="media-thumb"
-                            style={styles.mediaPhoto}
-                            onClick={() => setImageModal(media.url_media)}
-                          />
-                        )}
-                        {media.type_media === "video" && (
-                          <video controls style={styles.mediaVideo}>
-                            <source src={media.url_media} />
-                          </video>
-                        )}
-                        {media.type_media === "pdf" && (
-                          <a
-                            href={`https://docs.google.com/viewer?url=${encodeURIComponent(media.url_media)}&embedded=true`}
-                            target="_blank" rel="noopener noreferrer"
-                            style={styles.pdfLink}
-                          >
-                            <span style={{ fontSize: 28 }}>📄</span>
-                            <span style={{ fontWeight: 500, fontSize: 14 }}>{media.nom_original || "Document PDF"}</span>
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Reactions */}
-                {totalReactions(pub) > 0 && (
-                  <div style={styles.reactionsBar}>
-                    {["like","love","haha","wow","sad","angry"].map(r => pub[r + "s"] > 0 && (
-                      <span key={r} style={styles.reactionChip}>
-                        {REACTION_EMOJI[r]} <span style={{ fontWeight: 600 }}>{pub[r + "s"]}</span>
-                      </span>
-                    ))}
-                    <span style={styles.commentCount}>
-                      💬 {pub.nb_commentaires || 0} commentaire{pub.nb_commentaires !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
+  <div style={{ animation: "fadeIn 0.35s ease", display: "flex", flexDirection: "column", gap: "20px" }}>
+    {publications.length === 0 ? (
+      <EmptyState icon="✦" text="Aucune publication pour le moment" />
+    ) : (
+      publications.map((pub) => (
+        <div key={pub.id_publication} className="pub-card" style={styles.pubCard}>
+          
+          {/* 1. Header */}
+          <div style={styles.pubHeader}>
+            <img 
+              src={getAvatar(profile.photo_user, profile.sexe)} 
+              alt="" 
+              style={styles.pubAvatar} 
+            />
+            <div>
+              <p style={styles.pubAuthor}>{profile.prenom_user} {profile.nom_user}</p>
+              <p style={styles.pubDate}>
+                {new Date(pub.date_publication).toLocaleDateString("fr-FR", {
+                  day: "2-digit", month: "long", year: "numeric"
+                })}
+                {" · "}
+                {new Date(pub.date_publication).toLocaleTimeString("fr-FR", {
+                  hour: "2-digit", minute: "2-digit"
+                })}
+              </p>
+            </div>
           </div>
-        )}
+
+          {/* 2. Titre & Contenu */}
+          {pub.titre_publication && (
+            <h4 style={styles.pubTitle}>{pub.titre_publication}</h4>
+          )}
+          <div style={styles.pubContent}>
+            <p style={{ fontSize: "1.05rem", lineHeight: "1.5", color: "#333", margin: "10px 0" }}>
+              {pub.contenu}
+            </p>
+          </div>
+
+          {/* 3. Media Grid (Photos/Vidéos/PDF) */}
+          {pub.medias?.length > 0 && (
+            <div style={{
+              ...styles.mediaGrid,
+              display: "grid",
+              gap: "8px",
+              gridTemplateColumns: pub.medias.length === 1 ? "1fr" : pub.medias.length === 2 ? "1fr 1fr" : "1fr 1fr 1fr"
+            }}>
+              {pub.medias.map(media => (
+                <div key={media.id_media}>
+                  {media.type_media === "photo" && (
+                    <img
+                      src={media.url_media}
+                      alt=""
+                      style={{ ...styles.mediaPhoto, width: "100%", borderRadius: "8px", cursor: "pointer" }}
+                      onClick={() => setImageModal(media.url_media)}
+                    />
+                  )}
+                  {media.type_media === "video" && (
+                    <video controls style={{ width: "100%", borderRadius: "8px" }}>
+                      <source src={media.url_media} />
+                    </video>
+                  )}
+                  {media.type_media === "pdf" && (
+                    <a
+                      href={`https://docs.google.com/viewer?url=${encodeURIComponent(media.url_media)}&embedded=true`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={styles.pdfLink}
+                    >
+                      <span>📄</span>
+                      <span style={{ fontSize: 12 }}>{media.nom_original || "PDF"}</span>
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 4. Stats & Reactions */}
+          <div style={styles.pubStats}>
+            <div style={{ display: "flex", gap: "8px" }}>
+              {/* Thabet esm el column mel backend: likes wela nb_likes */}
+              { (pub.likes > 0 || pub.nb_likes > 0) && <span>👍 {pub.likes || pub.nb_likes}</span> }
+              { (pub.loves > 0 || pub.nb_loves > 0) && <span>❤️ {pub.loves || pub.nb_loves}</span> }
+              { (pub.wows > 0 || pub.nb_wows > 0) && <span>😮 {pub.wows || pub.nb_wows}</span> }
+            </div>
+            <div style={{ color: "#666", fontSize: "0.85rem" }}>
+              {pub.nb_commentaires || pub.nb_comments || 0} commentaires
+            </div>
+          </div>
+
+          <hr style={{ border: "0.5px solid #eee", margin: "12px 0" }} />
+
+          {/* 5. Action Buttons */}
+          <div style={styles.pubActionButtons}>
+            <button style={styles.actionBtn}>👍 Like</button>
+            <button style={styles.actionBtn}>💬 Commenter</button>
+            <button style={styles.actionBtn}>🔗 Partager</button>
+          </div>
+
+          {/* 6. Comment Input */}
+          <div style={styles.commentSection}>
+            <img 
+              src={getAvatar(profile.photo_user, profile.sexe)} 
+              alt="" 
+              style={styles.smallAvatar} 
+            />
+            <input 
+              type="text" 
+              placeholder="Écrire un commentaire..." 
+              style={styles.commentInput}
+            />
+          </div>
+
+        </div>
+      ))
+    )}
+  </div>
+)}
 
         {/* ── PHOTOS TAB ── */}
         {activeTab === "photos" && (
