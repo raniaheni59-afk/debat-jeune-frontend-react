@@ -604,41 +604,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   margin-bottom: 14px;
 }
 
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden; /* يمنع السكرول البراني جملة */
-}
-.jl-root {
-  display: flex;
-  height: 100vh;
-  width: 100vw;
-  overflow: hidden; /* تأكيد إضافي */
-  background: var(--bg);
-}
-.jl-sidebar, .jl-right {
-  height: 100vh;
-  overflow-y: auto; /* يسكرولي داخل المنيو برك إذا كبر */
-  flex-shrink: 0;   /* باش الـ Sidebar ما يتجبدش ولا يصغار */
-}
-.jl-main {
-  flex: 1;          /* ياخذ المساحة اللي بقات الكل في الوسط */
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* يمنع الـ Main بيدو، السكرول باش يكون في الـ scroll-area */
-}
 
-.jl-scroll {
-  flex: 1;
-  overflow-y: auto; /* هنا السحر! هذا هو اللي باش يتحرك */
-  height: 100%;
-  padding: 28px 24px 48px;
-  /* تنجم تزيد هذي باش الـ scroll يجي خفيف */
-  scrollbar-gutter: stable; 
-}
 
 /* ─── ANIMATIONS ─────────────────────────────────── */
 @keyframes fadeUp {
@@ -674,4 +640,40 @@ html, body {
 @media (max-width: 480px) {
   .jl-stats { grid-template-columns: 1fr 1fr; }
   .jl-welcome-h1 { font-size: 22px; }
+}
+html, body {
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important; /* يقتل السكرول البراني بالسيف */
+}
+.jl-root {
+  display: flex !important;
+  height: 100vh !important;
+  width: 100vw !important;
+  overflow: hidden !important;
+  position: relative;
+}
+
+.jl-sidebar, .jl-right {
+  height: 100vh !important;
+  position: relative !important; /* تأكد إنها مش fixed */
+  top: 0 !important;
+  flex-shrink: 0 !important;
+  overflow-y: auto !important; /* يسكرولي داخلهم هوما برك */
+}
+.jl-main {
+  flex: 1 !important;
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important; /* يمنع الـ main من السكرول */
+  min-width: 0;
+}
+
+.jl-scroll {
+  flex: 1 !important;
+  overflow-y: scroll !important; /* يفرض وجود الـ scroll لهنا */
+  height: 100% !important;
+  padding: 28px 24px 48px;
 }
