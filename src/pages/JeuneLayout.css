@@ -27,33 +27,41 @@
 
 .jl-container {
   display: flex;
-  height: 100vh;      /* Yched el toul mte3 el ecran lkol */
-  overflow: hidden;   /* Yamna3 el scroll l-barra */
+  height: 100vh;        /* Toul el écran lkol */
+  overflow: hidden;     /* Yamna3 el scroll el kbir mte3 el page lkol */
   background: var(--bg);
+  position: fixed;      /* Zid hedhi bech l-page ma t-boujich mel blassa */
+  top: 0;
+  left: 0;
+  width: 100%;
 }
 
 .jl-sidebar, .jl-right {
   height: 100vh;
-  overflow-y: auto;  /* Ken el menu twil y-scrolli wa7dou dakhliyan */
-  flex-shrink: 0;    /* Maykhallich el sidebars yet-fas-khou */
+  overflow-y: auto;     /* Ken el menu twil y-scrolli wa7dou dakhliyan */
+  flex-shrink: 0;       /* Maykhallich el sidebars yessgharu */
 }
 .jl-main {
-  flex: 1;
+  flex: 1;              /* Yfaker el fadhwa elli fil west lkol */
   height: 100vh;
-  overflow-y: auto;  /* Houni el scroll el wa7id elli n-7ebbouchi */
+  overflow-y: scroll;   /* Nforcew el scroll ykoun ken houni */
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  -webkit-overflow-scrolling: touch; /* Bechn ykoun fluide fil telifoun */
 }
-
 
 .jl-scroll {
+  /* Na7i ay height: 100% mel blassa hedhi kenek 7atha */
+  min-height: 101%;     /* Bechn dima el scroll ykoun disponible */
   padding: 40px 30px;
-  max-width: 900px;
-  margin: 0 auto;
-  width: 100%;
 }
-* {
-  box-sizing: border-box;
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden !important; /* Na7i el scroll el labrany jemla */
 }
 
 
