@@ -3,45 +3,62 @@ import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import PublicationCard from "../components/PublicationCard";
 import Chatbot from "../components/Chatbot";
-import DebateBlock from "../components/DebateBlock";
 import "./JeuneLayout.css";
 
+const BACKEND = "https://debat-jeune-production.up.railway.app";
+
+const getAvatar = (photo, sexe) => {
+  if (photo) return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;
+  return sexe === "femme"
+    ? "https://randomuser.me/api/portraits/women/44.jpg"
+    : "https://randomuser.me/api/portraits/men/44.jpg";
+};
+
+const NAV_ITEMS = [
+  { icon: "⌂", label: "Accueil", path: "/jeune", active: true },
+  { icon: "✉", label: "Messages", badge: "2" },
+  { icon: "+", label: "Publier", path: "/publier" },
+  { icon: "📅", label: "Calendrier" },
+  { icon: "◉", label: "Live & Archive", badge: "2", badgeGreen: true },
+  { icon: "🔔", label: "Notifications", path: "/notifications" },
+  { icon: "⚙", label: "Paramètres", path: "/settings" },
+];
+
 const JeuneLayout = () => {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
   const navigate = useNavigate();
 
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [highlightedPub, setHighlightedPub] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeNav, setActiveNav] = useState(0);
 
-  // ✅ Charger publications au démarrage
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pubId = params.get("publication");
+    if (pubId) {
+      setHighlightedPub(parseInt(pubId));
+      setTimeout(() => {
+        const el = document.getElementById(`pub-${pubId}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 1000);
+    }
+  }, []);
+
+  useEffect(() => { fetchPublications(); }, []);
+
   const fetchPublications = async () => {
     try {
       setLoading(true);
       const res = await API.get("/publications");
       setPublications(res.data);
-    } catch (error) {
-      console.error("Erreur chargement publications:", error);
+    } catch (err) {
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const pubId = params.get("publication");
-  if (pubId) {
-    setHighlightedPub(parseInt(pubId));
-    // scroll للـ publication بعد ما تتحمّل
-    setTimeout(() => {
-      const el = document.getElementById(`pub-${pubId}`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 1000);
-  }
-}, []);
-
-  useEffect(() => {
-    fetchPublications();
-  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -49,197 +66,219 @@ useEffect(() => {
     window.location.href = "/login";
   };
 
-  return (
-    <div className="jeune-page">
+  const handleNav = (item, idx) => {
+    setActiveNav(idx);
+    if (item.path) navigate(item.path);
+    setSidebarOpen(false);
+  };
 
-      {/* ===== SIDEBAR ===== */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <span className="sidebar-menu-icon">☰</span>
-          <span className="sidebar-menu-text">Menu</span>
+  return (
+    <div className="jl-root">
+      {/* Animated background orbs */}
+      <div className="jl-orb jl-orb1" />
+      <div className="jl-orb jl-orb2" />
+      <div className="jl-orb jl-orb3" />
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="jl-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      {/* ── SIDEBAR ── */}
+      <aside className={`jl-sidebar ${sidebarOpen ? "open" : ""}`}>
+        <div className="jl-sidebar-logo">
+          <div className="jl-logo-icon">S</div>
+          <span className="jl-logo-text">Swafy</span>
         </div>
 
-        <nav className="sidebar-nav">
-          <div className="nav-item active" onClick={() => navigate("/jeune")}>
-            <span className="nav-icon">⌂</span>
-            <span>Accueil</span>
-          </div>
-
-          <div className="nav-item">
-            <span className="nav-icon">✉</span>
-            <span>Messages</span>
-            <span className="nav-badge">2</span>
-          </div>
-
-          {/* ✅ BOUTON PUBLIER */}
-          <div className="nav-item" onClick={() => navigate("/publier")}>
-            <span className="nav-icon">＋</span>
-            <span>Publier</span>
-          </div>
-
-          <div className="nav-item">
-            <span className="nav-icon">📅</span>
-            <span>Calendrier</span>
-          </div>
-
-          <div className="nav-item">
-            <span className="nav-icon live-icon">LIVE</span>
-            <span>Live & Archive</span>
-            <span className="nav-badge green">2</span>
-          </div>
-
-          <div className="nav-item" onClick={() => navigate("/notifications")}>
-            <span className="nav-icon">🔔</span>
-            <span>Notification</span>
-          </div>
-
-          <div className="nav-item" onClick={() => navigate("/settings")}>
-            <span className="nav-icon">⚙</span>
-            <span>Parametre</span>
-          </div>
+        <nav className="jl-nav">
+          {NAV_ITEMS.map((item, idx) => (
+            <button
+              key={idx}
+              className={`jl-nav-item ${activeNav === idx ? "active" : ""}`}
+              onClick={() => handleNav(item, idx)}
+            >
+              <span className="jl-nav-icon">{item.icon}</span>
+              <span className="jl-nav-label">{item.label}</span>
+              {item.badge && (
+                <span className={`jl-badge ${item.badgeGreen ? "green" : ""}`}>
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          ))}
         </nav>
 
-        <div className="sidebar-exit" onClick={handleLogout}>
-          <span>⍈</span>
-          <span>Exit</span>
-        </div>
+        <button className="jl-logout" onClick={handleLogout}>
+          <span>↩</span>
+          <span>Déconnexion</span>
+        </button>
       </aside>
 
-      {/* ===== MAIN CONTENT ===== */}
-      <main className="main-content">
+      {/* ── MAIN ── */}
+      <main className="jl-main">
 
-        {/* Welcome Banner */}
-        <section className="welcome-banner">
-          <h1>Bienvenue 👋</h1>
-          <p>Votre inscription est validée et vous êtes connecté à votre espace jeune.</p>
-        </section>
-
-        {/* Cards Row */}
-        <div className="cards-row">
-          <div className="info-card-box" onClick={() => navigate("/profile")}>
-            <h3>Profil</h3>
-            <p>Compte actif</p>
-          </div>
-          <div className="info-card-box" onClick={() => navigate("/publier")}>
-            <h3>Publications</h3>
-            <p>Créer une publication</p>
-          </div>
-          <div className="info-card-box">
-            <h3>Live</h3>
-            <p>Suivez les débats en direct</p>
-          </div>
-          <div className="info-card-box">
-            <h3>Messages</h3>
-            <p>Consultez vos échanges</p>
+        {/* Top bar (mobile) */}
+        <div className="jl-topbar">
+          <button className="jl-burger" onClick={() => setSidebarOpen(!sidebarOpen)}>
+            ☰
+          </button>
+          <span className="jl-topbar-title">Swafy</span>
+          <div
+            className="jl-topbar-avatar"
+            onClick={() => navigate("/profile")}
+          >
+            <img
+              src={getAvatar(user?.photo_user, user?.sexe)}
+              alt="avatar"
+              onError={e => e.target.src = "https://randomuser.me/api/portraits/men/44.jpg"}
+            />
           </div>
         </div>
 
-        {/* Action Banners */}
-        <div className="action-banners">
-          <div className="action-banner live-banner">
-            <div className="banner-text">
-              <span className="banner-tag">EN DIRECT</span>
-              <h2>Join Us in Online<br />Live Sessions</h2>
-              <button className="banner-btn">Join Now</button>
-            </div>
-            <div className="banner-image">
-              <img
-                src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400"
-                alt="live"
-              />
-            </div>
-          </div>
+        <div className="jl-scroll">
 
-          <div className="action-banner enquete-banner">
-            <div className="banner-text">
-              <span className="banner-tag">NOUVEAU</span>
-              <h2>Participez à<br />nos Enquêtes</h2>
-              <button className="banner-btn">Participer</button>
+          {/* Welcome */}
+          <section className="jl-welcome">
+            <div className="jl-welcome-text">
+              <p className="jl-welcome-tag">Tableau de bord</p>
+              <h1 className="jl-welcome-h1">
+                Bonjour, <span>{user?.prenom_user || "Jeune"}</span> 👋
+              </h1>
+              <p className="jl-welcome-sub">
+                Bienvenue dans votre espace — explorez, publiez, débattez.
+              </p>
             </div>
-            <div className="banner-image">
-              <img
-                src="https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=400"
-                alt="enquete"
-              />
+            <div className="jl-welcome-art">
+              <div className="jl-welcome-ring r1" />
+              <div className="jl-welcome-ring r2" />
+              <div className="jl-welcome-ring r3" />
             </div>
-          </div>
-        </div>
+          </section>
 
-        {/* ✅ FEED PUBLICATIONS */}
-        <section className="publications-feed">
-          <h2 style={{ marginBottom: '20px', color: '#333' }}>
-            📰 Fil d'actualité
-          </h2>
-
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px' }}>
-              <div className="spinner"></div>
-              <p>Chargement des publications...</p>
-            </div>
-          ) : publications.length === 0 ? (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '60px 20px',
-              background: 'white',
-              borderRadius: '12px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-            }}>
-              <h3 style={{ color: '#888', marginBottom: '15px' }}>
-                Aucune publication pour le moment
-              </h3>
-              <button 
-                onClick={() => navigate("/publier")}
-                style={{
-                  background: '#6f5ccf',
-                  color: 'white',
-                  border: 'none',
-                  padding: '12px 30px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px'
-                }}
+          {/* Stat cards */}
+          <div className="jl-stats">
+            {[
+              { label: "Profil", sub: "Compte actif", icon: "👤", color: "#a78bfa", path: "/profile" },
+              { label: "Publications", sub: `${publications.length} posts`, icon: "✦", color: "#60a5fa", path: "/publier" },
+              { label: "Live", sub: "Débats en direct", icon: "◉", color: "#f472b6" },
+              { label: "Messages", sub: "2 non lus", icon: "✉", color: "#34d399" },
+            ].map((card, i) => (
+              <div
+                key={i}
+                className="jl-stat-card"
+                onClick={() => card.path && navigate(card.path)}
+                style={{ "--accent": card.color, animationDelay: `${i * 0.08}s` }}
               >
-                Créer la première publication
+                <div className="jl-stat-icon">{card.icon}</div>
+                <div>
+                  <p className="jl-stat-label">{card.label}</p>
+                  <p className="jl-stat-sub">{card.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Action banners */}
+          <div className="jl-banners">
+            <div className="jl-banner jl-banner-live">
+              <div className="jl-banner-body">
+                <span className="jl-banner-tag">EN DIRECT</span>
+                <h2>Sessions Live<br />Interactives</h2>
+                <button className="jl-banner-btn">Rejoindre →</button>
+              </div>
+              <img
+                src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300&q=80"
+                alt="live"
+                className="jl-banner-img"
+              />
+            </div>
+            <div className="jl-banner jl-banner-enquete">
+              <div className="jl-banner-body">
+                <span className="jl-banner-tag">NOUVEAU</span>
+                <h2>Participez aux<br />Enquêtes</h2>
+                <button className="jl-banner-btn">Participer →</button>
+              </div>
+              <img
+                src="https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=300&q=80"
+                alt="enquete"
+                className="jl-banner-img"
+              />
+            </div>
+          </div>
+
+          {/* Feed */}
+          <section className="jl-feed">
+            <div className="jl-feed-header">
+              <h2 className="jl-feed-title">Fil d'actualité</h2>
+              <button
+                className="jl-publish-btn"
+                onClick={() => navigate("/publier")}
+              >
+                + Publier
               </button>
             </div>
-          ) : (
-            publications.map(pub => (
-              <PublicationCard 
-                key={pub.id_publication} 
-                publication={pub} 
-                onUpdate={fetchPublications}
-              />
-            ))
-          )}
-        </section>
 
+            {loading ? (
+              <div className="jl-loading">
+                <div className="jl-spinner" />
+                <p>Chargement…</p>
+              </div>
+            ) : publications.length === 0 ? (
+              <div className="jl-empty">
+                <span style={{ fontSize: 40 }}>✦</span>
+                <p>Aucune publication pour le moment</p>
+                <button onClick={() => navigate("/publier")} className="jl-empty-btn">
+                  Créer la première publication
+                </button>
+              </div>
+            ) : (
+              publications.map(pub => (
+                <div
+                  key={pub.id_publication}
+                  id={`pub-${pub.id_publication}`}
+                  className={highlightedPub === pub.id_publication ? "jl-highlighted" : ""}
+                >
+                  <PublicationCard
+                    publication={pub}
+                    onUpdate={fetchPublications}
+                  />
+                </div>
+              ))
+            )}
+          </section>
+        </div>
       </main>
 
-      {/* ===== RIGHT SIDEBAR ===== */}
-      <aside className="right-sidebar">
+      {/* ── RIGHT SIDEBAR ── */}
+      <aside className="jl-right">
+
+        {/* Profile card */}
         <div
-          className="profile-card clickable-profile"
+          className="jl-profile-card"
           onClick={() => navigate("/profile")}
         >
-          <div className="profile-info">
-            <img
-              src={user?.photo_user 
-                ? `http://localhost:5000/${user.photo_user}` 
-                : "https://randomuser.me/api/portraits/women/44.jpg"
-              }
-              alt="profile"
-            />
-            <div>
-              <h4>{user?.nom_user || "Your name"} {user?.prenom_user || ""}</h4>
-              <p>{user?.email_user || "yourname@gmail.com"}</p>
-              <span className="profile-mini-role">Jeune membre • Swafy</span>
-            </div>
+          <img
+            src={getAvatar(user?.photo_user, user?.sexe)}
+            alt="avatar"
+            className="jl-profile-avatar"
+            onError={e => e.target.src = "https://randomuser.me/api/portraits/men/44.jpg"}
+          />
+          <div className="jl-profile-info">
+            <p className="jl-profile-name">
+              {user?.prenom_user} {user?.nom_user}
+            </p>
+            <p className="jl-profile-email">{user?.email_user}</p>
+            <span className="jl-profile-role">Jeune membre · Swafy</span>
           </div>
+          <span className="jl-profile-arrow">→</span>
         </div>
 
-        <Chatbot />
+        {/* Chatbot */}
+        <div className="jl-chatbot-wrap">
+          <Chatbot />
+        </div>
       </aside>
-
     </div>
   );
 };
