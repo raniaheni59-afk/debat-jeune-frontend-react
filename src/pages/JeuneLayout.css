@@ -30,6 +30,43 @@
 button { font-family: var(--font); cursor: pointer; border: none; background: none; }
 
 /* ─── ROOT ───────────────────────────────────────── */
+
+html, body {
+  height: 100vh !important;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* يقتل السكرول البراني */
+}
+.jl-root {
+  display: flex !important;
+  height: 100vh !important;
+  width: 100vw;
+  overflow: hidden !important; /* تأكيد المنع */
+  background: var(--bg);
+}
+.jl-sidebar, .jl-right {
+  height: 100vh !important; /* طول الشاشة كاملة */
+  flex-shrink: 0; /* باش ما يتفغصوش */
+  overflow-y: auto; /* لو المنيو طويل ياسر يسكرولي داخل روحو برك */
+  position: relative; /* نحي الـ fixed والـ sticky القديم */
+}
+.jl-main {
+  flex: 1;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* المين كاينو إطار برك */
+}
+
+.jl-scroll {
+  flex: 1;
+  overflow-y: scroll !important; /* السكرول محصور لهنا برك */
+  height: 100%;
+  padding: 28px 24px 48px;
+  scrollbar-width: thin; /* باش الـ scrollbar يجي مزيان وما يشوهش التصميم */
+}
+
+
 .jl-root {
   display: flex;
   min-height: 100vh;
@@ -640,39 +677,4 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 @media (max-width: 480px) {
   .jl-stats { grid-template-columns: 1fr 1fr; }
   .jl-welcome-h1 { font-size: 22px; }
-}
-
-html, body {
-  height: 100vh !important;
-  margin: 0;
-  padding: 0;
-  overflow: hidden !important; /* يقتل السكرول البراني */
-}
-.jl-root {
-  display: flex !important;
-  height: 100vh !important;
-  width: 100vw;
-  overflow: hidden !important; /* تأكيد المنع */
-  background: var(--bg);
-}
-.jl-sidebar, .jl-right {
-  height: 100vh !important; /* طول الشاشة كاملة */
-  flex-shrink: 0; /* باش ما يتفغصوش */
-  overflow-y: auto; /* لو المنيو طويل ياسر يسكرولي داخل روحو برك */
-  position: relative; /* نحي الـ fixed والـ sticky القديم */
-}
-.jl-main {
-  flex: 1;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* المين كاينو إطار برك */
-}
-
-.jl-scroll {
-  flex: 1;
-  overflow-y: scroll !important; /* السكرول محصور لهنا برك */
-  height: 100%;
-  padding: 28px 24px 48px;
-  scrollbar-width: thin; /* باش الـ scrollbar يجي مزيان وما يشوهش التصميم */
 }
