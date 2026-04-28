@@ -38,15 +38,15 @@ html, body {
   display: block; 
   width: 100%;
 }
-
-
-.jl-main {
-  flex: 1 !important;
+.jl-container {
   display: flex !important;
-  flex-direction: column !important;
-  height: 100% !important;
-  background: var(--bg) !important;
+  flex-direction: row !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
 }
+
+
 
 /* ─── RESET ──────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
