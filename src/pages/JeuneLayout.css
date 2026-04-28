@@ -25,43 +25,65 @@
 
 }
 
+/* ── Container mte3na ── */
 .jl-container {
   display: flex;
-  height: 100vh;        /* Toul el écran lkol */
-  overflow: hidden;     /* Yamna3 el scroll el kbir mte3 el page lkol */
-  background: var(--bg);
-  position: fixed;      /* Zid hedhi bech l-page ma t-boujich mel blassa */
-  top: 0;
-  left: 0;
-  width: 100%;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  transition: all 0.3s ease; /* Animation bechn el dakhla tji ndhifa */
 }
 
-.jl-sidebar, .jl-right {
+/* ── Sidebar ── */
+.jl-sidebar {
+  width: var(--sidebar-w);
   height: 100vh;
-  overflow-y: auto;     /* Ken el menu twil y-scrolli wa7dou dakhliyan */
-  flex-shrink: 0;       /* Maykhallich el sidebars yessgharu */
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+  background: var(--glass);
+  border-right: 1px solid var(--border);
 }
+
+/* ── Ki ykoun el menu mkhabbé ── */
+.sidebar-closed .jl-sidebar {
+  width: 0;
+  transform: translateX(-100%); /* Yokhroj mel écran */
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* ── El Main Content ── */
 .jl-main {
-  flex: 1;              /* Yfaker el fadhwa elli fil west lkol */
+  flex: 1;
   height: 100vh;
-  overflow-y: scroll;   /* Nforcew el scroll ykoun ken houni */
-  overflow-x: hidden;
+  overflow-y: auto; /* El scroll ken houni */
+  transition: all 0.3s ease;
+}
+
+/* Ki ykoun el menu mkhabbé, el main content yched el fadhwa lkol */
+.sidebar-closed .jl-main {
+  width: 100vw;
+}
+
+/* ── El Logo Toggle ── */
+.jl-logo-wrap {
+  padding: 20px;
   display: flex;
-  flex-direction: column;
-  -webkit-overflow-scrolling: touch; /* Bechn ykoun fluide fil telifoun */
+  align-items: center;
+  gap: 12px;
+  transition: transform 0.2s;
 }
 
-.jl-scroll {
-  /* Na7i ay height: 100% mel blassa hedhi kenek 7atha */
-  min-height: 101%;     /* Bechn dima el scroll ykoun disponible */
-  padding: 40px 30px;
+.jl-logo-wrap:hover {
+  transform: scale(1.05);
 }
 
-body, html {
-  margin: 0;
-  padding: 0;
-  height: 100%;
-  overflow: hidden !important; /* Na7i el scroll el labrany jemla */
+/* Responsive: fil mobile el logo dima ykhabi el menu */
+@media (max-width: 768px) {
+  .jl-sidebar {
+    position: fixed;
+    z-index: 999;
+  }
 }
 
 
