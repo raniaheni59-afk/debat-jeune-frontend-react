@@ -41,11 +41,14 @@ const JeuneLayout = () => {
 useEffect(() => {
   
   document.body.style.overflow = "auto";
-  
+  document.body.style.position = "static";
+  window.scrollTo(0, 0);
+
+  // Cleanup function: ki nakhroujou mel page hedhi
   return () => {
     document.body.style.overflow = "auto";
   };
-}, [navigate]);
+}, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
