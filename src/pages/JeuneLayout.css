@@ -32,12 +32,39 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 /* ─── ROOT ───────────────────────────────────────── */
 .jl-root {
   display: flex;
-  min-height: 100vh;
+  height: 100vh; /* لازم تكون 100vh باش نحصرو الطول في شاشة وحدة */
+  overflow: hidden; /* تمنع الـ ScrollBar البراني متاع المتصفح */
   background: var(--bg);
-  font-family: var(--font);
-  color: var(--text);
-  overflow: hidden;
-  position: relative;
+}
+.jl-sidebar, .jl-right {
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  overflow-y: auto; /* إذا كان المنيو طويل برشة يولي فيه scroll داخلي وحده */
+  flex-shrink: 0;
+}
+.jl-main {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto; /* هذا هو اللي باش يخلي الـ publications تهبط وتطلع */
+  scroll-behavior: smooth;
+}
+
+/* إذا كنت تستعمل في كلاس .jl-scroll داخل الـ main، تأكد منها */
+.jl-scroll {
+  padding: 28px 24px 48px;
+  /* نحي overflow-y منا إذا كان موجود في jl-main، أو خليه لهنا برك */
+}
+.jl-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.jl-chatbot-wrap {
+  flex: 1; /* يخلي الـ chatbot يعبي المساحة اللي تحت البروفايل الكل */
+  min-height: 0; /* مهمة جداً باش الـ scroll يخدم داخل الـ chatbot */
+  display: flex;
+  flex-direction: column;
 }
 
 /* ─── BACKGROUND ORBS ────────────────────────────── */
