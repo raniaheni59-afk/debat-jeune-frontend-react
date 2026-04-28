@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Outlet } from "react-router-dom";
 import API from "../services/api";
 import PublicationCard from "../components/PublicationCard";
 import Chatbot from "../components/Chatbot";
@@ -34,9 +34,12 @@ const JeuneLayout = () => {
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [highlightedPub, setHighlightedPub] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true); // Pour mobile et desktop
   const [activeNav, setActiveNav] = useState(0);
 
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
 
 useEffect(() => {
   
@@ -89,7 +92,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="jl-root">
+    <div className={`jl-root ${!sidebarOpen ? "sidebar-closed" : ""}`}>
       {/* Animated background orbs */}
       <div className="jl-orb jl-orb1" />
       <div className="jl-orb jl-orb2" />
@@ -101,8 +104,8 @@ useEffect(() => {
       )}
 
       {/* ── SIDEBAR ── */}
-      <aside className={`jl-sidebar ${sidebarOpen ? "open" : ""}`}>
-        <div className="jl-sidebar-logo">
+      <aside className={`jl-sidebar ${sidebarOpen ? "open" : "closed"}`}>
+        <div className="jl-sidebar-logo" onClick={toggleSidebar} style={{ cursor: "pointer" }}>
           <div className="jl-logo-icon">S</div>
           <span className="jl-logo-text">Swafy</span>
         </div>
@@ -224,7 +227,10 @@ useEffect(() => {
           </div>
 
           {/* Feed */}
-          <section className="jl-feed">
+          <div className="jl-content-area">
+            <Outlet /> {/* C'est ici que s'afficheront les pages enfants */}
+            
+            <section className="jl-feed">
             <div className="jl-feed-header">
               <h2 className="jl-feed-title">Fil d'actualité</h2>
               <button
@@ -263,6 +269,7 @@ useEffect(() => {
               ))
             )}
           </section>
+          </div>
         </div>
       </main>
 
