@@ -274,9 +274,6 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 
 /* ─── MAIN ───────────────────────────────────────── */
 
-.jl-scroll::-webkit-scrollbar { width: 4px; }
-.jl-scroll::-webkit-scrollbar-track { background: transparent; }
-.jl-scroll::-webkit-scrollbar-thumb { background: rgba(124, 92, 252, 0.901); border-radius: 4px; }
 
 /* ─── WELCOME ────────────────────────────────────── */
 .jl-welcome {
