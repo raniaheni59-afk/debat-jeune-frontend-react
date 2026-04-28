@@ -32,21 +32,26 @@ html, body {
   overflow-x: hidden;
 }
 
-
+.jl-scroll {
+  position: relative; /* bech dima l-content yo93ed fi blastou */
+  z-index: 1;
+  display: block; 
+  width: 100%;
+}
 .jl-container {
-  display: flex !important;
-  flex-direction: row !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  overflow: hidden !important;
+  display: flex ;
+  flex-direction: row ;
+  width: 100vw ;
+  height: 100vh ;
+  overflow: hidden ;
 }
 
 .jl-main {
-  flex: 1 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  height: 100% !important;
-  background: var(--bg) !important;
+  flex: 1 ;
+  display: flex ;
+  flex-direction: column ;
+  height: 100% ;
+  background: var(--bg) ;
 }
 
 /* ─── RESET ──────────────────────────────────────── */
