@@ -5,8 +5,8 @@
   --bg:       #4848b7;
   --bg2:      #3e3ec7;
   --glass:    rgba(158, 53, 223, 0.795);
-  --glass-b:  rgba(170, 72, 202, 0.684);
-  --border:   rgba(126, 26, 144, 0.804);
+  --glass-b:  rgba(169, 72, 202, 0.919);
+  --border:   rgba(161, 32, 184, 0.967);
   --border-h: rgba(159, 130, 255, 0.896);
   --purple:   #7c5cfc;
   --purple-l: #a78bfa;
@@ -14,7 +14,7 @@
   --pink:     #f472b6;
   --green:    #34d399;
   --text:     #e8e8f8;
-  --muted:    rgba(232,232,248,0.45);
+  --muted:    rgb(83, 83, 175);
   --radius:   18px;
   --sidebar-w: 220px;
   --right-w:   280px;
@@ -432,7 +432,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   transition: all 0.2s;
 }
 .jl-banner-btn:hover {
-  background: rgba(255,255,255,0.3);
+  background: rgba(166, 36, 183, 0.788);
   transform: translateX(2px);
 }
 .jl-banner-img {
@@ -442,7 +442,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   opacity: 0.85;
   margin-left: 16px;
   flex-shrink: 0;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  box-shadow: 0 8px 32px rgba(117, 23, 172, 0.847);
 }
 
 /* ─── FEED ───────────────────────────────────────── */
@@ -467,12 +467,12 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   font-size: 13px;
   font-weight: 700;
   font-family: var(--font);
-  box-shadow: 0 4px 16px rgba(124,92,252,0.35);
+  box-shadow: 0 4px 16px rgba(124, 92, 252, 0.816);
   transition: all 0.2s;
 }
 .jl-publish-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 24px rgba(124,92,252,0.45);
+  box-shadow: 0 6px 24px rgba(124, 92, 252, 0.849);
 }
 
 .jl-loading {
@@ -485,7 +485,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 .jl-spinner {
   width: 36px; height: 36px;
   border-radius: 50%;
-  border: 3px solid rgba(124,92,252,0.2);
+  border: 3px solid rgba(124, 92, 252, 0.886);
   border-top-color: var(--purple);
   animation: spin 0.8s linear infinite;
 }
@@ -512,20 +512,20 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   font-weight: 700;
   font-family: var(--font);
   margin-top: 4px;
-  box-shadow: 0 4px 16px rgba(124,92,252,0.3);
+  box-shadow: 0 4px 16px rgba(124, 92, 252, 0.807);
 }
 
 .jl-highlighted {
   outline: 2px solid var(--purple);
   border-radius: var(--radius);
-  box-shadow: 0 0 0 4px rgba(124,92,252,0.12);
+  box-shadow: 0 0 0 4px rgba(124, 92, 252, 0.908);
 }
 
 /* ─── RIGHT SIDEBAR ──────────────────────────────── */
 .jl-right {
   width: var(--right-w);
   min-height: 100vh;
-  background: rgba(18,18,43,0.6);
+  background: rgba(17, 17, 197, 0.852);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-left: 1px solid var(--border);
@@ -560,7 +560,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   width: 46px; height: 46px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgba(124,92,252,0.5);
+  border: 2px solid rgba(124, 92, 252, 0.847);
   flex-shrink: 0;
 }
 .jl-profile-info { flex: 1; min-width: 0; }
@@ -576,7 +576,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 }
 .jl-profile-role {
   font-size: 10px;
-  background: rgba(124,92,252,0.2);
+  background: rgba(124, 92, 252, 0.758);
   color: var(--purple-l);
   border-radius: 20px;
   padding: 2px 8px;
