@@ -36,8 +36,10 @@ const JeuneLayout = () => {
 
   useEffect(() => {
   document.body.classList.add("jl-active");
+  document.documentElement.classList.add("jl-active");
   return () => {
     document.body.classList.remove("jl-active");
+    document.documentElement.classList.remove("jl-active");
   };
 }, []);
 

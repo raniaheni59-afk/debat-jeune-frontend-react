@@ -642,32 +642,43 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   .jl-welcome-h1 { font-size: 22px; }
 }
 
+/* ===== SCOPED ONLY FOR /jeune ===== */
+body.jl-active,
+html.jl-active {
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
 
 .jl-root {
-  display: flex !important;
-  height: 100vh !important;
-  width: 100vw;
-  overflow: hidden !important; /* تأكيد المنع */
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
   background: var(--bg);
 }
-.jl-sidebar, .jl-right {
-  height: 100vh !important; /* طول الشاشة كاملة */
-  flex-shrink: 0; /* باش ما يتفغصوش */
-  overflow-y: auto; /* لو المنيو طويل ياسر يسكرولي داخل روحو برك */
-  position: relative; /* نحي الـ fixed والـ sticky القديم */
+
+.jl-sidebar,
+.jl-right {
+  height: 100vh;
+  flex-shrink: 0;
+  overflow-y: auto;
+  position: relative;
 }
+
 .jl-main {
   flex: 1;
   height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* المين كاينو إطار برك */
+  overflow: hidden;
 }
 
 .jl-scroll {
   flex: 1;
-  overflow-y: scroll !important; /* السكرول محصور لهنا برك */
+  overflow-y: auto;
   height: 100%;
   padding: 28px 24px 48px;
-  scrollbar-width: thin; /* باش الـ scrollbar يجي مزيان وما يشوهش التصميم */
+  scrollbar-width: thin;
 }

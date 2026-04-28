@@ -191,7 +191,13 @@ export default function MessengerPage() {
         .ms-page * { box-sizing: border-box; margin: 0; padding: 0; }
         .ms-page button { font-family: 'Outfit', sans-serif; cursor: pointer; border: none; background: none; }
         .ms-page input { font-family: 'Outfit', sans-serif; }
-
+        
+        body.ms-active {
+  margin: 0;
+  overflow: hidden;
+  background: #0b1220;
+}
+  
         .ms-page {
           min-height: 100vh; width: 100%;
           background: #0d0d1a;
