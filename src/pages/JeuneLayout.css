@@ -6,7 +6,7 @@
   --bg2:      #3e3ea0;
   --glass:    rgba(158, 53, 223, 0.596);
   --glass-b:  rgba(170, 72, 202, 0.684);
-  --border:   rgba(126, 26, 144, 0.836);
+  --border:   rgba(126, 26, 144, 0.94);
   --border-h: rgba(98, 65, 207, 0.807);
   --purple:   #7c5cfc;
   --purple-l: #a78bfa;
@@ -14,7 +14,7 @@
   --pink:     #f472b6;
   --green:    #34d399;
   --text:     #e8e8f8;
-  --muted:    rgba(232,232,248,0.45);
+  --muted:    rgba(74, 74, 211, 0.786);
   --radius:   18px;
   --sidebar-w: 220px;
   --right-w:   280px;
