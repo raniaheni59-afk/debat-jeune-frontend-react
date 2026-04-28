@@ -642,11 +642,11 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   .jl-welcome-h1 { font-size: 22px; }
 }
 
-html, body {
-  height: 100vh !important;
+body.jl-active {
+  height: 100vh;
   margin: 0;
   padding: 0;
-  overflow: hidden !important; /* يقتل السكرول البراني */
+  overflow: hidden;
 }
 .jl-root {
   display: flex !important;
