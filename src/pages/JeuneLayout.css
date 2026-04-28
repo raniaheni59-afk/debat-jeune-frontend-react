@@ -641,39 +641,38 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   .jl-stats { grid-template-columns: 1fr 1fr; }
   .jl-welcome-h1 { font-size: 22px; }
 }
+
 html, body {
-  height: 100% !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: hidden !important; /* يقتل السكرول البراني بالسيف */
+  height: 100vh !important;
+  margin: 0;
+  padding: 0;
+  overflow: hidden !important; /* يقتل السكرول البراني */
 }
 .jl-root {
   display: flex !important;
   height: 100vh !important;
-  width: 100vw !important;
-  overflow: hidden !important;
-  position: relative;
+  width: 100vw;
+  overflow: hidden !important; /* تأكيد المنع */
+  background: var(--bg);
 }
-
 .jl-sidebar, .jl-right {
-  height: 100vh !important;
-  position: relative !important; /* تأكد إنها مش fixed */
-  top: 0 !important;
-  flex-shrink: 0 !important;
-  overflow-y: auto !important; /* يسكرولي داخلهم هوما برك */
+  height: 100vh !important; /* طول الشاشة كاملة */
+  flex-shrink: 0; /* باش ما يتفغصوش */
+  overflow-y: auto; /* لو المنيو طويل ياسر يسكرولي داخل روحو برك */
+  position: relative; /* نحي الـ fixed والـ sticky القديم */
 }
 .jl-main {
-  flex: 1 !important;
-  height: 100vh !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important; /* يمنع الـ main من السكرول */
-  min-width: 0;
+  flex: 1;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* المين كاينو إطار برك */
 }
 
 .jl-scroll {
-  flex: 1 !important;
-  overflow-y: scroll !important; /* يفرض وجود الـ scroll لهنا */
-  height: 100% !important;
+  flex: 1;
+  overflow-y: scroll !important; /* السكرول محصور لهنا برك */
+  height: 100%;
   padding: 28px 24px 48px;
+  scrollbar-width: thin; /* باش الـ scrollbar يجي مزيان وما يشوهش التصميم */
 }
