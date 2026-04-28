@@ -25,35 +25,44 @@
 
 }
 
-html, body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  overflow-x: hidden;
+.jl-container {
+  display: flex;
+  height: 100vh;      /* Yched el toul mte3 el ecran lkol */
+  overflow: hidden;   /* Yamna3 el scroll l-barra */
+  background: var(--bg);
 }
+
+.jl-sidebar, .jl-right {
+  height: 100vh;
+  overflow-y: auto;  /* Ken el menu twil y-scrolli wa7dou dakhliyan */
+  flex-shrink: 0;    /* Maykhallich el sidebars yet-fas-khou */
+}
+.jl-main {
+  flex: 1;
+  height: 100vh;
+  overflow-y: auto;  /* Houni el scroll el wa7id elli n-7ebbouchi */
+  display: flex;
+  flex-direction: column;
+}
+
 
 .jl-scroll {
-  position: relative; /* bech dima l-content yo93ed fi blastou */
-  z-index: 1;
-  display: block; 
+  padding: 40px 30px;
+  max-width: 900px;
+  margin: 0 auto;
   width: 100%;
 }
-.jl-container {
-  display: flex ;
-  flex-direction: row ;
-  width: 100vw ;
-  height: 100vh ;
-  overflow: hidden ;
+* {
+  box-sizing: border-box;
 }
 
-.jl-main {
-  flex: 1 ;
-  display: flex ;
-  flex-direction: column ;
-  height: 100% ;
-  background: var(--bg) ;
-}
 
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden; 
+}
 /* ─── RESET ──────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 button { font-family: var(--font); cursor: pointer; border: none; background: none; }
@@ -264,21 +273,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 .jl-topbar-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
 /* ─── MAIN ───────────────────────────────────────── */
-.jl-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  z-index: 1;
-  overflow: hidden;
-}
-.jl-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 28px 24px 48px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(124, 92, 252, 0.884) transparent;
-}
+
 .jl-scroll::-webkit-scrollbar { width: 4px; }
 .jl-scroll::-webkit-scrollbar-track { background: transparent; }
 .jl-scroll::-webkit-scrollbar-thumb { background: rgba(124, 92, 252, 0.901); border-radius: 4px; }
