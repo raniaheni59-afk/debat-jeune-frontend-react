@@ -25,13 +25,14 @@
 
 }
 
-
-.jl-scroll {
-  position: relative; /* bech dima l-content yo93ed fi blastou */
-  z-index: 1;
-  display: block; 
-  width: 100%;
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
 }
+
+
 .jl-container {
   display: flex !important;
   flex-direction: row !important;
