@@ -456,7 +456,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   transition: all 0.2s;
 }
 .jl-banner-btn:hover {
-  background: rgba(166, 36, 183, 0.788);
+  background: rgba(166, 36, 183, 0.54);
   transform: translateX(2px);
 }
 .jl-banner-img {
@@ -549,7 +549,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 .jl-right {
   width: var(--right-w);
   min-height: 100vh;
-  background: rgba(149, 17, 197, 0.966);
+  background: rgba(129, 34, 163, 0.603);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-left: 1px solid var(--border);
@@ -562,7 +562,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   overflow-y: auto;
   scrollbar-width: none;
 }
-.jl-right::-webkit-scrollbar { display: none; }
+
 
 .jl-profile-card {
   background: var(--glass);
