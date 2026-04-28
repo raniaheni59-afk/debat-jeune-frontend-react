@@ -45,15 +45,6 @@ export default function MessengerPage() {
     [conversations, activeConversationId]
   );
 
-  useEffect(() => {
-  const handlePopState = () => {
-    window.location.reload(); // Force refresh ki yenzel 3al fleche mte3 l-navigateur
-  };
-
-  window.addEventListener('popstate', handlePopState);
-  return () => window.removeEventListener('popstate', handlePopState);
-}, []);
-
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -195,16 +186,10 @@ export default function MessengerPage() {
         .ms-page * { box-sizing: border-box; margin: 0; padding: 0; }
         .ms-page button { font-family: 'Outfit', sans-serif; cursor: pointer; border: none; background: none; }
         .ms-page input { font-family: 'Outfit', sans-serif; }
-        
-        body.ms-active {
-  margin: 0;
-  overflow: hidden;
-  background: #8b17ae;
-}
-  
+
         .ms-page {
           min-height: 100vh; width: 100%;
-          background: #8b17ae;
+          background: #0d0d1a;
           display: flex; justify-content: center; align-items: stretch;
           color: #e8ecff;
         }
@@ -224,25 +209,25 @@ export default function MessengerPage() {
         /* ── SIDEBAR ── */
         .ms-sidebar {
           display: flex; flex-direction: column;
-          background: #8b17ae;
+          background: rgba(18,18,43,0.88);
           backdrop-filter: blur(24px);
-          border-right: 1px solid rgba(146, 14, 146, 0.83);
+          border-right: 1px solid rgba(255,255,255,.09);
         }
         .ms-sidebar-top {
           padding: 20px 16px 14px;
-          border-bottom: 1px solid rgba(180, 26, 197, 0.94);
+          border-bottom: 1px solid rgba(255,255,255,.07);
         }
         .ms-sidebar-header {
           display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
         }
         .ms-back-btn {
           width: 32px; height: 32px; border-radius: 8px;
-          background: rgba(124, 92, 252, 0.94); color: #a78bfa;
-          border: 1px solid rgba(124, 92, 252, 0.93);
+          background: rgba(124,92,252,.15); color: #a78bfa;
+          border: 1px solid rgba(124,92,252,.25);
           display: flex; align-items: center; justify-content: center;
           font-size: 14px; transition: all .2s;
         }
-        .ms-back-btn:hover { background: rgba(124, 92, 252, 0.95); }
+        .ms-back-btn:hover { background: rgba(124,92,252,.3); }
         .ms-title {
           font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800;
           background: linear-gradient(90deg,#fff,#a78bfa);
@@ -250,15 +235,15 @@ export default function MessengerPage() {
         }
         .ms-search {
           width: 100%; padding: 10px 14px; border-radius: 12px;
-          border: 1px solid rgba(169, 40, 225, 0.81);
-          background: rgba(158, 17, 205, 0.94); color: #e8ecff;
+          border: 1px solid rgba(255,255,255,.10);
+          background: rgba(255,255,255,.05); color: #e8ecff;
           outline: none; font-size: 13px; transition: border-color .2s;
         }
-        .ms-search:focus { border-color: rgba(124, 92, 252, 0.9); }
+        .ms-search:focus { border-color: rgba(124,92,252,.4); }
         .ms-search::placeholder { color: rgba(232,236,255,.4); }
         .ms-list { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: rgba(124,92,252,.2) transparent; }
         .ms-list::-webkit-scrollbar { width: 3px; }
-        .ms-list::-webkit-scrollbar-thumb { background: rgba(124, 92, 252, 0.87); border-radius: 4px; }
+        .ms-list::-webkit-scrollbar-thumb { background: rgba(124,92,252,.3); border-radius: 4px; }
         .ms-subtitle { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(167,139,250,.7); padding: 8px 8px 4px; }
         .ms-empty { opacity: .6; padding: 24px; text-align: center; font-size: 13px; }
 
@@ -269,8 +254,8 @@ export default function MessengerPage() {
           color: #e8ecff; text-align: left; margin-bottom: 4px;
           transition: all .18s;
         }
-        .ms-chat-item:hover { background: rgba(166, 24, 202, 0.96); border-color: rgba(255,255,255,.09); }
-        .ms-chat-item.active { background: rgba(124, 92, 252, 0.9); border-color: rgba(124,92,252,.35); }
+        .ms-chat-item:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.09); }
+        .ms-chat-item.active { background: rgba(124,92,252,.18); border-color: rgba(124,92,252,.35); }
         .ms-chat-item .ms-ava { width:42px;height:42px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.12);flex-shrink:0;background:rgba(255,255,255,.06); }
         .ms-chat-item .ms-ava img { width:100%;height:100%;object-fit:cover; }
         .ms-chat-meta { flex:1;min-width:0; }
@@ -281,12 +266,12 @@ export default function MessengerPage() {
         /* ── MAIN CHAT ── */
         .ms-main {
           display: flex; flex-direction: column;
-          background: rgba(185, 22, 218, 0.91);
-          border-right: 1px solid rgba(211, 24, 224, 0.86);
+          background: rgba(0,0,0,.08);
+          border-right: 1px solid rgba(255,255,255,.07);
         }
         .ms-main-header {
-          padding: 16px 20px; border-bottom: 1px solid rgba(167, 28, 202, 0.91);
-          background: rgba(137, 14, 189, 0.8); backdrop-filter: blur(16px);
+          padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,.07);
+          background: rgba(18,18,43,.6); backdrop-filter: blur(16px);
           display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
         }
         .ms-active-user { display:flex;gap:12px;align-items:center; }
@@ -299,13 +284,13 @@ export default function MessengerPage() {
         .ms-messages {
           flex: 1; padding: 20px; overflow-y: auto;
           display: flex; flex-direction: column; gap: 8px;
-          scrollbar-width: thin; scrollbar-color: rgba(124, 92, 252, 0.92) transparent;
+          scrollbar-width: thin; scrollbar-color: rgba(124,92,252,.2) transparent;
         }
         .ms-messages::-webkit-scrollbar { width: 3px; }
         .ms-messages::-webkit-scrollbar-thumb { background: rgba(124,92,252,.3); border-radius: 4px; }
 
         .ms-date-divider {
-          text-align: center; font-size: 11px; color: rgba(232, 236, 255, 0.69);
+          text-align: center; font-size: 11px; color: rgba(232,236,255,.35);
           font-weight: 600; margin: 8px 0; letter-spacing: .5px;
         }
         .ms-bubble-row { display:flex; align-items:flex-end; gap:8px; }
@@ -317,18 +302,18 @@ export default function MessengerPage() {
         .ms-bubble {
           max-width: 65%; padding: 11px 14px;
           border-radius: 18px; line-height: 1.45; font-size: 14px;
-          border: 1px solid rgba(145, 20, 159, 0.92);
-          box-shadow: 0 4px 16px rgba(130, 6, 164, 0.91);
+          border: 1px solid rgba(255,255,255,.1);
+          box-shadow: 0 4px 16px rgba(0,0,0,.18);
           word-break: break-word;
         }
         .ms-bubble.mine {
-          background: linear-gradient(135deg, rgba(124, 92, 252, 0.94), rgba(79,163,247,.25));
-          border-color: rgba(124, 92, 252, 0.93);
+          background: linear-gradient(135deg, rgba(124,92,252,.35), rgba(79,163,247,.25));
+          border-color: rgba(124,92,252,.4);
           border-bottom-right-radius: 4px;
         }
         .ms-bubble.theirs {
-          background: rgba(185, 27, 233, 0.07);
-          border-color: rgba(163, 16, 207, 0.12);
+          background: rgba(255,255,255,.07);
+          border-color: rgba(255,255,255,.12);
           border-bottom-left-radius: 4px;
         }
         .ms-time { margin-top: 5px; font-size: 10.5px; color: rgba(232,236,255,.45); text-align: right; }
@@ -340,7 +325,7 @@ export default function MessengerPage() {
         /* file preview */
         .ms-file-preview {
           margin: 0 20px 0; padding: 10px 14px;
-          background: rgba(124, 92, 252, 0.91); border: 1px solid rgba(124,92,252,.25);
+          background: rgba(124,92,252,.12); border: 1px solid rgba(124,92,252,.25);
           border-radius: 12px; display: flex; align-items: center; gap: 10px;
         }
         .ms-file-preview img { width:50px;height:50px;object-fit:cover;border-radius:8px; }
@@ -349,21 +334,21 @@ export default function MessengerPage() {
 
         /* input bar */
         .ms-input-bar {
-          padding: 14px 20px; border-top: 1px solid rgba(136, 12, 207, 0.07);
-          background: rgba(127, 30, 225, 0.6); backdrop-filter: blur(16px);
+          padding: 14px 20px; border-top: 1px solid rgba(255,255,255,.07);
+          background: rgba(18,18,43,.6); backdrop-filter: blur(16px);
           display: flex; gap: 10px; align-items: center; flex-shrink: 0;
         }
         .ms-attach-btn {
           width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
-          background: rgba(98, 18, 197, 0.06); border: 1px solid rgba(255,255,255,.10);
+          background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10);
           color: #a78bfa; font-size: 18px;
           display: flex; align-items: center; justify-content: center;
           transition: all .2s;
         }
-        .ms-attach-btn:hover { background: rgba(124, 92, 252, 0.9); border-color: rgba(124,92,252,.3); }
+        .ms-attach-btn:hover { background: rgba(124,92,252,.18); border-color: rgba(124,92,252,.3); }
         .ms-text-input {
-          flex: 1; border-radius: 14px; border: 1px solid rgba(255, 255, 255, 0.78);
-          background: rgba(255, 255, 255, 0.9); color: #e8ecff;
+          flex: 1; border-radius: 14px; border: 1px solid rgba(255,255,255,.10);
+          background: rgba(255,255,255,.06); color: #e8ecff;
           padding: 10px 16px; outline: none; font-size: 14px;
           transition: border-color .2s;
         }
@@ -403,12 +388,12 @@ export default function MessengerPage() {
         .ms-right-email { font-size: 12px; color: rgba(232,236,255,.5); text-align: center; }
         .ms-right-view-btn {
           width: 100%; padding: 9px; border-radius: 10px;
-          background: rgba(124, 92, 252, 0.92); color: #a78bfa;
-          border: 1px solid rgba(124, 92, 252, 0.94);
+          background: rgba(124,92,252,.15); color: #a78bfa;
+          border: 1px solid rgba(124,92,252,.25);
           font-size: 12px; font-weight: 700; transition: all .2s;
         }
-        .ms-right-view-btn:hover { background: rgba(124, 92, 252, 0.9); }
-        .ms-divider { height: 1px; background: rgba(143, 24, 159, 0.86); }
+        .ms-right-view-btn:hover { background: rgba(124,92,252,.28); }
+        .ms-divider { height: 1px; background: rgba(255,255,255,.07); }
         .ms-right-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(167,139,250,.7); }
         .ms-photo-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 3px; }
         .ms-photo-thumb { aspect-ratio:1; border-radius:6px; overflow:hidden; cursor:pointer; }
@@ -420,15 +405,15 @@ export default function MessengerPage() {
         .ms-user-result {
           width: 100%; display: flex; gap: 10px; align-items: center;
           padding: 10px; border-radius: 12px;
-          border: 1px solid rgba(255, 255, 255, 0.81);
-          background: rgba(134, 36, 188, 0.84);
+          border: 1px solid rgba(255,255,255,.10);
+          background: rgba(255,255,255,.05);
           color: #e8ecff; cursor: pointer; margin-bottom: 6px;
           text-align: left; transition: background .18s;
         }
-        .ms-user-result:hover { background: rgba(167, 23, 215, 0.84); }
+        .ms-user-result:hover { background: rgba(255,255,255,.10); }
 
         /* image lightbox */
-        .ms-lightbox { position:fixed;inset:0;background:rgba(110, 15, 145, 0.92);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px); }
+        .ms-lightbox { position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px); }
         .ms-lightbox img { max-width:90vw;max-height:88vh;object-fit:contain;border-radius:12px; }
         .ms-lightbox-close { position:absolute;top:20px;right:20px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:white;font-size:20px;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center; }
 
