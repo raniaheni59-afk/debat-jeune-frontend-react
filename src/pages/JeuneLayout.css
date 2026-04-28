@@ -3,7 +3,6 @@
 /* ─── TOKENS ─────────────────────────────────────── */
 :root {
   --bg:       #8e48b7;
-  --bg2:      #a03ec7;
   --glass:    rgba(158, 53, 223, 0.629);
   --glass-b:  rgba(169, 72, 202, 0.722);
   --border:   rgba(161, 32, 184, 0.677);
@@ -20,6 +19,10 @@
   --right-w:   280px;
   --font:     'Outfit', sans-serif;
   --font-h:   'Syne', sans-serif;
+  --bg2: #1a1a3a; 
+  --sidebar-bg: rgba(255, 255, 255, 0.03); 
+  --glass-bright: rgba(255, 255, 255, 0.08);
+
 }
 
 /* ─── RESET ──────────────────────────────────────── */
