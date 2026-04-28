@@ -606,28 +606,30 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 
 .jl-root {
   display: flex;
-  height: 100vh; /* لازم تكون 100vh باش نحصرو الطول في شاشة وحدة */
-  overflow: hidden; /* تمنع الـ ScrollBar البراني متاع المتصفح */
+  height: 100vh;      /* ثبت الطول على قد الشاشة بالضبط */
+  max-height: 100vh;
+  overflow: hidden;   /* يمنع الصفحة كاملة باش تهبط */
   background: var(--bg);
+  position: relative;
 }
 .jl-sidebar, .jl-right {
-  height: 100vh;
-  position: sticky;
-  top: 0;
-  overflow-y: auto; /* إذا كان المنيو طويل برشة يولي فيه scroll داخلي وحده */
-  flex-shrink: 0;
+  height: 100%;
+  flex-shrink: 0;     /* يمنعهم باش يتفغصوا */
+  overflow-y: auto;   /* إذا المنيو طويل، يعمل scroll وحده داخل المنيو برك */
 }
 .jl-main {
   flex: 1;
-  height: 100vh;
-  overflow-y: auto; /* هذا هو اللي باش يخلي الـ publications تهبط وتطلع */
-  scroll-behavior: smooth;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden; /* يمنع الـ main بيدو، السكرول باش يكون داخل الـ jl-scroll */
 }
 
-/* إذا كنت تستعمل في كلاس .jl-scroll داخل الـ main، تأكد منها */
 .jl-scroll {
+  flex: 1;
+  overflow-y: auto;  /* هذا الوحيد اللي مسموح له بالسكرول في الصفحة كاملة */
+  height: 100%;      /* مهم جداً */
   padding: 28px 24px 48px;
-  /* نحي overflow-y منا إذا كان موجود في jl-main، أو خليه لهنا برك */
 }
 .jl-right {
   display: flex;
