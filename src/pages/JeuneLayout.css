@@ -25,6 +25,18 @@
 
 }
 
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.jl-scroll {
+  /* bech dima l-content ykoun s7i7 7ata ki tarja3 ltéli */
+  min-height: 100vh; 
+}
+
 /* ─── RESET ──────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 button { font-family: var(--font); cursor: pointer; border: none; background: none; }
@@ -673,12 +685,4 @@ html.jl-active {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-}
-
-.jl-scroll {
-  flex: 1;
-  overflow-y: auto;
-  height: 100%;
-  padding: 28px 24px 48px;
-  scrollbar-width: thin;
 }

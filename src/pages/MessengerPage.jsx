@@ -46,8 +46,12 @@ export default function MessengerPage() {
   );
 
   useEffect(() => {
-  document.body.classList.add("ms-body");
-  return () => document.body.classList.remove("ms-body");
+  const handlePopState = () => {
+    window.location.reload(); // Force refresh ki yenzel 3al fleche mte3 l-navigateur
+  };
+
+  window.addEventListener('popstate', handlePopState);
+  return () => window.removeEventListener('popstate', handlePopState);
 }, []);
 
   // Auto-scroll to bottom

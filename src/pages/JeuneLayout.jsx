@@ -34,14 +34,13 @@ const JeuneLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState(0);
 
-  useEffect(() => {
-  document.body.classList.add("jl-active");
-  document.documentElement.classList.add("jl-active");
-  return () => {
-    document.body.classList.remove("jl-active");
-    document.documentElement.classList.remove("jl-active");
-  };
-}, []);
+
+useEffect(() => {
+  const storedUser = localStorage.getItem("user");
+  if (!storedUser || !localStorage.getItem("token")) {
+    navigate("/login"); // ken l-user mouch mawjoud dima raj3ou lil login
+  }
+}, [navigate]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
