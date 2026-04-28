@@ -528,7 +528,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 .jl-right {
   width: var(--right-w);
   min-height: 100vh;
-  background: rgba(17, 17, 197, 0.852);
+  background: rgba(149, 17, 197, 0.966);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-left: 1px solid var(--border);
