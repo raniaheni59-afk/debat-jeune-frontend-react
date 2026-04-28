@@ -253,3 +253,4 @@
 }
 .ms-rightTitle{ font-weight:900; margin-bottom:10px; }
 .ms-rightText{ color: rgba(232,236,255,.78); line-height:1.45; font-size:13px; }
+.ms-page { min-height: 100vh; }
