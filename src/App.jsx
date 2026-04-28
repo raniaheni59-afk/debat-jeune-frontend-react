@@ -69,6 +69,7 @@ const ProtectedAdminRoute = ({ children }) => {
           <AdminDashboard />
         </ProtectedAdminRoute>
       } />
+      <Route path="/messenger" element={<MessengerPage />} />
       <Route
   path="/messenger"
   element={
