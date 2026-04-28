@@ -33,8 +33,10 @@ html, body {
 }
 
 .jl-scroll {
-  /* bech dima l-content ykoun s7i7 7ata ki tarja3 ltéli */
-  min-height: 100vh; 
+  position: relative; /* bech dima l-content yo93ed fi blastou */
+  z-index: 1;
+  display: block; 
+  width: 100%;
 }
 
 /* ─── RESET ──────────────────────────────────────── */
@@ -655,4 +657,34 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 }
 
 /* ===== SCOPED ONLY FOR /jeune ===== */
+body.jl-active,
+html.jl-active {
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
 
+.jl-root {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.jl-sidebar,
+.jl-right {
+  height: 100vh;
+  flex-shrink: 0;
+  overflow-y: auto;
+  position: relative;
+}
+
+.jl-main {
+  flex: 1;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

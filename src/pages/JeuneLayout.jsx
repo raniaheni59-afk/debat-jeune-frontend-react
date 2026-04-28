@@ -25,7 +25,10 @@ const NAV_ITEMS = [
 ];
 
 const JeuneLayout = () => {
-  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [user, setUser] = useState(() => {
+  const saved = localStorage.getItem("user");
+  return saved ? JSON.parse(saved) : null;
+});
   const navigate = useNavigate();
 
   const [publications, setPublications] = useState([]);
@@ -36,10 +39,12 @@ const JeuneLayout = () => {
 
 
 useEffect(() => {
-  const storedUser = localStorage.getItem("user");
-  if (!storedUser || !localStorage.getItem("token")) {
-    navigate("/login"); // ken l-user mouch mawjoud dima raj3ou lil login
-  }
+  
+  document.body.style.overflow = "auto";
+  
+  return () => {
+    document.body.style.overflow = "auto";
+  };
 }, [navigate]);
 
   useEffect(() => {
