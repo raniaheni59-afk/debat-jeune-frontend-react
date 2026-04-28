@@ -16,7 +16,7 @@ const getAvatar = (photo, sexe) => {
 
 const NAV_ITEMS = [
   { icon: "⌂", label: "Accueil", path: "/jeune", active: true },
-  { icon: "✉", label: "Messages", badge: "2" },
+  { icon: "✉", label: "Messages", path: "/messenger", badge: "2" },
   { icon: "+", label: "Publier", path: "/publier" },
   { icon: "📅", label: "Calendrier" },
   { icon: "◉", label: "Live & Archive", badge: "2", badgeGreen: true },

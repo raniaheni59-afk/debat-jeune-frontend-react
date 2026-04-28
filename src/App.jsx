@@ -15,6 +15,7 @@ import PublicationDetail from "./pages/PublicationDetail";
 import Accueil from "./pages/Accueil";
 import Swafy from "./pages/Swafy";
 import "./index.css";
+import MessengerPage from "./pages/MessengerPage";
 
 const ProtectedAdminRoute = ({ children }) => {
   const token = localStorage.getItem("token");
@@ -68,7 +69,14 @@ const ProtectedAdminRoute = ({ children }) => {
           <AdminDashboard />
         </ProtectedAdminRoute>
       } />
-
+      <Route
+  path="/messenger"
+  element={
+   <ProtectedRoute>
+      <MessengerPage />
+    </ProtectedRoute>
+  }
+/>
       {/* 404 */}
       <Route path="*" element={<h2>404 - Page non trouvée</h2>} />
     </Routes>
