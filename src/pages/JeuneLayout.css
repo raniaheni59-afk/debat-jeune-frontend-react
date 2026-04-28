@@ -25,7 +25,12 @@
 
 }
 
-
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
 
 .jl-scroll {
   position: relative; /* bech dima l-content yo93ed fi blastou */
@@ -34,6 +39,14 @@
   width: 100%;
 }
 
+
+.jl-main {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  background: var(--bg) !important;
+}
 
 /* ─── RESET ──────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
