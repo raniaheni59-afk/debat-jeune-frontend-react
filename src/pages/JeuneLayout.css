@@ -50,10 +50,10 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   scroll-behavior: smooth;
 }
 
-/* إذا كنت تستعمل في كلاس .jl-scroll داخل الـ main، تأكد منها */
+
 .jl-scroll {
   padding: 28px 24px 48px;
-  /* نحي overflow-y منا إذا كان موجود في jl-main، أو خليه لهنا برك */
+  
 }
 .jl-right {
   display: flex;
@@ -61,8 +61,8 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 }
 
 .jl-chatbot-wrap {
-  flex: 1; /* يخلي الـ chatbot يعبي المساحة اللي تحت البروفايل الكل */
-  min-height: 0; /* مهمة جداً باش الـ scroll يخدم داخل الـ chatbot */
+  flex: 1; 
+  min-height: 0; 
   display: flex;
   flex-direction: column;
 }
