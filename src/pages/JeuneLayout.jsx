@@ -35,6 +35,13 @@ const JeuneLayout = () => {
   const [activeNav, setActiveNav] = useState(0);
 
   useEffect(() => {
+  document.body.classList.add("jl-active");
+  return () => {
+    document.body.classList.remove("jl-active");
+  };
+}, []);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pubId = params.get("publication");
     if (pubId) {

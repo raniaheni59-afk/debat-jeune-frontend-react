@@ -45,6 +45,11 @@ export default function MessengerPage() {
     [conversations, activeConversationId]
   );
 
+  useEffect(() => {
+  document.body.classList.add("ms-body");
+  return () => document.body.classList.remove("ms-body");
+}, []);
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
