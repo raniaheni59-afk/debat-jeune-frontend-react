@@ -1,256 +1,254 @@
-.ms-attachmentImg{ width:220px; max-width:100%; border-radius:12px; display:block; }
-.ms-attachmentVideo{ width:260px; max-width:100%; border-radius:12px; display:block; }
+/* ✅ كل شيء scoped تحت .ms-page باش ما يأثرش على باقي الصفحات */
 
-.ms-userResult{
-  width:100%;
-  display:flex;
-  gap:12px;
-  align-items:center;
-  padding:12px;
-  border-radius:14px;
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
-  color:#e8ecff;
-  cursor:pointer;
-  margin-bottom:8px;
-  text-align:left;
-}
-.ms-userResult:hover{
-  background: rgba(255,255,255,.10);
-}
-.ms-subtitle{
-  opacity:.75;
-  font-size:12px;
-  padding:8px 4px;
-}
-
-.ms-page{
+.ms-page {
   min-height: 100vh;
+  width: 100%;
   background:
     radial-gradient(900px 500px at 20% 0%, rgba(88,101,242,.45), transparent 60%),
     radial-gradient(900px 500px at 80% 20%, rgba(34,197,94,.25), transparent 55%),
     linear-gradient(120deg, rgba(18,24,38,1), rgba(12,18,30,1));
-  display:flex;
-  justify-content:center;
-  align-items:flex-start;
-  padding:24px;
-  color:#e8ecff;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+  color: #e8ecff;
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+  box-sizing: border-box;
 }
 
-.ms-shell{
-  width:min(1280px, 100%);
+.ms-page * { box-sizing: border-box; }
+
+.ms-page .ms-shell {
+  width: min(1280px, 100%);
   height: calc(100vh - 48px);
-  min-height: 650px;
+  min-height: 600px;
   background: rgba(255,255,255,.06);
-  border: 1px solid rgba(134, 10, 183, 0.744);
+  border: 1px solid rgba(255,255,255,.14);
   border-radius: 18px;
-  overflow:hidden;
-  display:grid;
+  overflow: hidden;
+  display: grid;
   grid-template-columns: 320px 1fr 280px;
-  box-shadow: 0 20px 60px rgba(169, 10, 226, 0.666);
+  box-shadow: 0 20px 60px rgba(0,0,0,.35);
   backdrop-filter: blur(14px);
 }
 
-@media (max-width: 1050px){
-  .ms-shell{ grid-template-columns: 320px 1fr; }
-  .ms-right{ display:none; }
+@media (max-width: 1050px) {
+  .ms-page .ms-shell { grid-template-columns: 320px 1fr; }
+  .ms-page .ms-right { display: none; }
 }
 
-.ms-sidebar{
-  border-right: 1px solid rgba(193, 17, 247, 0.951);
-  background: rgba(178, 14, 184, 0.937);
-  display:flex;
-  flex-direction:column;
+.ms-page .ms-sidebar {
+  border-right: 1px solid rgba(255,255,255,.12);
+  background: rgba(0,0,0,.10);
+  display: flex;
+  flex-direction: column;
 }
 
-.ms-sidebarTop{
-  padding:16px;
-  border-bottom:1px solid rgba(163, 19, 207, 0.955);
+.ms-page .ms-sidebarTop {
+  padding: 16px;
+  border-bottom: 1px solid rgba(255,255,255,.10);
 }
 
-.ms-title{
-  font-weight:800;
-  letter-spacing:.2px;
-  margin-bottom:10px;
+.ms-page .ms-title {
+  font-weight: 800;
+  margin-bottom: 10px;
 }
 
-.ms-search{
-  width:100%;
-  padding:10px 12px;
-  border-radius:12px;
-  border:1px solid rgba(199, 0, 249, 0.975);
-  background: rgba(128, 6, 158, 0.877);
-  color:#e8ecff;
-  outline:none;
+.ms-page .ms-search {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #e8ecff;
+  outline: none;
 }
 
-.ms-list{
-  padding:10px;
-  overflow:auto;
-  flex:1;
+.ms-page .ms-list { padding: 10px; overflow: auto; }
+
+.ms-page .ms-empty {
+  opacity: .7;
+  padding: 18px;
+  text-align: center;
 }
 
-.ms-chatItem{
-  width:100%;
-  display:flex;
-  gap:12px;
-  align-items:center;
-  padding:12px;
-  border-radius:14px;
-  border:1px solid transparent;
+.ms-page .ms-chatItem {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid transparent;
   background: transparent;
-  color:#e8ecff;
-  cursor:pointer;
-  text-align:left;
-  margin-bottom:8px;
+  color: #e8ecff;
+  cursor: pointer;
+  text-align: left;
+  margin-bottom: 8px;
 }
-.ms-chatItem:hover{
-  border-color: rgba(123, 32, 189, 0.673);
-  background: rgba(163, 20, 230, 0.886);
+.ms-page .ms-chatItem:hover {
+  border-color: rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
 }
-.ms-chatItem.active{
-  border-color: rgba(0, 3, 195, 0.756);
-  background: rgba(133, 11, 198, 0.941);
-}
-.ms-avatar{
-  width:42px; height:42px;
-  border-radius:50%;
-  overflow:hidden;
-  border:1px solid rgba(85, 12, 180, 0.834);
-  background: rgba(143, 20, 219, 0.849);
-  flex:0 0 auto;
-}
-.ms-avatar.small{ width:44px; height:44px; }
-.ms-avatar img{ width:100%; height:100%; object-fit:cover; }
-.ms-avatarFallback{
-  width:100%; height:100%;
-  display:flex; align-items:center; justify-content:center;
-  font-weight:800;
-  background: rgba(166, 16, 226, 0.904);
+.ms-page .ms-chatItem.active {
+  border-color: rgba(99,102,241,.5);
+  background: rgba(99,102,241,.18);
 }
 
-.ms-chatMeta{ flex:1; min-width:0; }
-.ms-chatName{ font-weight:800; }
-.ms-chatLast{
-  margin-top:4px;
-  font-size:12.5px;
+.ms-page .ms-avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.08);
+  flex: 0 0 auto;
+}
+.ms-page .ms-avatar.small { width: 44px; height: 44px; }
+.ms-page .ms-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ms-page .ms-avatarFallback {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800;
+  background: rgba(255,255,255,.08);
+}
+
+.ms-page .ms-chatMeta { flex: 1; min-width: 0; }
+.ms-page .ms-chatName { font-weight: 800; }
+.ms-page .ms-chatLast {
+  margin-top: 4px;
+  font-size: 12.5px;
   color: rgba(232,236,255,.78);
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.ms-main{
-  display:flex;
-  flex-direction:column;
-  background: rgba(148, 18, 192, 0.937);
+.ms-page .ms-main {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0,0,0,.06);
 }
 
-.ms-mainHeader{
-  padding:14px 18px;
-  border-bottom:1px solid rgba(119, 23, 209, 0.875);
-  background: rgba(98, 6, 119, 0.901);
+.ms-page .ms-mainHeader {
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
 }
 
-.ms-activeUser{
-  display:flex; gap:12px; align-items:center;
+.ms-page .ms-activeUser {
+  display: flex; gap: 12px; align-items: center;
+}
+.ms-page .ms-activeName { font-weight: 900; }
+.ms-page .ms-activeSub {
+  font-size: 12.5px;
+  color: rgba(232,236,255,.72);
+  margin-top: 2px;
 }
 
-.ms-activeName{ font-weight:900; }
-.ms-activeSub{ font-size:12.5px; color: rgba(232,236,255,.72); margin-top:2px; }
-
-.ms-messages{
-  flex:1;
-  padding:18px;
-  overflow:auto;
+.ms-page .ms-messages {
+  flex: 1;
+  padding: 18px;
+  overflow: auto;
   background:
-    radial-gradient(600px 220px at 50% 0%, rgba(8, 11, 215, 0.888), transparent 60%),
-    rgba(153, 31, 230, 0.864);
+    radial-gradient(600px 220px at 50% 0%, rgba(99,102,241,.18), transparent 60%),
+    rgba(0,0,0,.12);
 }
 
-.ms-bubbleRow{
-  display:flex;
-  margin-bottom:10px;
-}
-.ms-bubbleRow.mine{ justify-content:flex-end; }
-.ms-bubbleRow.theirs{ justify-content:flex-start; }
+.ms-page .ms-bubbleRow { display: flex; margin-bottom: 10px; }
+.ms-page .ms-bubbleRow.mine { justify-content: flex-end; }
+.ms-page .ms-bubbleRow.theirs { justify-content: flex-start; }
 
-.ms-bubble{
+.ms-page .ms-bubble {
   max-width: 68%;
-  padding:12px 14px;
+  padding: 12px 14px;
   border-radius: 16px;
-  border:1px solid rgba(204, 22, 255, 0.864);
-  background: rgba(129, 15, 195, 0.847);
-  box-shadow: 0 10px 28px rgba(110, 13, 189, 0.87);
-  line-height:1.35;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  line-height: 1.35;
 }
-
-.ms-bubble.mine{
-  background: rgba(148, 22, 216, 0.892);
+.ms-page .ms-bubble.mine {
+  background: rgba(99,102,241,.22);
   border-color: rgba(99,102,241,.55);
 }
-.ms-bubble.theirs{
-  background: rgba(135, 12, 229, 0.889);
-  border-color: rgba(153, 13, 181, 0.849);
+.ms-page .ms-bubble.theirs {
+  background: rgba(255,255,255,.06);
+  border-color: rgba(255,255,255,.16);
 }
 
-.ms-time{
-  margin-top:6px;
-  font-size:11px;
+.ms-page .ms-time {
+  margin-top: 6px;
+  font-size: 11px;
   color: rgba(232,236,255,.65);
 }
 
-.ms-inputBar{
-  padding:14px;
-  border-top:1px solid rgba(84, 19, 150, 0.732);
-  display:flex;
-  gap:10px;
-  background: rgba(140, 17, 216, 0.749);
+.ms-page .ms-inputBar {
+  padding: 14px;
+  border-top: 1px solid rgba(255,255,255,.10);
+  display: flex;
+  gap: 10px;
+  background: rgba(255,255,255,.04);
+}
+.ms-page .ms-iconBtn {
+  width: 42px; height: 42px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #e8ecff;
+  cursor: pointer;
+}
+.ms-page .ms-input {
+  flex: 1;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #e8ecff;
+  padding: 10px 14px;
+  outline: none;
+}
+.ms-page .ms-sendBtn {
+  width: 110px;
+  border-radius: 14px;
+  border: 1px solid rgba(99,102,241,.55);
+  background: rgba(99,102,241,.30);
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.ms-page .ms-sendBtn:disabled { opacity: .5; cursor: not-allowed; }
+
+.ms-page .ms-attachmentImg {
+  width: 220px;
+  max-width: 100%;
+  border-radius: 12px;
+  display: block;
+}
+.ms-page .ms-attachmentVideo {
+  width: 260px;
+  max-width: 100%;
+  border-radius: 12px;
+  display: block;
 }
 
-.ms-iconBtn{
-  width:42px; height:42px;
-  border-radius:14px;
-  border:1px solid rgba(99, 15, 159, 0.12);
-  background: rgba(160, 29, 225, 0.841);
-  color:#e8ecff;
-  cursor:pointer;
+.ms-page .ms-userResult {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #e8ecff;
+  cursor: pointer;
+  margin-bottom: 8px;
+  text-align: left;
 }
-.ms-input{
-  flex:1;
-  border-radius:14px;
-  border:1px solid rgba(135, 25, 199, 0.742);
-  background: rgba(129, 19, 189, 0.832);
-  color:#e8ecff;
-  padding:10px 14px;
-  outline:none;
+.ms-page .ms-userResult:hover {
+  background: rgba(255,255,255,.10);
 }
-.ms-sendBtn{
-  width:110px;
-  border-radius:14px;
-  border:1px solid rgba(99,102,241,.55);
-  background: rgba(23, 26, 172, 0.879);
-  color:#fff;
-  font-weight:800;
-  cursor:pointer;
+.ms-page .ms-subtitle {
+  opacity: .75;
+  font-size: 12px;
+  padding: 8px 4px;
 }
-.ms-sendBtn:disabled{
-  opacity:.5; cursor:not-allowed;
-}
-
-.ms-right{
-  border-left:1px solid rgba(153, 48, 188, 0.734);
-  background: rgba(148, 28, 175, 0.832);
-  padding:16px;
-}
-
-.ms-rightCard{
-  border:1px solid rgba(113, 18, 148, 0.89);
-  background: rgba(123, 13, 179, 0.856);
-  border-radius:16px;
-  padding:14px;
-}
-.ms-rightTitle{ font-weight:900; margin-bottom:10px; }
-.ms-rightText{ color: rgba(232,236,255,.78); line-height:1.45; font-size:13px; }
-.ms-page { min-height: 100vh; }
