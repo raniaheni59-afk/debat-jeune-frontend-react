@@ -17,12 +17,12 @@
   height: calc(100vh - 48px);
   min-height: 650px;
   background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.14);
+  border: 1px solid rgba(134, 10, 183, 0.744);
   border-radius: 18px;
   overflow:hidden;
   display:grid;
   grid-template-columns: 320px 1fr 280px;
-  box-shadow: 0 20px 60px rgba(0,0,0,.35);
+  box-shadow: 0 20px 60px rgba(169, 10, 226, 0.666);
   backdrop-filter: blur(14px);
 }
 
@@ -32,15 +32,15 @@
 }
 
 .ms-sidebar{
-  border-right: 1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.10);
+  border-right: 1px solid rgba(193, 17, 247, 0.951);
+  background: rgba(178, 14, 184, 0.937);
   display:flex;
   flex-direction:column;
 }
 
 .ms-sidebarTop{
   padding:16px;
-  border-bottom:1px solid rgba(255,255,255,.10);
+  border-bottom:1px solid rgba(163, 19, 207, 0.955);
 }
 
 .ms-title{
@@ -53,8 +53,8 @@
   width:100%;
   padding:10px 12px;
   border-radius:12px;
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
+  border:1px solid rgba(199, 0, 249, 0.975);
+  background: rgba(128, 6, 158, 0.877);
   color:#e8ecff;
   outline:none;
 }
@@ -80,19 +80,19 @@
   margin-bottom:8px;
 }
 .ms-chatItem:hover{
-  border-color: rgba(255,255,255,.14);
-  background: rgba(255,255,255,.06);
+  border-color: rgba(123, 32, 189, 0.673);
+  background: rgba(163, 20, 230, 0.886);
 }
 .ms-chatItem.active{
-  border-color: rgba(99,102,241,.5);
-  background: rgba(99,102,241,.18);
+  border-color: rgba(0, 3, 195, 0.756);
+  background: rgba(133, 11, 198, 0.941);
 }
 .ms-avatar{
   width:42px; height:42px;
   border-radius:50%;
   overflow:hidden;
-  border:1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.08);
+  border:1px solid rgba(85, 12, 180, 0.834);
+  background: rgba(143, 20, 219, 0.849);
   flex:0 0 auto;
 }
 .ms-avatar.small{ width:44px; height:44px; }
@@ -101,7 +101,7 @@
   width:100%; height:100%;
   display:flex; align-items:center; justify-content:center;
   font-weight:800;
-  background: rgba(255,255,255,.08);
+  background: rgba(166, 16, 226, 0.904);
 }
 
 .ms-chatMeta{ flex:1; min-width:0; }
@@ -118,13 +118,13 @@
 .ms-main{
   display:flex;
   flex-direction:column;
-  background: rgba(0,0,0,.06);
+  background: rgba(148, 18, 192, 0.937);
 }
 
 .ms-mainHeader{
   padding:14px 18px;
-  border-bottom:1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.04);
+  border-bottom:1px solid rgba(119, 23, 209, 0.875);
+  background: rgba(98, 6, 119, 0.901);
 }
 
 .ms-activeUser{
@@ -139,8 +139,8 @@
   padding:18px;
   overflow:auto;
   background:
-    radial-gradient(600px 220px at 50% 0%, rgba(99,102,241,.18), transparent 60%),
-    rgba(0,0,0,.12);
+    radial-gradient(600px 220px at 50% 0%, rgba(8, 11, 215, 0.888), transparent 60%),
+    rgba(153, 31, 230, 0.864);
 }
 
 .ms-bubbleRow{
@@ -154,19 +154,19 @@
   max-width: 68%;
   padding:12px 14px;
   border-radius: 16px;
-  border:1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.06);
-  box-shadow: 0 10px 28px rgba(0,0,0,.18);
+  border:1px solid rgba(204, 22, 255, 0.864);
+  background: rgba(129, 15, 195, 0.847);
+  box-shadow: 0 10px 28px rgba(110, 13, 189, 0.87);
   line-height:1.35;
 }
 
 .ms-bubble.mine{
-  background: rgba(99,102,241,.22);
+  background: rgba(148, 22, 216, 0.892);
   border-color: rgba(99,102,241,.55);
 }
 .ms-bubble.theirs{
-  background: rgba(255,255,255,.06);
-  border-color: rgba(255,255,255,.16);
+  background: rgba(135, 12, 229, 0.889);
+  border-color: rgba(153, 13, 181, 0.849);
 }
 
 .ms-time{
@@ -177,25 +177,25 @@
 
 .ms-inputBar{
   padding:14px;
-  border-top:1px solid rgba(255,255,255,.10);
+  border-top:1px solid rgba(84, 19, 150, 0.732);
   display:flex;
   gap:10px;
-  background: rgba(255,255,255,.04);
+  background: rgba(140, 17, 216, 0.749);
 }
 
 .ms-iconBtn{
   width:42px; height:42px;
   border-radius:14px;
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
+  border:1px solid rgba(99, 15, 159, 0.12);
+  background: rgba(160, 29, 225, 0.841);
   color:#e8ecff;
   cursor:pointer;
 }
 .ms-input{
   flex:1;
   border-radius:14px;
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
+  border:1px solid rgba(135, 25, 199, 0.742);
+  background: rgba(129, 19, 189, 0.832);
   color:#e8ecff;
   padding:10px 14px;
   outline:none;
@@ -204,7 +204,7 @@
   width:110px;
   border-radius:14px;
   border:1px solid rgba(99,102,241,.55);
-  background: rgba(99,102,241,.30);
+  background: rgba(23, 26, 172, 0.879);
   color:#fff;
   font-weight:800;
   cursor:pointer;
@@ -214,14 +214,14 @@
 }
 
 .ms-right{
-  border-left:1px solid rgba(255,255,255,.12);
-  background: rgba(0,0,0,.08);
+  border-left:1px solid rgba(153, 48, 188, 0.734);
+  background: rgba(148, 28, 175, 0.832);
   padding:16px;
 }
 
 .ms-rightCard{
-  border:1px solid rgba(255,255,255,.12);
-  background: rgba(255,255,255,.06);
+  border:1px solid rgba(113, 18, 148, 0.89);
+  background: rgba(123, 13, 179, 0.856);
   border-radius:16px;
   padding:14px;
 }
