@@ -6,7 +6,10 @@ import "./MessengerPage.css";
 function decodeUserId(token) {
   if (!token) return null;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    
+    const payload = JSON.parse(atob(parts[1]));
     return String(payload.userId ?? payload.id_user ?? payload.id ?? payload.sub ?? payload.user?.id);
   } catch {
     return null;
@@ -18,7 +21,10 @@ export default function MessengerPage() {
   const userId = useMemo(() => decodeUserId(token), [token]);
 
   const apiBase = API.defaults.baseURL || "";
-  const SOCKET_URL = apiBase.replace(/\/api\/?$/, ""); // remove /api
+  // تحسين استخراج رابط الـ Socket لضمان عدم وجود /api في النهاية
+  const SOCKET_URL = apiBase.includes("/api") 
+    ? apiBase.split("/api")[0] 
+    : apiBase;
 
   const [query, setQuery] = useState("");
   const [searchUsers, setSearchUsers] = useState([]);
