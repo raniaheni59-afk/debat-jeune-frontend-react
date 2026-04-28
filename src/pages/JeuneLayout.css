@@ -374,7 +374,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   opacity: 0.7;
 }
 .jl-stat-card:hover {
-  background: rgba(148, 20, 155, 0.853);
+  background: rgb(93, 11, 97);
   border-color: var(--border-h);
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(162, 64, 201, 0.915), 0 0 0 1px rgba(124,92,252,0.15);
