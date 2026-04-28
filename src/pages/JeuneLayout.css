@@ -4,9 +4,9 @@
 :root {
   --bg:       #4848b7;
   --bg2:      #3e3ec7;
-  --glass:    rgba(158, 53, 223, 0.795);
-  --glass-b:  rgba(169, 72, 202, 0.919);
-  --border:   rgba(161, 32, 184, 0.967);
+  --glass:    rgba(158, 53, 223, 0.629);
+  --glass-b:  rgba(169, 72, 202, 0.722);
+  --border:   rgba(161, 32, 184, 0.677);
   --border-h: rgba(159, 130, 255, 0.896);
   --purple:   #7c5cfc;
   --purple-l: #a78bfa;
