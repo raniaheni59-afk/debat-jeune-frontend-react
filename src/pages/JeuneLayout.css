@@ -642,12 +642,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   .jl-welcome-h1 { font-size: 22px; }
 }
 
-body.jl-active {
-  height: 100vh;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
+
 .jl-root {
   display: flex !important;
   height: 100vh !important;
