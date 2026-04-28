@@ -44,6 +44,16 @@ export default function MessengerPage() {
     [conversations, activeConversationId]
   );
 
+  useEffect(() => {
+  // باش نضيف class على body فقط وقت ما نكون في messenger
+  document.body.classList.add("ms-body");
+
+  return () => {
+    // نشيلوها كي نخرج
+    document.body.classList.remove("ms-body");
+  };
+}, []);
+
   // socket connect + listen
   useEffect(() => {
     if (!token) return;
