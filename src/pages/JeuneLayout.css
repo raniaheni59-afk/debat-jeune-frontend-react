@@ -44,11 +44,13 @@
   z-index: 10;
 }
 
-/* 3. El Main content fil west */
 .jl-main {
   flex: 1;
   height: 100vh;
-  overflow-y: auto; /* El scroll ykoun houni barka */
+  overflow-y: auto; /* Khalli ken hedhi auto */
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Ki ykoun el menu mkhabbé, el main content yched el fadhwa lkol */
