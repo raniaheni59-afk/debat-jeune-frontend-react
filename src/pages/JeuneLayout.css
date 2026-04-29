@@ -355,3 +355,6 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   .jl-welcome-art { display:none; }
 }
 @media (max-width:480px) { .jl-stats { grid-template-columns:1fr 1fr; } .jl-welcome-h1 { font-size:22px; } }
+
+
+
