@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Outlet } from "react-router-dom";
+import { io } from "socket.io-client";
 import API from "../services/api";
 import PublicationCard from "../components/PublicationCard";
 import Chatbot from "../components/Chatbot";
@@ -34,6 +35,7 @@ const JeuneLayout = () => {
     }
   });
   const navigate = useNavigate();
+  const token = localStorage.getItem("token");
 
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,8 +49,8 @@ const JeuneLayout = () => {
 
 useEffect(() => {
   if (!token) return;
-
-  const newSocket = io(SOCKET_URL, {
+  
+  const newSocket = io(BACKEND, {
     auth: { token },
     transports: ["websocket"] // Zid hedhi bech tna9as el déconnexion
   });
@@ -98,7 +100,7 @@ useEffect(() => {
   };
 
   return (
-    <div className={`jl-root ${!sidebarOpen ? "sidebar-closed" : ""}`}>
+    <div className={`jl-container jl-root ${!sidebarOpen ? "sidebar-closed" : ""}`}>
       {/* Animated background orbs */}
       <div className="jl-orb jl-orb1" />
       <div className="jl-orb jl-orb2" />
