@@ -51,18 +51,18 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 .jl-orb1 {
   width: 500px; height: 500px;
   /* ✅ opacity 0.08 max — décoratif seulement */
-  background: radial-gradient(circle, rgba(124,92,252,0.08) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(124, 92, 252, 0.849) 0%, transparent 70%);
   top: -120px; left: -100px;
 }
 .jl-orb2 {
   width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(79,163,247,0.06) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(79, 163, 247, 0.826) 0%, transparent 70%);
   bottom: 0; right: 100px;
   animation-delay: -4s;
 }
 .jl-orb3 {
   width: 300px; height: 300px;
-  background: radial-gradient(circle, rgba(244,114,182,0.05) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(244, 114, 181, 0.84) 0%, transparent 70%);
   top: 50%; left: 40%;
   animation-delay: -8s;
 }
@@ -83,7 +83,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 .jl-sidebar {
   width: var(--sidebar-w);
   height: 100vh;
-  background: rgba(71, 10, 97, 0.95);
+  background: rgba(105, 16, 144, 0.95);
   backdrop-filter: blur(24px);
   border-right: 1px solid var(--border);
   display: flex;
@@ -126,22 +126,22 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   border: 1px solid transparent;
 }
 .jl-nav-item:hover {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.844);
   color: var(--text); border-color: var(--border-h);
 }
 .jl-nav-item.active {
-  background: rgba(124,92,252,0.20);
-  color: var(--text); border-color: rgba(124,92,252,0.35);
-  box-shadow: 0 4px 16px rgba(124,92,252,0.15);
+  background: rgba(124, 92, 252, 0.833);
+  color: var(--text); border-color: rgba(124, 92, 252, 0.941);
+  box-shadow: 0 4px 16px rgba(124, 92, 252, 0.868);
 }
 .jl-nav-icon { font-size: 17px; width: 22px; text-align: center; flex-shrink: 0; }
 .jl-nav-label { flex: 1; }
  
 .jl-badge {
-  background: rgba(124,92,252,0.30); color: var(--purple-l);
+  background: rgba(124, 92, 252, 0.895); color: var(--purple-l);
   border-radius: 20px; padding: 2px 8px; font-size: 11px; font-weight: 700;
 }
-.jl-badge.green { background: rgba(52,211,153,0.20); color: var(--green); }
+.jl-badge.green { background: rgba(52, 211, 153, 0.69); color: var(--green); }
  
 .jl-logout {
   display: flex; align-items: center; gap: 10px;
@@ -151,7 +151,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   margin-top: 12px; border: 1px solid transparent;
 }
 .jl-logout:hover {
-  background: rgba(244,114,182,0.10);
+  background: rgba(244, 114, 181, 0.83);
   color: var(--pink); border-color: rgba(244,114,182,0.20);
 }
  
@@ -238,7 +238,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 }
 .jl-welcome-ring {
   border-radius: 50%;
-  border: 1.5px solid rgba(167,139,250,0.25);
+  border: 1.5px solid rgba(167, 139, 250, 0.781);
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%,-50%);
   animation: pulseRing 3s ease-in-out infinite;
@@ -257,7 +257,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   gap: 12px; margin-bottom: 20px;
 }
 .jl-stat-card {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.764);
   border: 1px solid var(--border);
   border-radius: var(--radius); padding: 18px 16px;
   display: flex; align-items: center; gap: 14px;
@@ -269,7 +269,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   background:linear-gradient(90deg,var(--accent,#7c5cfc),transparent); opacity:.7;
 }
 .jl-stat-card:hover {
-  background: rgba(255,255,255,0.09);
+  background: rgba(255, 255, 255, 0.768);
   border-color: var(--border-h); transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.25);
 }
