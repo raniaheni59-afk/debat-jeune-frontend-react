@@ -38,9 +38,7 @@ const JeuneLayout = () => {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
 
-  const NAV_ITEMS = [
-  { icon: "⚙", label: "Paramètres", path: "/settings" }, // Lezem ykoun /settings
-];
+ 
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [highlightedPub, setHighlightedPub] = useState(null);
