@@ -7,6 +7,10 @@ import './index.css';
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
+    <Routes>
+        <Route path="/profile/:id" element={<ProfilePage />} />
+        <Route path="*" element={<Navigate to="/profile/1" />} />
+      </Routes>
       <App />
     </BrowserRouter>
   </React.StrictMode>
