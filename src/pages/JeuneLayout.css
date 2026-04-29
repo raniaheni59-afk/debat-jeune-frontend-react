@@ -34,14 +34,14 @@
   overflow: hidden;
 }
 
-/* 2. Traja3 el Sidebar ken mchet */
-.jl-sidebar {
-  width: var(--sidebar-w, 220px) !important;
-  min-width: 220px;
-  display: block !important; /* Forceha bechn t-th-har */
+.jl-right {
+  width: var(--right-w);
   height: 100vh;
-  background: var(--glass);
-  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Sakker el scroll houni */
+  border-left: 1px solid var(--border);
+  background: var(--glass-b);
 }
 
 .jl-main {
@@ -53,23 +53,6 @@
   flex-direction: column;
 }
 
-/* Ki ykoun el menu mkhabbé, el main content yched el fadhwa lkol */
-.sidebar-closed .jl-main {
-  width: 100vw;
-}
-
-/* ── El Logo Toggle ── */
-.jl-logo-wrap {
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: transform 0.2s;
-}
-
-.jl-logo-wrap:hover {
-  transform: scale(1.05);
-}
 
 /* Responsive: fil mobile el logo dima ykhabi el menu */
 @media (max-width: 768px) {
