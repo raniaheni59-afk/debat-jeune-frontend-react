@@ -211,7 +211,7 @@ export default function MessengerPage() {
           display: flex; flex-direction: column;
           background: rgba(18,18,43,0.88);
           backdrop-filter: blur(24px);
-          border-right: 1px solid rgba(255,255,255,.09);
+          border-right: 1px solid rgba(255, 255, 255, 0.74);
         }
         .ms-sidebar-top {
           padding: 20px 16px 14px;
@@ -222,8 +222,8 @@ export default function MessengerPage() {
         }
         .ms-back-btn {
           width: 32px; height: 32px; border-radius: 8px;
-          background: rgba(124,92,252,.15); color: #a78bfa;
-          border: 1px solid rgba(124,92,252,.25);
+          background: rgba(124, 92, 252, 0.78); color: #a78bfa;
+          border: 1px solid rgba(124, 92, 252, 0.82);
           display: flex; align-items: center; justify-content: center;
           font-size: 14px; transition: all .2s;
         }
@@ -239,7 +239,7 @@ export default function MessengerPage() {
           background: rgba(255,255,255,.05); color: #e8ecff;
           outline: none; font-size: 13px; transition: border-color .2s;
         }
-        .ms-search:focus { border-color: rgba(124,92,252,.4); }
+        .ms-search:focus { border-color: rgba(124, 92, 252, 0.85); }
         .ms-search::placeholder { color: rgba(232,236,255,.4); }
         .ms-list { flex: 1; overflow-y: auto; padding: 8px; scrollbar-width: thin; scrollbar-color: rgba(124,92,252,.2) transparent; }
         .ms-list::-webkit-scrollbar { width: 3px; }
@@ -254,23 +254,23 @@ export default function MessengerPage() {
           color: #e8ecff; text-align: left; margin-bottom: 4px;
           transition: all .18s;
         }
-        .ms-chat-item:hover { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.09); }
-        .ms-chat-item.active { background: rgba(124,92,252,.18); border-color: rgba(124,92,252,.35); }
+        .ms-chat-item:hover { background: rgba(255, 255, 255, 0.79); border-color: rgba(255,255,255,.09); }
+        .ms-chat-item.active { background: rgba(124, 92, 252, 0.93); border-color: rgba(124,92,252,.35); }
         .ms-chat-item .ms-ava { width:42px;height:42px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.12);flex-shrink:0;background:rgba(255,255,255,.06); }
         .ms-chat-item .ms-ava img { width:100%;height:100%;object-fit:cover; }
         .ms-chat-meta { flex:1;min-width:0; }
         .ms-chat-name { font-size:13px;font-weight:700;color:#e8ecff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .ms-chat-last { font-size:11.5px;color:rgba(232,236,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px; }
+        .ms-chat-last { font-size:11.5px;color:rgba(232, 236, 255, 0.71);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px; }
         .ms-chat-time { font-size:10px;color:rgba(232,236,255,.4);flex-shrink:0; }
 
         /* ── MAIN CHAT ── */
         .ms-main {
           display: flex; flex-direction: column;
-          background: rgba(0,0,0,.08);
-          border-right: 1px solid rgba(255,255,255,.07);
+          background: rgba(0, 0, 0, 0.8);
+          border-right: 1px solid rgba(255, 255, 255, 0.94);
         }
         .ms-main-header {
-          padding: 16px 20px; border-bottom: 1px solid rgba(255,255,255,.07);
+          padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.85);
           background: rgba(18,18,43,.6); backdrop-filter: blur(16px);
           display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
         }
@@ -284,13 +284,13 @@ export default function MessengerPage() {
         .ms-messages {
           flex: 1; padding: 20px; overflow-y: auto;
           display: flex; flex-direction: column; gap: 8px;
-          scrollbar-width: thin; scrollbar-color: rgba(124,92,252,.2) transparent;
+          scrollbar-width: thin; scrollbar-color: rgba(124, 92, 252, 0.86) transparent;
         }
         .ms-messages::-webkit-scrollbar { width: 3px; }
-        .ms-messages::-webkit-scrollbar-thumb { background: rgba(124,92,252,.3); border-radius: 4px; }
+        .ms-messages::-webkit-scrollbar-thumb { background: rgba(124, 92, 252, 0.9); border-radius: 4px; }
 
         .ms-date-divider {
-          text-align: center; font-size: 11px; color: rgba(232,236,255,.35);
+          text-align: center; font-size: 11px; color: rgba(232, 236, 255, 0.96);
           font-weight: 600; margin: 8px 0; letter-spacing: .5px;
         }
         .ms-bubble-row { display:flex; align-items:flex-end; gap:8px; }
