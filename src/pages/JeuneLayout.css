@@ -44,13 +44,11 @@
   z-index: 10;
 }
 
+/* 3. El Main content fil west */
 .jl-main {
   flex: 1;
   height: 100vh;
-  overflow-y: auto; /* Khalli ken hedhi auto */
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
+  overflow-y: auto; /* El scroll ykoun houni barka */
 }
 
 /* Ki ykoun el menu mkhabbé, el main content yched el fadhwa lkol */
@@ -566,12 +564,19 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 /* ─── RIGHT SIDEBAR ──────────────────────────────── */
 .jl-right {
   width: var(--right-w);
-  height: 100vh;
+  min-height: 100vh;
+  background: rgba(73, 15, 95, 0.603);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-left: 1px solid var(--border);
+  padding: 28px 16px;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Sakker el scroll houni */
-  border-left: 1px solid var(--border);
-  background: var(--glass-b);
+  gap: 16px;
+  z-index: 1;
+  flex-shrink: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 .jl-right::-webkit-scrollbar { display: none; }
 
