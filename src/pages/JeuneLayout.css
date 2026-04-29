@@ -25,26 +25,37 @@
 
 }
 
-/* 1. Force el container ykoun Flex */
-.jl-container {
-  display: flex !important;
-  flex-direction: row !important; /* Bechn el menu wel content yjiw bjanb b3adh-hom */
+/* Container kbir ykoun fixe */
+.jl-root {
+  display: flex;
+  height: 100vh;
   width: 100vw;
+  overflow: hidden; /* Na7i el scroll el kbir */
+}
+
+/* Sidebar limin wel ysar ykounu fixes */
+.jl-sidebar, .jl-right {
+  height: 100vh;
+  overflow: hidden; /* May-scrollich */
+  flex-shrink: 0;
+}
+
+/* El main content mte3na */
+.jl-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   height: 100vh;
   overflow: hidden;
 }
 
-.jl-right {
-  width: var(--right-w);
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden; /* Sakker el scroll houni */
-  border-left: 1px solid var(--border);
-  background: var(--glass-b);
+/* El blassa mte3 el publications barka hiya el scrollable */
+.jl-scroll {
+  flex: 1;
+  overflow-y: auto; /* Scroll ken houni */
+  padding: 20px;
+  scroll-behavior: smooth;
 }
-
-
 
 /* Responsive: fil mobile el logo dima ykhabi el menu */
 @media (max-width: 768px) {
