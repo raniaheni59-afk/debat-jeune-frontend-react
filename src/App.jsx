@@ -15,6 +15,7 @@ import PublicationDetail from "./pages/PublicationDetail";
 import Accueil from "./pages/Accueil";
 import Swafy from "./pages/Swafy";
 import "./index.css";
+import Settings from "./pages/Settings";
 
 
 const ProtectedAdminRoute = ({ children }) => {
