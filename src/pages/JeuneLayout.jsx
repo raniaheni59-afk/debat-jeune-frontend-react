@@ -41,7 +41,7 @@ const JeuneLayout = () => {
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [highlightedPub, setHighlightedPub] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState(0);
 
   const toggleSidebar = () => {
