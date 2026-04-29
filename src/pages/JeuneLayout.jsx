@@ -46,16 +46,18 @@ const JeuneLayout = () => {
   };
 
 useEffect(() => {
-  
-  document.body.style.overflow = "auto";
-  document.body.style.position = "static";
-  window.scrollTo(0, 0);
+  if (!token) return;
 
-  // Cleanup function: ki nakhroujou mel page hedhi
+  const newSocket = io(SOCKET_URL, {
+    auth: { token },
+    transports: ["websocket"] // Zid hedhi bech tna9as el déconnexion
+  });
+
+  // CLEANUP: Hedhi aham 7aja bech tna7i el loop
   return () => {
-    document.body.style.overflow = "auto";
+    newSocket.disconnect();
   };
-}, []);
+}, [token]); // Lezem el dependency tkoun ken el token
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
