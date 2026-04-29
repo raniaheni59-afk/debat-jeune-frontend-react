@@ -290,16 +290,16 @@
 }
 .premium-badge {
   position: absolute; top: 12px; right: 12px;
-  background: linear-gradient(135deg, #d946ef, #a21caf);
+  background: linear-gradient(135deg, #7c3aed, #7c3aed);
   color: white; font-size: 10px; font-weight: 800;
   padding: 4px 8px; border-radius: 6px; letter-spacing: 1px;
 }
-.premium-widget h4 { color: #86198f; margin: 0 0 8px 0; font-size: 16px; }
-.premium-widget p { color: #a21caf; font-size: 13px; margin: 0 0 16px 0; line-height: 1.4; }
+.premium-widget h4 { color: #7c3aed; margin: 0 0 8px 0; font-size: 16px; }
+.premium-widget p { color: #8541af; font-size: 13px; margin: 0 0 16px 0; line-height: 1.4; }
 
 .btn-upgrade {
   width: 100%; padding: 10px; border: none; border-radius: 10px;
-  background: linear-gradient(135deg, #d946ef, #a21CAF);
+  background: linear-gradient(135deg, #8541af, #7c3aed);
   color: white; font-weight: 600; cursor: pointer;
   font-size: 13px; box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
 }
