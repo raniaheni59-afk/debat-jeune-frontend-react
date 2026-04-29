@@ -69,15 +69,8 @@ const ProtectedAdminRoute = ({ children }) => {
           <AdminDashboard />
         </ProtectedAdminRoute>
       } />
-    
-       <Route 
-  path="/settings" 
-  element={
-    <ProtectedRoute>
-      <Settings />
-    </ProtectedRoute>
-  } 
-/>
+      <Route path="/settings" element={<SettingsPage />} />
+      
       {/* 404 */}
       <Route path="*" element={<h2>404 - Page non trouvée</h2>} />
     </Routes>
