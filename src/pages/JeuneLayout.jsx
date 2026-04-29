@@ -49,20 +49,23 @@ const JeuneLayout = () => {
   };
 
 useEffect(() => {
-  const token = localStorage.getItem("token"); // Récupère ton token
-  if (!token) return;
+  const token = localStorage.getItem("token"); // 💡 Thabet esmou "token" walla "token_user"
 
-  // Initialisation propre
+  if (!token) {
+    console.error("No token found in localStorage");
+    return;
+  }
+
   const newSocket = io("https://debat-jeune-production.up.railway.app", {
-    auth: { token },
-    transports: ["websocket"], // Force le websocket pour éviter les bugs de polling
-    reconnectionAttempts: 5    // Limite les tentatives pour éviter de saturer le serveur
+    auth: { token }, // 💡 Hna lezem ykoun el token maktoub s7i7
+    transports: ["websocket"]
   });
 
-return () => {
-    console.log("Nettoyage du socket...");
-    newSocket.disconnect();
-  };
+  newSocket.on("connect_error", (err) => {
+    console.error("Socket connection error:", err.message);
+  });
+
+  return () => newSocket.disconnect();
 }, []);
 
   useEffect(() => {
