@@ -25,39 +25,30 @@
 
 }
 
-/* ── Container mte3na ── */
+/* 1. Force el container ykoun Flex */
 .jl-container {
-  display: flex;
-  height: 100vh;
+  display: flex !important;
+  flex-direction: row !important; /* Bechn el menu wel content yjiw bjanb b3adh-hom */
   width: 100vw;
-  overflow: hidden;
-  transition: all 0.3s ease; /* Animation bechn el dakhla tji ndhifa */
-}
-
-/* ── Sidebar ── */
-.jl-sidebar {
-  width: var(--sidebar-w);
   height: 100vh;
-  flex-shrink: 0;
-  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+/* 2. Traja3 el Sidebar ken mchet */
+.jl-sidebar {
+  width: var(--sidebar-w, 220px) !important;
+  min-width: 220px;
+  display: block !important; /* Forceha bechn t-th-har */
+  height: 100vh;
   background: var(--glass);
-  border-right: 1px solid var(--border);
+  z-index: 10;
 }
 
-/* ── Ki ykoun el menu mkhabbé ── */
-.sidebar-closed .jl-sidebar {
-  width: 0;
-  transform: translateX(-100%); /* Yokhroj mel écran */
-  opacity: 0;
-  visibility: hidden;
-}
-
-/* ── El Main Content ── */
+/* 3. El Main content fil west */
 .jl-main {
   flex: 1;
   height: 100vh;
-  overflow-y: auto; /* El scroll ken houni */
-  transition: all 0.3s ease;
+  overflow-y: auto; /* El scroll ykoun houni barka */
 }
 
 /* Ki ykoun el menu mkhabbé, el main content yched el fadhwa lkol */
