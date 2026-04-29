@@ -44,14 +44,6 @@
   background: var(--glass-b);
 }
 
-.jl-main {
-  flex: 1;
-  height: 100vh;
-  overflow-y: auto; /* Khalli ken hedhi auto */
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
-}
 
 
 /* Responsive: fil mobile el logo dima ykhabi el menu */
