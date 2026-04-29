@@ -34,7 +34,7 @@ const JeuneLayout = () => {
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [highlightedPub, setHighlightedPub] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeNav, setActiveNav] = useState(0);
 
   const toggleSidebar = () => {
@@ -92,7 +92,6 @@ useEffect(() => {
   };
 
   return (
-    
     <div className={`jl-root ${!sidebarOpen ? "sidebar-closed" : ""}`}>
       {/* Animated background orbs */}
       <div className="jl-orb jl-orb1" />
