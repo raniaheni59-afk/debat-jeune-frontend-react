@@ -26,15 +26,19 @@ const NAV_ITEMS = [
 
 const JeuneLayout = () => {
   const [user, setUser] = useState(() => {
-  const saved = localStorage.getItem("user");
-  return saved ? JSON.parse(saved) : null;
-});
+    try {
+      const saved = localStorage.getItem("user");
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      return null;
+    }
+  });
   const navigate = useNavigate();
 
   const [publications, setPublications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [highlightedPub, setHighlightedPub] = useState(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeNav, setActiveNav] = useState(0);
 
   const toggleSidebar = () => {
