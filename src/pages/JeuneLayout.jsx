@@ -49,18 +49,21 @@ const JeuneLayout = () => {
   };
 
 useEffect(() => {
-  if (!token || !BACKEND) return;
-  
-  const newSocket = io(BACKEND, {
+  const token = localStorage.getItem("token"); // Récupère ton token
+  if (!token) return;
+
+  // Initialisation propre
+  const newSocket = io("https://debat-jeune-production.up.railway.app", {
     auth: { token },
-    transports: ["websocket"] // Zid hedhi bech tna9as el déconnexion
+    transports: ["websocket"], // Force le websocket pour éviter les bugs de polling
+    reconnectionAttempts: 5    // Limite les tentatives pour éviter de saturer le serveur
   });
 
-  // CLEANUP: Hedhi aham 7aja bech tna7i el loop
-  return () => {
+return () => {
+    console.log("Nettoyage du socket...");
     newSocket.disconnect();
   };
-}, [token]); // Lezem el dependency tkoun ken el token
+}, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
