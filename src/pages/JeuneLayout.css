@@ -321,7 +321,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 /* ─── RIGHT SIDEBAR ──────────────────────────────── */
 .jl-right {
   width: var(--right-w); height: 100vh;
-  background: #7260A7;
+  background: #dedce3;
   backdrop-filter: blur(24px);
   border-left: 1px solid var(--border);
   padding: 28px 16px;
