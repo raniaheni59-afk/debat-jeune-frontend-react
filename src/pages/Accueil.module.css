@@ -358,7 +358,7 @@
 }
 .phoneCard{
   background: linear-gradient(135deg, rgba(255,255,255,.14), rgba(255,255,255,.06));
-  border: 1px solid rgba(255,255,255,.16);
+  border: 1px solid #7260A7(255,255,255,.16);
   border-radius: 18px;
   padding: 14px;
   color: #fff;
@@ -370,7 +370,7 @@
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(255, 209, 102, .95);
-  color: #2a1f4b;
+  color: #7260A7;
 }
 .phoneTitle{
   margin-top: 10px;
@@ -402,8 +402,8 @@
   flex: 1;
   height: 38px;
   border-radius: 14px;
-  background: rgba(255,255,255,.10);
-  border: 1px solid rgba(255,255,255,.12);
+  background: #7260A7;
+  border: 1px solid #7260A7;
 }
 .phoneList{
   margin-top: 14px;
@@ -413,8 +413,8 @@
 .listItem{
   height: 16px;
   border-radius: 999px;
-  background: rgba(255,255,255,.10);
-  border: 1px solid rgba(255,255,255,.12);
+  background: #7260A7;
+  border: 1px solid #7260A7;
 }
 
 /* STEPS */
@@ -427,9 +427,9 @@
 .miniPreview{
   height: 260px;
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(111,90,167,.18), rgba(111,90,167,.08));
-  border: 1px solid rgba(111,90,167,.18);
-  box-shadow: 0 12px 30px rgba(40,20,90,.08);
+  background: linear-gradient(180deg, #7260A7, #7260A7);
+  border: 1px solid #7260A7;
+  box-shadow: 0 12px 30px #7260A7;
   padding: 18px;
 }
 .miniTop{
@@ -448,7 +448,7 @@
 
 .stepsRight h3{
   margin: 0 0 12px;
-  color: #241c40;
+  color: #7260A7;
   font-size: 22px;
 }
 .stepItem{
@@ -458,7 +458,7 @@
   border-radius: 18px;
   background: #fff;
   border: 1px solid var(--stroke);
-  box-shadow: 0 10px 22px rgba(40,20,90,.06);
+  box-shadow: 0 10px 22px #7260A7;
   margin-bottom: 10px;
 }
 .stepNum{
@@ -471,7 +471,7 @@
   place-items: center;
   font-weight: 1000;
 }
-.stepTitle{ font-weight: 950; color: #2b214e; }
+.stepTitle{ font-weight: 950; color: #7260A7; }
 .stepDesc{ color: var(--muted); font-weight: 600; font-size: 14px; margin-top: 2px; }
 
 .cta{
@@ -489,7 +489,7 @@
 /* FOOTER */
 .footer{
   margin-top: 10px;
-  background: linear-gradient(180deg, #6f5aa7 0%, #5f4a97 100%);
+  background: linear-gradient(180deg, #7260A7 0%, #7260A7 100%);
   color: rgba(255,255,255,.92);
   padding: 30px 0 18px;
 }
