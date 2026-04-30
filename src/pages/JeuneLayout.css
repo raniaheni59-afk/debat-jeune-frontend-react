@@ -331,7 +331,7 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
 }
 .jl-right::-webkit-scrollbar { display: none; }
  
-.jl-profile-card { background:var(--glass); border:1px solid var(--border); border-radius:var(--radius); padding:16px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:all .2s; }
+.jl-profile-card { background:#b6a3ef; border:1px solid var(--border); border-radius:var(--radius); padding:16px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:all .2s; }
 .jl-profile-card:hover { background:var(--glass-b); border-color:var(--border-h); transform:translateX(-2px); }
 .jl-profile-avatar { width:46px; height:46px; border-radius:50%; object-fit:cover; border:2px solid rgba(124,92,252,.5); flex-shrink:0; }
 .jl-profile-info { flex:1; min-width:0; }
