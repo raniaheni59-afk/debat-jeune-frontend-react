@@ -1,0 +1,69 @@
+.parametre-contact {
+  min-height: 100vh;
+  background: #f8f7fc;
+  padding: 30px;
+  font-family: "Segoe UI";
+}
+
+.pc-header {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.pc-header button {
+  background: #7c5cbf;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.pc-card {
+  background: white;
+  padding: 20px;
+  border-radius: 14px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.pc-card h3 {
+  margin-bottom: 10px;
+}
+
+.pc-card select {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.emoji-preview {
+  font-size: 22px;
+}
+
+.danger button {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: #ffe5e5;
+  color: #d32f2f;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.documents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.doc-item {
+  background: #ece9ff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}

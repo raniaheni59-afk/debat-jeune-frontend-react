@@ -24,7 +24,7 @@ const Login = () => {
       
       const role = res.data.user?.role;
       if (role === "admin" || role === "superadmin") {
-        navigate("/admin/dashboard");
+        navigate("/admin");
       } else if (role === "jeune") {
         navigate("/jeune");
       } else {
