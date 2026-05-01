@@ -13,7 +13,7 @@ export default function Register() {
   const [form, setForm] = useState({
     nom_user: "", prenom_user: "", date_naissance: "", sexe: "",
     gouvernorat: "", delegation: "", ville: "", etablissement: "", statut: "",
-    email_user: "", temporary_code: "", mot_de_passe_user: "", confirm_mot_de_passe_user: ""
+    email_user: "", mot_de_passe_user: ""
   });
 
   const [age, setAge] = useState(null);
@@ -284,48 +284,24 @@ useEffect(() => {
             {/* STEP 3 */}
             {step === 3 && (
   <form onSubmit={handleFinalSubmit} className="step-content">
-    <p>Nous avons envoyé un <strong>Code Secret</strong> à votre email. Veuillez le coller ci-dessous et choisir votre mot de passe.</p>
+    <p>Nous avons envoyé un <strong>Code Secret</strong> à votre email. Copiez-le et collez-le ici.</p>
     
     {!codeSent && (
       <p style={{color: "#667eea"}}>⏳ Envoi du code en cours...</p>
     )}
 
     {codeSent && (
-      <> 
+      <>
         <div className="input-group full-width">
-          <label>Code Secret *</label>
+          <label>Code Secret (Mot de passe) *</label>
           <input 
             type="text" 
-            name="temporary_code"
-            value={form.temporary_code}
-            onChange={handleChange}
-            placeholder="Collez le code ici..."
-            autoComplete="off"
-            required
-          />
-        </div>
-        <div className="input-group full-width">
-          <label>Nouveau mot de passe *</label>
-          <input
-            type="password"
             name="mot_de_passe_user" 
             value={form.mot_de_passe_user} 
             onChange={handleChange} 
             placeholder="Collez le code ici..." 
             autoComplete="off"
             required 
-          />
-        </div>
-        <div className="input-group full-width">
-          <label>Confirmer mot de passe *</label>
-          <input
-            type="password"
-            name="confirm_mot_de_passe_user"
-            value={form.confirm_mot_de_passe_user}
-            onChange={handleChange}
-            placeholder="Confirmez votre mot de passe"
-            autoComplete="off"
-            required
           />
         </div>
         <button type="submit" className="register-submit-btn full-width" disabled={loading}>
