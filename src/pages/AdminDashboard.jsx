@@ -5,7 +5,7 @@ import AdminLiveStream from "./AdminLiveStream";
 import Swafy_Meet from "./Swafy_Meet";
 import ArchivePage from "./ArchivePage";
 import ParametrePage from "./ParametrePage";
-
+import { useLang } from "../i18n/LanguageContext";
 import ParametreContact from "./ParametreContact";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
