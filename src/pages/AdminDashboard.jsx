@@ -5,7 +5,7 @@ import AdminLiveStream from "./AdminLiveStream";
 import Swafy_Meet from "./Swafy_Meet";
 import ArchivePage from "./ArchivePage";
 import ParametrePage from "./ParametrePage";
-import { useLang } from "../i18n/LanguageContext";
+
 import ParametreContact from "./ParametreContact";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -53,6 +53,7 @@ export default function AdminDashboard() {
   const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
   const [newChart, setNewChart] = useState({ type: "line", title: "" });
   
+  const t = (key) => key;
   const [charts, setCharts] = useState([
     {
       id: "chart-event",
