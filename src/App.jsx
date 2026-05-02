@@ -34,6 +34,17 @@ const ProtectedAdminRoute = ({ children }) => {
   return children;
 };
 
+function ThemeProvider({ children }) {
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    document.documentElement.setAttribute(
+      "data-theme",
+      user.role === "admin" ? "admin" : "jeune"
+    );
+  }, []);
+  return children;
+}
+
  function App() {
   return (
     <Routes>
