@@ -53,7 +53,7 @@ export default function AdminDashboard() {
   const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
   const [newChart, setNewChart] = useState({ type: "line", title: "" });
   
-  const t = (key) => key;
+ 
   const [charts, setCharts] = useState([
     {
       id: "chart-event",
