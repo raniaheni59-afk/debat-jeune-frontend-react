@@ -1,0 +1,133 @@
+.meet-room-page {
+  min-height: 100vh;
+  background: #0f172a;
+  color: white;
+  padding: 20px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.meet-room-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.meet-room-header h2 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.meet-room-header p {
+  margin: 5px 0 0;
+  color: #cbd5e1;
+}
+
+.meet-room-link-box {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meet-room-link-box input {
+  min-width: 320px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: white;
+}
+
+.meet-room-link-box button {
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.meet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.meet-local-wrapper,
+.meet-video-card {
+  position: relative;
+  background: #1e293b;
+  border-radius: 16px;
+  overflow: hidden;
+  min-height: 240px;
+  border: 1px solid #334155;
+}
+
+.meet-video {
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  object-fit: cover;
+  background: black;
+}
+
+.meet-video-name {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.meet-video-off {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #111827;
+  color: #cbd5e1;
+  font-size: 16px;
+}
+
+.meet-hidden-video {
+  opacity: 0;
+}
+
+.meet-controls {
+  margin-top: 24px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.meet-btn {
+  padding: 12px 18px;
+  border: none;
+  border-radius: 12px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.meet-btn-secondary {
+  background: #475569;
+}
+
+.meet-btn-danger {
+  background: #dc2626;
+}
+
+.meet-error {
+  background: #7f1d1d;
+  color: #fecaca;
+  padding: 14px;
+  border-radius: 12px;
+  margin-bottom: 20px;
+}
