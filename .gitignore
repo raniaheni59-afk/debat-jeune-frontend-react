@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+<<<<<<< HEAD
+=======
+"public/videos/" 
+"public/gallery/" 
+>>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
+.env
+

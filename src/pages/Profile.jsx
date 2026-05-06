@@ -146,24 +146,10 @@ export default function Profile() {
         .stat-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(99,91,255,0.15) !important; }
       `}</style>
 
-      <div style={styles.avatarWrap}>
-        <img
-          src={getAvatar(profile.photo_user, profile.sexe)}
-          alt="avatar"
-          style={styles.avatarImg}
-        />
-        {isMe && (
-          <label style={styles.avatarEditBtn} title="Changer la photo">
-            <span style={{ fontSize: 16 }}>📷</span>
-            <input 
-              type="file" 
-              accept="image/*" 
-              onChange={handleAvatarUpload} 
-              style={{ display: "none" }} 
-            />
-          </label>
-        )}
-      
+      <div style={styles.hero}>
+        <div style={styles.coverBg}>
+           <button className="back-btn" onClick={() => navigate(-1)} style={styles.backBtn}>← Retour</button>
+        </div>
 
         {/* Avatar zone */}
         <div style={styles.avatarZone}>
@@ -282,20 +268,13 @@ export default function Profile() {
                 </div>
               ))}
             </div>
-            {editing && (
-        <div style={styles.card}>
-           {/* Hné t7ot el bouton Enregistrer mta3ek */}
-           <button 
-             onClick={handleSave} 
-             style={styles.saveBtn} 
-             disabled={saving}
-           >
-             {saving ? "Enregistrement..." : "💾 Enregistrer les modifications"}
-           </button>
-        </div>
-      )}
-    </div>
-
+            <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
+              <button onClick={handleSave} style={styles.saveBtn} disabled={saving}>
+                {saving ? "Enregistrement..." : "💾 Enregistrer les modifications"}
+              </button>
+              <button onClick={() => setEditing(false)} style={styles.cancelBtn}>Annuler</button>
+            </div>
+          </div>
         )}
 
         {/* ── PUBLICATIONS TAB ── */}

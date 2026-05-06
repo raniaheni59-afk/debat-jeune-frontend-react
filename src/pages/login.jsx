@@ -16,15 +16,15 @@ const Login = () => {
         email_user: email,
         mot_de_passe_user: password,
       });
-      
+
       console.log("Connexion réussie:", res.data);
 
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
-      
+
       const role = res.data.user?.role;
       if (role === "admin" || role === "superadmin") {
-        navigate("/admin");
+        navigate("/admin/dashboard");
       } else if (role === "jeune") {
         navigate("/jeune");
       } else {
@@ -35,16 +35,21 @@ const Login = () => {
         message: err.message,
         code: err.code,
         response: err.response?.data,
-        url: err.config?.url
+        url: err.config?.url,
       });
-      const errorMsg = err.response?.data?.message || "Impossible de contacter le serveur (Vérifiez si le backend est lancé sur le port 5000)";
+      // Afficher le vrai message du serveur, ou un message générique clair
+      const errorMsg =
+        err.response?.data?.message ||
+        (err.code === "ERR_NETWORK"
+          ? "Impossible de contacter le serveur. Vérifiez votre connexion."
+          : "Une erreur est survenue. Veuillez réessayer.");
       setError(errorMsg);
     }
   };
 
   return (
     <div className="auth-page">
-      {/* Formes décoratives animées définies dans index.css */}
+      {/* Formes décoratives animées */}
       <div className="shape shape-top-left"></div>
       <div className="shape shape-bottom-left"></div>
       <div className="shape shape-center-left"></div>
@@ -54,31 +59,29 @@ const Login = () => {
       <div className="shape shape-small-wave-2"></div>
       <div className="shape shape-blob"></div>
 
-      {/* Panneau principal en arrière-plan (effet de verre) */}
       <div className="main-panel"></div>
 
-      {/* Carte de connexion */}
       <div className="auth-card">
         <h1>SWAFY</h1>
-        <p> Connectez-vous pour continuer.</p>
-        
+        <p>Connectez-vous pour continuer.</p>
+
         <form onSubmit={handleLogin}>
           <label>Email</label>
-          <input 
-            type="email" 
-            placeholder="votre@email.com" 
+          <input
+            type="email"
+            placeholder="votre@email.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required 
+            required
           />
 
           <label>Mot de passe</label>
-          <input 
-            type="password" 
-            placeholder="••••••••" 
+          <input
+            type="password"
+            placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            required 
+            required
           />
 
           <div className="forgot-password">Mot de passe oublié ?</div>

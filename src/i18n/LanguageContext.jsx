@@ -10,6 +10,7 @@ export function LanguageProvider({ children }) {
   useEffect(() => {
     const loadLang = async () => {
       try {
+        // ✅ Utilise API (avec token + bonne baseURL) au lieu de axios direct
         const res = await API.get("/settings");
         if (res.data?.language) setLanguage(res.data.language);
       } catch {}

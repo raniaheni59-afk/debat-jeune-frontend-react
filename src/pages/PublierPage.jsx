@@ -3,8 +3,13 @@ import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import "./PublierPage.css";
 
-export default function PublierPage() {
+export default function PublierPage({ onBack }) {
   const navigate = useNavigate();
+
+  const goBack = () => {
+    if (onBack) onBack();
+    else navigate(-1);
+  };
 
   const [activeType, setActiveType] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -104,7 +109,8 @@ const handleSubmit = async (e) => {
     finishProgress();
     setTimeout(() => {
       alert("Publication créée avec succès !");
-      navigate("/jeune");
+      if (onBack) onBack();
+      else navigate("/jeune");
     }, 500);
   } catch (err) {
     clearInterval(progressIntervalRef.current);
@@ -121,7 +127,7 @@ const handleSubmit = async (e) => {
 
         {/* HEADER */}
         <div className="publier-header">
-          <button onClick={() => navigate("/jeune")} className="btn-back">
+          <button onClick={goBack} className="btn-back">
             ← Retour
           </button>
           <h1>Créer une Publication</h1>
@@ -291,4 +297,5 @@ const handleSubmit = async (e) => {
       </div>
     </div>
   );
+
 }
