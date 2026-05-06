@@ -320,28 +320,6 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
  
 /* ─── RIGHT SIDEBAR ──────────────────────────────── */
 .jl-right {
-<<<<<<< HEAD
-  width: var(--right-w); height: 100vh;
-  background: #7260A7;
-  backdrop-filter: blur(24px);
-  border-left: 1px solid var(--border);
-  padding: 28px 16px;
-  display: flex; flex-direction: column; gap: 16px;
-  flex-shrink: 0; z-index: 1;
-  overflow-y: auto; scrollbar-width: none;
-}
-.jl-right::-webkit-scrollbar { display: none; }
- 
-.jl-profile-card { background:var(--glass); border:1px solid var(--border); border-radius:var(--radius); padding:16px; display:flex; align-items:center; gap:12px; cursor:pointer; transition:all .2s; }
-.jl-profile-card:hover { background:var(--glass-b); border-color:var(--border-h); transform:translateX(-2px); }
-.jl-profile-avatar { width:46px; height:46px; border-radius:50%; object-fit:cover; border:2px solid rgba(124,92,252,.5); flex-shrink:0; }
-.jl-profile-info { flex:1; min-width:0; }
-.jl-profile-name  { font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.jl-profile-email { font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
-.jl-profile-role  { font-size:10px; background:rgba(124,92,252,.2); color:var(--purple-l); border-radius:20px; padding:2px 8px; margin-top:5px; display:inline-block; font-weight:600; }
-.jl-profile-arrow { color:var(--purple-l); font-size:16px; flex-shrink:0; }
-.jl-chatbot-wrap  { flex:1; overflow:hidden; }
-=======
   width: var(--right-w);
   height: 100vh;
   background: linear-gradient(180deg, #6b5aa0 0%, #7260A7 40%, #5e4f90 100%);
@@ -473,7 +451,6 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   border-radius: 20px;
   flex-shrink: 0;
 }
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
  
 /* ─── ANIMATIONS ─────────────────────────────────── */
 @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
@@ -491,11 +468,75 @@ button { font-family: var(--font); cursor: pointer; border: none; background: no
   .jl-banner-img { width:80px; height:80px; }
   .jl-welcome-art { display:none; }
 }
-<<<<<<< HEAD
 @media (max-width:480px) { .jl-stats { grid-template-columns:1fr 1fr; } .jl-welcome-h1 { font-size:22px; } }
 
+/* Quick stats */
+.jl-right-stats {
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+}
+.jl-right-stat { display:flex; flex-direction:column; align-items:center; gap:3px; flex:1; }
+.jl-right-stat-num   { font-size:20px; font-weight:800; color:#fff; line-height:1; font-family:var(--font-h); }
+.jl-right-stat-label { font-size:9.5px; font-weight:600; color:rgba(255,255,255,0.55); text-transform:uppercase; letter-spacing:.5px; }
+.jl-right-stat-divider { width:1px; height:30px; background:rgba(255,255,255,0.18); flex-shrink:0; }
 
+/* Chatbot */
+.jl-chatbot-wrap {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: var(--radius);
+  min-height: 0;
+}
+.jl-chatbot-header {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255,255,255,0.12);
+  flex-shrink: 0;
+}
+.jl-chatbot-icon  { font-size:20px; flex-shrink:0; }
+.jl-chatbot-title { font-size:12.5px; font-weight:700; color:#fff; margin:0; }
+.jl-chatbot-sub   { font-size:10px; color:rgba(255,255,255,0.55); margin:0; }
+.jl-chatbot-live  {
+  margin-left: auto;
+  font-size: 9.5px; font-weight: 700;
+  color: #4ade80;
+  background: rgba(74,222,128,0.15);
+  padding: 2px 7px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
 
-=======
+ 
+/* ─── ANIMATIONS ─────────────────────────────────── */
+@keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+ 
+/* ─── RESPONSIVE ─────────────────────────────────── */
+@media (max-width:1200px) { .jl-right { width:250px; } }
+@media (max-width:1024px) { .jl-right { display:none; } .jl-stats { grid-template-columns:repeat(2,1fr); } }
+@media (max-width:768px) {
+  .jl-sidebar { position:fixed; left:-240px; top:0; bottom:0; transition:left .3s; z-index:100; width:240px; }
+  .jl-sidebar.open { left:0; }
+  .jl-topbar { display:flex; }
+  .jl-scroll { padding:20px 16px 40px; }
+  .jl-banners { grid-template-columns:1fr; }
+  .jl-stats   { grid-template-columns:repeat(2,1fr); }
+  .jl-banner-img { width:80px; height:80px; }
+  .jl-welcome-art { display:none; }
+}
+
 @media (max-width:480px) { .jl-stats { grid-template-columns:1fr 1fr; } .jl-welcome-h1 { font-size:22px; } }
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
+
+@media (max-width:480px) { .jl-stats { grid-template-columns:1fr 1fr; } .jl-welcome-h1 { font-size:22px; } }
+

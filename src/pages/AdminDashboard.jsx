@@ -1,9 +1,6 @@
 import CalendarPage from "./CalendarPage";
-<<<<<<< HEAD
-=======
 import PublierPage from "./PublierPage";
 import PublicationCard from "../components/PublicationCard";
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
 import AdminContact from "./AdminContact";
 import NewLive from "./NewLive";
 import AdminLiveStream from "./AdminLiveStream";
@@ -11,10 +8,7 @@ import Swafy_Meet from "./Swafy_Meet";
 import ArchivePage from "./ArchivePage";
 import ParametrePage from "./ParametrePage";
 import { useLang } from "../i18n/LanguageContext";
-<<<<<<< HEAD
-=======
 import { useNotifications } from "../hooks/useNotifications";
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
 import ParametreContact from "./ParametreContact";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -58,11 +52,6 @@ export default function AdminDashboard() {
   const toastId = useRef(0);
 
   const [editModal, setEditModal] = useState({ open: false, mode: "", targetId: null, data: {} });
-<<<<<<< HEAD
-  const [addChartModal, setAddChartModal] = useState(false);
-  const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
-  const [newChart, setNewChart] = useState({ type: "line", title: "" });
-=======
 
   // ── Notifications real-time ──
   const { notifications: adminNotifs, unreadCount: adminUnread, markRead: markNotifRead, markAllRead: markAllNotifsRead } = useNotifications();
@@ -73,7 +62,6 @@ export default function AdminDashboard() {
   const [newChart, setNewChart] = useState({ type: "line", title: "" });
   const [publications, setPublications] = useState([]);
   const [pubLoading, setPubLoading] = useState(false);
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
   
  
   const [charts, setCharts] = useState([
@@ -180,10 +168,7 @@ const fetchGouvernoratStats = useCallback(async () => {
       @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
       @keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(142,114,209,.3)}50%{box-shadow:0 0 0 6px rgba(142,114,209,.15)}}
       @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.015)}}
-<<<<<<< HEAD
-=======
       @keyframes spin{to{transform:rotate(360deg)}}
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:'Poppins',sans-serif}
       ::-webkit-scrollbar{width:6px}
@@ -258,8 +243,6 @@ const fetchGouvernoratStats = useCallback(async () => {
   );
 }, []);
 
-<<<<<<< HEAD
-=======
 // ✅ fetch publications
 const fetchPublications = useCallback(async () => {
   try {
@@ -274,7 +257,6 @@ useEffect(() => {
   fetchPublications();
 }, [fetchPublications]);
 
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
 // ✅ events من DB
 useEffect(() => {
   fetchGouvernoratStats();
@@ -629,25 +611,14 @@ const navItems = [
   { key:"swafyMeet",    label: "Swafy Meet" }, // اسم خاص نخليه
   { key:"live",         label: t("live"), isLive:true },
   { key:"participant",  label: t("participants") },
-<<<<<<< HEAD
-  { key:"notification", label: t("notifications") },
-=======
   { key:"notification", label: t("notifications"), badge: adminUnread || null },
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
   { key:"archive",      label: t("archive") },
   { key:"parametre",    label: t("parametre") },
 ];
 
   // ── Empty pages ──
  const emptyPages = {
-<<<<<<< HEAD
-  accueil:      { icon:"🏠" },
-  publier:      { icon:"➕" },
   participant:  { icon:"👥" },
-  notification: { icon:"🔔" },
-=======
-  participant:  { icon:"👥" },
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
   parametre:    { icon:"⚙️" },
 };
 
@@ -689,24 +660,16 @@ const navItems = [
 
   
   const fullPages = [
-<<<<<<< HEAD
-=======
   "accueil",
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
   "calendrier",
   "messages",
   "newlive",
   "live",
   "swafyMeet",
   "archive",
-<<<<<<< HEAD
-  "parametre" ,
-  "parametreContact"
-=======
   "parametre",
   "parametreContact",
   "publier"
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
 ];
 
   const isFullPage = fullPages.includes(activePage);
@@ -965,8 +928,6 @@ const navItems = [
     <ParametreContact onBack={() => setActivePage("messages")} />
   </div>
 )}
-<<<<<<< HEAD
-=======
 
 {activePage === "accueil" && (
   <div style={{
@@ -1088,7 +1049,6 @@ const navItems = [
   );
 })()}
 
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
       {/* ══════════════════════════════════
            EMPTY PAGES
       ══════════════════════════════════ */}

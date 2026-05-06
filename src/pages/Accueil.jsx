@@ -149,8 +149,6 @@ body {
   font-size: 1.4rem; cursor: pointer; padding: 6px;
 }
 
-<<<<<<< HEAD
-=======
 
 /* ── PARTNERS BAR (top) ── */
 .partners-bar {
@@ -206,7 +204,6 @@ body {
 /* ── SWAFY LOGO in navbar ── */
 .brand-logo { height: 32px; object-fit: contain; }
 
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
 /* ── HERO ── */
 .hero {
   position: relative; min-height: 100vh;
@@ -869,17 +866,10 @@ function LiveCard() {
 }
 
 const themes = [
-<<<<<<< HEAD
-  { icon: <FiMessageCircle />, name: "Support", desc: "User-friendly · Assistance rapide" },
-  { icon: <FiZap />, name: "Innovation", desc: "Fast · Prototyping · Créativité" },
-  { icon: <FiClock />, name: "24/7 Access", desc: "Disponible à tout moment" },
-  { icon: <FiShield />, name: "Sécurité", desc: "Formation gratuite · Cyberdéfense" },
-=======
   { icon: <FiTrendingUp />, name: "Recherche partenariale", desc: "Stimuler l'employabilité des jeunes chercheurs à travers une recherche inclusive et structurée." },
   { icon: <FiZap />,         name: "Entrepreneuriat & Créativité", desc: "Renforcer l'esprit d'entrepreneuriat, d'innovation et de créativité chez les jeunes tunisiens." },
   { icon: <FiUsers />,       name: "Jeunesse Créative", desc: "Dynamiser le tissu associatif Jeunesse-Science dans tous les gouvernorats de Tunisie." },
   { icon: <FiAward />,       name: "Clubs Scientifiques", desc: "Création et restructuration de clubs scientifiques dans les établissements éducatifs publics." },
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
 ];
 
 function Thematique() {
@@ -961,17 +951,11 @@ function Objectif() {
               </span>
             </h2>
             <p className="objectif-text">
-<<<<<<< HEAD
-              نعاونو الشباب باش يكتسب مهارات رقمية، يشارك في challenges،
-              ويمشي في مسار واضح: تعلم → تطبيق → تقييم. SWAFY هي
-              وجهتكم للنجاح الرقمي في تونس.
-=======
               SWAFY est un projet financé par l'Union européenne (9,5 M€ · 48 mois),
               géré par l'ANPR, visant à contribuer à l'amélioration de la valeur ajoutée
               de la recherche et l'innovation dans le développement économique tunisien,
               et à soutenir l'entrepreneuriat et l'employabilité des jeunes à travers
               le renforcement de l'esprit de créativité et d'invention.
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
             </p>
             <div className="store-row">
               <a className="store-btn" href="#!"><span>🍎</span> App Store</a>
@@ -1077,8 +1061,6 @@ function Footer() {
           </div>
         </div>
 
-<<<<<<< HEAD
-=======
         {/* Partner logos */}
         <div className="footer-partners">
           <div className="footer-partners-title">Partenaires & Financeurs</div>
@@ -1098,7 +1080,6 @@ function Footer() {
           </div>
         </div>
 
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
         <div className="footer-bottom">
           <span className="footer-bottom-left">© {new Date().getFullYear()} SWAFY · Tunis, Tunisie</span>
           <span className="footer-bottom-right">Built with React · Designed for Youth</span>
@@ -1108,8 +1089,6 @@ function Footer() {
   );
 }
 
-<<<<<<< HEAD
-=======
 
 function PartnersBar() {
   return (
@@ -1136,17 +1115,13 @@ function PartnersBar() {
   );
 }
 
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
 /* ─── PAGE ────────────────────────────────────────────────── */
 export default function Accueil() {
   return (
     <>
       <StyleInjector />
       <div className="noise" />
-<<<<<<< HEAD
-=======
       <PartnersBar />
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
       <Navbar />
       <main>
         <Hero />
@@ -1158,8 +1133,4 @@ export default function Accueil() {
       <Footer />
     </>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 7ad9b6fb5d8413d2b7460a3024d4bcb3de574fb1
