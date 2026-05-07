@@ -34,15 +34,17 @@ export default function JeuneContact() {
   const bottomRef = useRef(null);
   const socketRef = useRef(null);
   const searchTimer = useRef(null);
+  const selectedRef = useRef(null); // FIX Bug 2: ref pour éviter stale closure
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // ── Socket ──────────────────────────────────────────────────────────────────
+  // ── Socket — monté UNE SEULE FOIS (FIX Bug 2) ───────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem("token");
     socketRef.current = io(BACKEND, { auth: { token }, transports: ["websocket"] });
 
     socketRef.current.on("newMessage", (msg) => {
-      if (selected && msg.conversation_id === selected.id) {
+      // Utiliser la ref pour lire la valeur courante de selected (FIX Bug 2)
+      if (selectedRef.current && msg.conversation_id === selectedRef.current.id) {
         setMessages((prev) =>
           prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
         );
@@ -59,7 +61,12 @@ export default function JeuneContact() {
     });
 
     return () => socketRef.current?.disconnect();
-  }, [selected?.id]);
+  }, []); // ← dépendances vides : socket monté une seule fois
+
+  // Garder la ref synchronisée avec selected
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
 
   // ── Fetch conversations ──────────────────────────────────────────────────────
   const fetchConversations = useCallback(async () => {
@@ -112,7 +119,7 @@ export default function JeuneContact() {
     }
   };
 
-  // ── Fetch messages ───────────────────────────────────────────────────────────
+  // ── Fetch messages + join room ───────────────────────────────────────────────
   useEffect(() => {
     if (!selected) return;
     const load = async () => {
@@ -134,17 +141,18 @@ export default function JeuneContact() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ── Send ─────────────────────────────────────────────────────────────────────
+  // ── Send — FIX Bug 1 : on n'ajoute PAS localement, le socket le fait ────────
   const send = async () => {
     if (!text.trim() || !selected) return;
     const msgText = text.trim();
     setText("");
     try {
-      const res = await API.post("/messenger/messages", {
+      await API.post("/messenger/messages", {
         conversationId: selected.id,
         text: msgText,
       });
-      setMessages((prev) => [...prev, res.data]);
+      // ❌ Supprimé : setMessages((prev) => [...prev, res.data]);
+      // ✅ Le socket "newMessage" va recevoir le message et l'ajouter
     } catch {
       alert("Erreur d'envoi");
     }
