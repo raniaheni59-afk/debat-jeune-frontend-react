@@ -47,7 +47,6 @@ useEffect(() => {
   const emailParam = params.get("email");
   
   if (stepParam === "3" && emailParam) {
-    // ← Rja3 el form data mel sessionStorage
     const savedForm = sessionStorage.getItem("registerForm");
     if (savedForm) {
       setForm(prev => ({ ...JSON.parse(savedForm), email_user: emailParam }));
