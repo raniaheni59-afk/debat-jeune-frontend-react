@@ -41,24 +41,27 @@ export default function Register() {
   }
 }, [form.date_naissance]);
 
-// useEffect 2: redirect من email OUI
 useEffect(() => {
   const params = new URLSearchParams(window.location.search);
   const stepParam = params.get("step");
   const emailParam = params.get("email");
   
   if (stepParam === "3" && emailParam) {
-    setForm(prev => ({ ...prev, email_user: emailParam }));
+    // ← Rja3 el form data mel sessionStorage
+    const savedForm = sessionStorage.getItem("registerForm");
+    if (savedForm) {
+      setForm(prev => ({ ...JSON.parse(savedForm), email_user: emailParam }));
+    } else {
+      setForm(prev => ({ ...prev, email_user: emailParam }));
+    }
     setOwnerConfirmed(true);
     setStep(3);
     API.post("/auth/send-password-code", { email: emailParam })
       .then(() => {
         setCodeSent(true);
-        setMessage({ type: "success", text: "✅ Code secret envoyé à votre email !" });
+        setMessage({ type: "success", text: "✅ Code secret envoyé !" });
       })
-      .catch(() => {
-        setMessage({ type: "error", text: "Erreur envoi code." });
-      });
+      .catch(() => setMessage({ type: "error", text: "Erreur envoi code." }));
   }
 }, []);
 
@@ -72,16 +75,11 @@ useEffect(() => {
     });
   };
 
-  // STEP 1: Validation Info
-  const handleNextToEmail = (e) => {
-    e.preventDefault();
-    if (age !== null && age < 12) return alert("Accès refusé : Moins de 12 ans.");
-    if (!form.nom_user || !form.prenom_user || !form.date_naissance || !form.sexe || !form.statut ||
-        !form.gouvernorat || !form.delegation || !form.ville || !form.etablissement) {
-      return alert("Veuillez remplir tous les champs obligatoires.");
-    }
-    setStep(2);
-  };
+ const handleNextToEmail = (e) => {
+  e.preventDefault();
+  sessionStorage.setItem("registerForm", JSON.stringify(form));
+  setStep(2);
+};
 
   // STEP 2: Send Owner Check
   const sendOwnerCheck = async () => {
