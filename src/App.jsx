@@ -15,41 +15,27 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import PublicationDetail from "./pages/PublicationDetail";
 import Accueil from "./pages/Accueil";
 import Swafy from "./pages/Swafy";
-import JeuneContact from "./pages/JeuneContact";
-import Settings from "./pages/Settings";
 import "./index.css";
+import Settings from "./pages/Settings";
+import JeuneContact from "./pages/JeuneContact"; 
 
-const BACKEND =
-  import.meta.env.VITE_BACKEND_URL ||
-  "https://debat-jeune-production.up.railway.app";
+const BACKEND = "https://debat-jeune-production.up.railway.app";
 
-// ── Guards ───────────────────────────────────────────
 const ProtectedAdminRoute = ({ children }) => {
   const token = localStorage.getItem("token");
   const userStr = localStorage.getItem("user");
   if (!token || !userStr) return <Navigate to="/admin/login" replace />;
   try {
     const user = JSON.parse(userStr);
-    if (user.role !== "admin" && user.role !== "superadmin")
-      return <Navigate to="/login" replace />;
+    if (user.role !== "admin") return <Navigate to="/login" replace />;
   } catch {
     return <Navigate to="/admin/login" replace />;
   }
   return children;
 };
 
-// ── App ──────────────────────────────────────────────
 function App() {
-  // Theme
-  useEffect(() => {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
-    document.documentElement.setAttribute(
-      "data-theme",
-      user.role === "admin" || user.role === "superadmin" ? "admin" : "jeune"
-    );
-  }, []);
-
-  // Socket global pour notifications
+  
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -63,9 +49,7 @@ function App() {
     });
 
     socket.on("new_notification", (notif) => {
-      window.dispatchEvent(
-        new CustomEvent("new_notification", { detail: notif })
-      );
+      window.dispatchEvent(new CustomEvent("new_notification", { detail: notif }));
     });
 
     socket.on("connect_error", (err) =>
@@ -73,7 +57,7 @@ function App() {
     );
 
     return () => socket.disconnect();
-  }, []);
+  }, []); 
 
   return (
     <Routes>
@@ -85,75 +69,31 @@ function App() {
       <Route path="/verify-code" element={<VerifyCode />} />
 
       {/* Espace Jeune */}
-      <Route
-        path="/jeune"
-        element={
-          <ProtectedRoute>
-            <JeuneLayout />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/profile/:id"
-        element={
-          <ProtectedRoute>
-            <Profile />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/publier"
-        element={
-          <ProtectedRoute>
-            <PublierPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/notifications"
-        element={
-          <ProtectedRoute>
-            <Notifications />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/publication/:id"
-        element={
-          <ProtectedRoute>
-            <PublicationDetail />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/jeune" element={
+        <ProtectedRoute><JeuneLayout /></ProtectedRoute>
+      } />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/profile/:id" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/publier" element={
+        <ProtectedRoute><PublierPage /></ProtectedRoute>
+      } />
+      <Route path="/notifications" element={
+        <ProtectedRoute><Notifications /></ProtectedRoute>
+      } />
+      <Route path="/publication/:id" element={<ProtectedRoute><PublicationDetail /></ProtectedRoute>} />
+
+     
+      <Route path="/contact" element={
+        <ProtectedRoute><JeuneContact /></ProtectedRoute>
+      } />
 
       {/* Espace Admin */}
       <Route path="/admin/login" element={<AdminLogin />} />
-      <Route
-        path="/admin/dashboard"
-        element={
-          <ProtectedAdminRoute>
-            <AdminDashboard />
-          </ProtectedAdminRoute>
-        }
-      />
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      <Route path="/settings" element={
+        <ProtectedRoute><Settings /></ProtectedRoute>
+      } />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
-
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <Settings />
-          </ProtectedRoute>
-        }
-      />
 
       {/* 404 */}
       <Route path="*" element={<h2>404 - Page non trouvée</h2>} />
