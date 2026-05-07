@@ -47,12 +47,21 @@ useEffect(() => {
   const emailParam = params.get("email");
   
   if (stepParam === "3" && emailParam) {
-    const savedForm = sessionStorage.getItem("registerForm");
-    if (savedForm) {
-      setForm(prev => ({ ...JSON.parse(savedForm), email_user: emailParam }));
-    } else {
-      setForm(prev => ({ ...prev, email_user: emailParam }));
-    }
+  const savedForm = sessionStorage.getItem("registerForm");
+  if (savedForm) {
+    setForm(prev => ({ ...JSON.parse(savedForm), email_user: emailParam }));
+  } else {
+    setForm(prev => ({ ...prev, email_user: emailParam }));
+  }
+  setOwnerConfirmed(true);
+  setStep(3);
+  API.post("/auth/send-password-code", { email: emailParam })
+    .then(() => {
+      setCodeSent(true);
+      setMessage({ type: "success", text: "✅ Code secret envoyé !" });
+    })
+    .catch(() => setMessage({ type: "error", text: "Erreur envoi code." }));
+}
     setOwnerConfirmed(true);
     setStep(3);
     API.post("/auth/send-password-code", { email: emailParam })
