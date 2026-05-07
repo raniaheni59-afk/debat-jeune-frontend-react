@@ -34,16 +34,14 @@ export default function JeuneContact() {
   const bottomRef = useRef(null);
   const socketRef = useRef(null);
   const searchTimer = useRef(null);
-  const selectedRef = useRef(null); // FIX Bug 2: ref pour éviter stale closure
+  const selectedRef = useRef(null);
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // ── Socket — monté UNE SEULE FOIS (FIX Bug 2) ───────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem("token");
     socketRef.current = io(BACKEND, { auth: { token }, transports: ["websocket"] });
 
     socketRef.current.on("newMessage", (msg) => {
-      // Utiliser la ref pour lire la valeur courante de selected (FIX Bug 2)
       if (selectedRef.current && msg.conversation_id === selectedRef.current.id) {
         setMessages((prev) =>
           prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
@@ -61,14 +59,10 @@ export default function JeuneContact() {
     });
 
     return () => socketRef.current?.disconnect();
-  }, []); // ← dépendances vides : socket monté une seule fois
+  }, []);
 
-  // Garder la ref synchronisée avec selected
-  useEffect(() => {
-    selectedRef.current = selected;
-  }, [selected]);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
 
-  // ── Fetch conversations ──────────────────────────────────────────────────────
   const fetchConversations = useCallback(async () => {
     try {
       const res = await API.get("/messenger/conversations");
@@ -80,7 +74,6 @@ export default function JeuneContact() {
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  // ── Search users ─────────────────────────────────────────────────────────────
   useEffect(() => {
     clearTimeout(searchTimer.current);
     if (!query.trim()) { setSearchResults([]); setSearching(false); return; }
@@ -94,7 +87,6 @@ export default function JeuneContact() {
     }, 350);
   }, [query]);
 
-  // ── Open / select conversation ───────────────────────────────────────────────
   const openConversation = async (targetId, userInfo) => {
     setQuery("");
     setSearchResults([]);
@@ -119,7 +111,6 @@ export default function JeuneContact() {
     }
   };
 
-  // ── Fetch messages + join room ───────────────────────────────────────────────
   useEffect(() => {
     if (!selected) return;
     const load = async () => {
@@ -141,7 +132,6 @@ export default function JeuneContact() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ── Send — FIX Bug 1 : on n'ajoute PAS localement, le socket le fait ────────
   const send = async () => {
     if (!text.trim() || !selected) return;
     const msgText = text.trim();
@@ -151,8 +141,6 @@ export default function JeuneContact() {
         conversationId: selected.id,
         text: msgText,
       });
-      // ❌ Supprimé : setMessages((prev) => [...prev, res.data]);
-      // ✅ Le socket "newMessage" va recevoir le message et l'ajouter
     } catch {
       alert("Erreur d'envoi");
     }
@@ -167,15 +155,14 @@ export default function JeuneContact() {
       {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
       <aside className="contacts-panel">
 
-        {/* Header */}
-        <div style={{ padding: "20px 16px 10px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#fff", marginBottom: 12 }}>
+        <div style={{ padding: "20px 16px 10px", borderBottom: "1px solid #e8e8f0" }}>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 12 }}>
             💬 Messages
           </h2>
           <div style={{ position: "relative" }}>
             <span style={{
               position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
-              fontSize: 13, color: "rgba(255,255,255,0.5)",
+              fontSize: 13, color: "#9e97c0",
             }}>🔍</span>
             <input
               type="text"
@@ -184,35 +171,34 @@ export default function JeuneContact() {
               onChange={(e) => setQuery(e.target.value)}
               style={{
                 width: "100%", padding: "9px 10px 9px 32px",
-                borderRadius: 10, border: "1px solid rgba(255,255,255,0.2)",
-                background: "rgba(255,255,255,0.12)", color: "#fff",
+                borderRadius: 10, border: "1.5px solid #d0c9f5",
+                background: "#f3f0ff", color: "#1a1a2e",
                 fontSize: 13, outline: "none", boxSizing: "border-box",
+                caretColor: "#6b4fbb",
               }}
             />
             {searching && (
-              <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+              <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#9e97c0" }}>
                 ...
               </span>
             )}
           </div>
         </div>
 
-        {/* Section label */}
         {isSearchMode && (
-          <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "rgba(255,255,255,0.4)" }}>
+          <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#9e97c0" }}>
             Résultats ({searchResults.length})
           </div>
         )}
         {!isSearchMode && conversations.length > 0 && (
-          <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "rgba(255,255,255,0.4)" }}>
+          <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, color: "#9e97c0" }}>
             Conversations ({conversations.length})
           </div>
         )}
 
-        {/* List */}
         <div className="chat-list">
           {displayList.length === 0 && !searching && (
-            <div style={{ padding: "30px 16px", textAlign: "center", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>
+            <div style={{ padding: "30px 16px", textAlign: "center", color: "#9e97c0", fontSize: 13 }}>
               {isSearchMode ? "Aucun résultat" : "Aucune conversation"}
             </div>
           )}
@@ -228,9 +214,7 @@ export default function JeuneContact() {
                 key={item.id || item.id_user}
                 className={`chat-item ${isActive ? "active" : ""}`}
                 onClick={() =>
-                  isSearchMode
-                    ? openConversation(id, item)
-                    : setSelected(item)
+                  isSearchMode ? openConversation(id, item) : setSelected(item)
                 }
               >
                 <div style={{
@@ -244,16 +228,16 @@ export default function JeuneContact() {
 
                 <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontWeight: 600, fontSize: 13.5, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>
+                    <span style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>
                       {prenom} {nom}
                     </span>
                     {item.last_time && (
-                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", flexShrink: 0, marginLeft: 4 }}>
+                      <span style={{ fontSize: 10, color: "#9e97c0", flexShrink: 0, marginLeft: 4 }}>
                         {formatTime(item.last_time)}
                       </span>
                     )}
                   </div>
-                  <p style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <p style={{ fontSize: 12, color: "#6b6b8a", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {isSearchMode
                       ? (item.role === "admin" ? "👑 Admin" : "👤 Jeune")
                       : (item.last_message || "Nouvelle conversation")}
@@ -269,9 +253,10 @@ export default function JeuneContact() {
       <main className="chat-window">
         {selected ? (
           <>
+            {/* Header */}
             <div style={{
               padding: "16px 20px", display: "flex", alignItems: "center", gap: 12,
-              background: "rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.1)",
+              background: "#ffffff", borderBottom: "1px solid #e8e8f0",
               flexShrink: 0,
             }}>
               <div style={{
@@ -283,22 +268,24 @@ export default function JeuneContact() {
                 {getInitials(selected.prenom_user, selected.nom_user)}
               </div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#1a1a2e" }}>
                   {selected.prenom_user} {selected.nom_user}
                 </div>
-                <div style={{ fontSize: 11, color: "#4ade80" }}>● En ligne</div>
+                <div style={{ fontSize: 11, color: "#22c55e" }}>● En ligne</div>
               </div>
             </div>
 
+            {/* Messages */}
             <div style={{
               flex: 1, overflowY: "auto", padding: "20px",
               display: "flex", flexDirection: "column", gap: 8,
-              scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.15) transparent",
+              background: "#f7f8fc",
+              scrollbarWidth: "thin", scrollbarColor: "#d0c9f5 transparent",
             }}>
               {loadingMsgs ? (
-                <div style={{ margin: "auto", color: "rgba(255,255,255,0.4)", fontSize: 13 }}>Chargement…</div>
+                <div style={{ margin: "auto", color: "#9e97c0", fontSize: 13 }}>Chargement…</div>
               ) : messages.length === 0 ? (
-                <div style={{ margin: "auto", color: "rgba(255,255,255,0.4)", fontSize: 13, textAlign: "center" }}>
+                <div style={{ margin: "auto", color: "#9e97c0", fontSize: 13, textAlign: "center" }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
                   Démarrez la conversation !
                 </div>
@@ -308,23 +295,21 @@ export default function JeuneContact() {
                   return (
                     <div key={m.id} style={{
                       alignSelf: isMe ? "flex-end" : "flex-start",
-                      maxWidth: "70%",
+                      maxWidth: "70%", display: "flex", flexDirection: "column", gap: 3,
                     }}>
                       <div style={{
-                        background: isMe
-                          ? "linear-gradient(135deg,#7c5cbf,#5a3fa0)"
-                          : "rgba(255,255,255,0.13)",
-                        color: "#fff",
+                        background: isMe ? "linear-gradient(135deg,#7c5cbf,#5a3fa0)" : "#ffffff",
+                        color: isMe ? "#ffffff" : "#1a1a2e",
                         padding: "10px 14px",
                         borderRadius: isMe ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
                         fontSize: 13.5, lineHeight: 1.5,
-                        boxShadow: isMe ? "0 4px 12px rgba(90,63,160,0.3)" : "none",
+                        boxShadow: isMe ? "0 4px 12px rgba(90,63,160,0.25)" : "0 1px 4px rgba(0,0,0,0.08)",
+                        border: isMe ? "none" : "1px solid #e8e8f0",
                       }}>
                         {m.text}
                       </div>
                       <span style={{
-                        display: "block", fontSize: 10,
-                        color: "rgba(255,255,255,0.35)",
+                        display: "block", fontSize: 10, color: "#9e97c0",
                         textAlign: isMe ? "right" : "left",
                         marginTop: 3, paddingInline: 4,
                       }}>
@@ -337,10 +322,11 @@ export default function JeuneContact() {
               <div ref={bottomRef} />
             </div>
 
+            {/* Input */}
             <div style={{
-              padding: "14px 16px", borderTop: "1px solid rgba(255,255,255,0.1)",
+              padding: "14px 16px", borderTop: "1px solid #e8e8f0",
               display: "flex", gap: 10, flexShrink: 0,
-              background: "rgba(255,255,255,0.04)",
+              background: "#ffffff",
             }}>
               <textarea
                 placeholder="Écrire un message..."
@@ -352,10 +338,11 @@ export default function JeuneContact() {
                 rows={1}
                 style={{
                   flex: 1, padding: "10px 14px",
-                  borderRadius: 12, border: "1px solid rgba(255,255,255,0.2)",
-                  background: "rgba(255,255,255,0.1)", color: "#fff",
+                  borderRadius: 12, border: "1.5px solid #d0c9f5",
+                  background: "#f3f0ff", color: "#1a1a2e",
                   fontSize: 13.5, outline: "none", resize: "none",
-                  fontFamily: "Poppins, sans-serif",
+                  fontFamily: "Segoe UI, system-ui, Arial",
+                  caretColor: "#6b4fbb",
                 }}
               />
               <button
@@ -365,7 +352,7 @@ export default function JeuneContact() {
                   color: "#fff", border: "none",
                   padding: "0 20px", borderRadius: 12,
                   fontWeight: 700, fontSize: 14, cursor: "pointer",
-                  boxShadow: "0 4px 12px rgba(90,63,160,0.4)",
+                  boxShadow: "0 4px 12px rgba(90,63,160,0.3)",
                 }}
               >
                 ➤
@@ -376,13 +363,11 @@ export default function JeuneContact() {
           <div style={{
             display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center",
-            height: "100%", color: "rgba(255,255,255,0.35)", gap: 12,
+            height: "100%", gap: 12, background: "#f7f8fc",
           }}>
             <div style={{ fontSize: 48 }}>💬</div>
-            <p style={{ fontSize: 14, fontWeight: 500 }}>Sélectionnez une conversation</p>
-            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)" }}>
-              ou recherchez un utilisateur
-            </p>
+            <p style={{ fontSize: 14, fontWeight: 500, color: "#6b6b8a" }}>Sélectionnez une conversation</p>
+            <p style={{ fontSize: 12, color: "#9e97c0" }}>ou recherchez un utilisateur</p>
           </div>
         )}
       </main>
