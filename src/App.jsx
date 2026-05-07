@@ -17,7 +17,7 @@ import Accueil from "./pages/Accueil";
 import Swafy from "./pages/Swafy";
 import "./index.css";
 import Settings from "./pages/Settings";
-import JeuneContact from "./pages/JeuneContact"; 
+import JeuneContact from "./pages/JeuneContact"; // ✅ déjà importé
 
 const BACKEND = "https://debat-jeune-production.up.railway.app";
 
@@ -82,7 +82,7 @@ function App() {
       } />
       <Route path="/publication/:id" element={<ProtectedRoute><PublicationDetail /></ProtectedRoute>} />
 
-     
+      {/* ✅ FIX Bug 4 : route contact manquante */}
       <Route path="/contact" element={
         <ProtectedRoute><JeuneContact /></ProtectedRoute>
       } />
