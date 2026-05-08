@@ -113,8 +113,12 @@ export default function JeuneContact() {
 
     socketRef.current.on("newMessage", (msg) => {
       if (selectedRef.current !== "group" && selectedRef.current?.id === msg.conversation_id) {
-        setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
-      }
+        
+      }setMessages(prev =>
+  prev.find(m => Number(m.id) === Number(msg.id))
+    ? prev
+    : [...prev, msg]
+);
       setConversations(prev =>
         prev.map(c => c.id === msg.conversation_id
           ? { ...c, last_message: msg.text || `[${msg.msg_type || "fichier"}]`, last_time: msg.created_at }
@@ -124,7 +128,11 @@ export default function JeuneContact() {
     });
 
     socketRef.current.on("newGroupMessage", (msg) => {
-      setGroupMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
+      setGroupMessages(prev =>
+  prev.find(m => Number(m.id) === Number(msg.id))
+    ? prev
+    : [...prev, msg]
+);
     });
 
     socketRef.current.emit("joinGroup");
@@ -218,36 +226,29 @@ export default function JeuneContact() {
 
     try {
       if (selected === "group") {
-        // Group: texte seulement (file upload nécessite backend multipart)
-        if (msgText) {
-          const res = await API.post("/messenger/group/messages", { text: msgText });
-          setGroupMessages(prev => [...prev, res.data]);
-        }
-      } else {
-        if (file) {
-          const formData = new FormData();
-          formData.append("file", file);
-          if (msgText) formData.append("text", msgText);
-          formData.append("conversationId", selected.id);
-          const res = await API.post("/messenger/messages/upload", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-          setMessages(prev => [...prev, res.data]);
-        } else {
-          const res = await API.post("/messenger/messages", {
-            conversationId: selected.id,
-            text: msgText,
-          });
-          setMessages(prev => [...prev, res.data]);
-          setConversations(prev =>
-            prev.map(c =>
-              c.id === selected.id
-                ? { ...c, last_message: msgText, last_time: new Date() }
-                : c
-            )
-          );
-        }
-      }
+  if (msgText) {
+    await API.post("/messenger/group/messages", { text: msgText });
+  }
+} else {
+  if (file) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    if (msgText) formData.append("text", msgText);
+
+    formData.append("conversationId", selected.id);
+
+    await API.post("/messenger/messages/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+  } else {
+    await API.post("/messenger/messages", {
+      conversationId: selected.id,
+      text: msgText,
+    });
+  }
+}
     } catch (err) {
       console.error(err);
       alert("Erreur d'envoi");
@@ -424,8 +425,11 @@ export default function JeuneContact() {
                 </div>
               ) : (
                 activeMessages.map(m => {
-                  const isMe = m.sender_id === currentUser.id_user;
-                  return (
+                  const myId = Number(currentUser.id_user);
+                  const isGroup = selected === "group";
+                  const isMe = Number(m.sender_id) === myId;
+
+                    return (
                     <div key={m.id} style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "72%", display: "flex", flexDirection: "column", gap: 3, animation: "fadeUp 0.2s ease" }}>
                       {isGroup && !isMe && (
                         <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
