@@ -4,7 +4,7 @@ import API from "../services/api";
 import "./AdminContact.css";
 
 const BACKEND = "https://debat-jeune-production.up.railway.app";
-const AVATAR_COLORS = ["#6d56c1", "#2563eb", "#059669", "#d97706", "#dc2626", "#7c3aed"];
+const AVATAR_COLORS = ["#6d56c1", "#2563eb", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
 
 const getInitials = (prenom, nom) =>
   ((prenom?.[0] || "") + (nom?.[0] || "")).toUpperCase() || "?";
@@ -18,16 +18,41 @@ const formatTime = (d) => {
   return dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 };
 
+// ── Prefix-first sort: résultats qui commencent par la query viennent en premier
+const sortByPrefix = (results, query) => {
+  if (!query) return results;
+  const q = query.trim().toLowerCase();
+  return [...results].sort((a, b) => {
+    const aFull = `${a.prenom_user} ${a.nom_user}`.toLowerCase();
+    const bFull = `${b.prenom_user} ${b.nom_user}`.toLowerCase();
+    const aFirst = a.prenom_user?.toLowerCase() || "";
+    const bFirst = b.prenom_user?.toLowerCase() || "";
+    const aLast = a.nom_user?.toLowerCase() || "";
+    const bLast = b.nom_user?.toLowerCase() || "";
+    const aStarts = aFull.startsWith(q) || aFirst.startsWith(q) || aLast.startsWith(q);
+    const bStarts = bFull.startsWith(q) || bFirst.startsWith(q) || bLast.startsWith(q);
+    if (aStarts && !bStarts) return -1;
+    if (!aStarts && bStarts) return 1;
+    return aFull.localeCompare(bFull);
+  });
+};
+
 function Avatar({ user, size = 42 }) {
   if (user?.photo_user) {
-    return <img src={user.photo_user} alt="" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />;
+    return (
+      <img
+        src={user.photo_user}
+        alt=""
+        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
+      />
+    );
   }
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%", flexShrink: 0,
       background: getColor(user?.id_user),
       display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#fff", fontWeight: 700, fontSize: size * 0.35,
+      color: "#fff", fontWeight: 700, fontSize: Math.round(size * 0.35),
     }}>
       {getInitials(user?.prenom_user, user?.nom_user)}
     </div>
@@ -37,10 +62,18 @@ function Avatar({ user, size = 42 }) {
 function FileMessage({ msg, isMe }) {
   if (!msg.file_url) return null;
   if (msg.msg_type === "image") {
-    return <a href={msg.file_url} target="_blank" rel="noreferrer"><img src={msg.file_url} alt="" style={{ maxWidth: 200, borderRadius: 10, display: "block", marginTop: msg.text ? 6 : 0 }} /></a>;
+    return (
+      <a href={msg.file_url} target="_blank" rel="noreferrer">
+        <img src={msg.file_url} alt="" style={{ maxWidth: 200, borderRadius: 10, display: "block", marginTop: msg.text ? 6 : 0 }} />
+      </a>
+    );
   }
   if (msg.msg_type === "video") {
-    return <video controls style={{ maxWidth: 200, borderRadius: 10, marginTop: msg.text ? 6 : 0 }}><source src={msg.file_url} /></video>;
+    return (
+      <video controls style={{ maxWidth: 200, borderRadius: 10, marginTop: msg.text ? 6 : 0 }}>
+        <source src={msg.file_url} />
+      </video>
+    );
   }
   return (
     <a href={msg.file_url} target="_blank" rel="noreferrer" style={{
@@ -57,7 +90,7 @@ function FileMessage({ msg, isMe }) {
 export default function JeuneContact() {
   const [conversations, setConversations] = useState([]);
   const [admins, setAdmins] = useState([]);
-  const [selected, setSelected] = useState(null); // conv | "group" | null
+  const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
   const [groupMessages, setGroupMessages] = useState([]);
   const [query, setQuery] = useState("");
@@ -73,18 +106,18 @@ export default function JeuneContact() {
   const fileInputRef = useRef(null);
   const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // ── Socket ──────────────────────────────────────────────────────────────────
+  // ── Socket ──────────────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem("token");
     socketRef.current = io(BACKEND, { auth: { token }, transports: ["websocket"] });
 
     socketRef.current.on("newMessage", (msg) => {
-  if (selectedRef.current !== "group" && selectedRef.current?.id === msg.conversation_id) {
-    setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
-  }
+      if (selectedRef.current !== "group" && selectedRef.current?.id === msg.conversation_id) {
+        setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
+      }
       setConversations(prev =>
         prev.map(c => c.id === msg.conversation_id
-          ? { ...c, last_message: msg.text || `[${msg.msg_type}]`, last_time: msg.created_at }
+          ? { ...c, last_message: msg.text || `[${msg.msg_type || "fichier"}]`, last_time: msg.created_at }
           : c
         ).sort((a, b) => new Date(b.last_time) - new Date(a.last_time))
       );
@@ -100,45 +133,49 @@ export default function JeuneContact() {
 
   useEffect(() => { selectedRef.current = selected; }, [selected]);
 
-  // ── Fetch data ──────────────────────────────────────────────────────────────
+  // ── Fetch data ──────────────────────────────────────────────────────
   const fetchConversations = useCallback(async () => {
     try {
       const res = await API.get("/messenger/conversations");
-
-setConversations(res.data || []);
+      setConversations(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error("conversations error:", err);
     }
   }, []);
-
-
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
   useEffect(() => {
     API.get("/messenger/admins")
       .then(res => setAdmins(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {});
+      .catch(() => { });
     API.get("/messenger/group/messages")
       .then(res => setGroupMessages(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
-  // ── Search ──────────────────────────────────────────────────────────────────
+  // ── Search (admins seulement pour jeunes) + prefix-first sort ──────
   useEffect(() => {
     clearTimeout(searchTimer.current);
     if (!query.trim()) { setSearchResults([]); setSearching(false); return; }
     setSearching(true);
     searchTimer.current = setTimeout(async () => {
       try {
-        const res = await API.get(`/messenger/users/search?q=${encodeURIComponent(query)}`);
-        setSearchResults(Array.isArray(res.data) ? res.data : []);
+        const res = await API.get(`/messenger/admins`);
+        const all = Array.isArray(res.data) ? res.data : [];
+        const q = query.trim().toLowerCase();
+        // Filtrer côté client sur les admins seulement
+        const filtered = all.filter(u => {
+          const full = `${u.prenom_user} ${u.nom_user}`.toLowerCase();
+          return full.includes(q);
+        });
+        setSearchResults(sortByPrefix(filtered, query));
       } catch { setSearchResults([]); }
       finally { setSearching(false); }
     }, 350);
   }, [query]);
 
-  // ── Open conversation ───────────────────────────────────────────────────────
+  // ── Open conversation ───────────────────────────────────────────────
   const openConversation = async (targetId, userInfo) => {
     setQuery(""); setSearchResults([]);
     try {
@@ -152,7 +189,7 @@ setConversations(res.data || []);
     } catch (err) { console.error(err); }
   };
 
-  // ── Load messages ───────────────────────────────────────────────────────────
+  // ── Load messages ───────────────────────────────────────────────────
   useEffect(() => {
     if (!selected || selected === "group") return;
     const load = async () => {
@@ -161,7 +198,7 @@ setConversations(res.data || []);
         const res = await API.get(`/messenger/messages/${selected.id}`);
         setMessages(Array.isArray(res.data) ? res.data : []);
         socketRef.current?.emit("joinConversation", { conversationId: selected.id });
-      } catch {}
+      } catch { }
       finally { setLoadingMsgs(false); }
     };
     load();
@@ -171,62 +208,55 @@ setConversations(res.data || []);
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, groupMessages, selected]);
 
-  // ── Send ────────────────────────────────────────────────────────────────────
- const send = async () => {
+  // ── Send (texte + fichier) ──────────────────────────────────────────
+  const send = async () => {
+    if ((!text.trim() && !filePreview) || !selected) return;
+    const msgText = text.trim();
+    setText("");
+    const file = filePreview;
+    setFilePreview(null);
 
-  if (!text.trim() || !selected) return;
-
-  const msgText = text.trim();
-
-  setText("");
-
-  try {
-
-    if (selected === "group") {
-
-      const res = await API.post(
-        "/messenger/group/messages",
-        { text: msgText }
-      );
-
-      setGroupMessages(prev => [...prev, res.data]);
-
-    } else {
-
-      const res = await API.post(
-        "/messenger/messages",
-        {
-          conversationId: selected.id,
-          text: msgText,
+    try {
+      if (selected === "group") {
+        // Group: texte seulement (file upload nécessite backend multipart)
+        if (msgText) {
+          const res = await API.post("/messenger/group/messages", { text: msgText });
+          setGroupMessages(prev => [...prev, res.data]);
         }
-      );
-
-      setMessages(prev => [...prev, res.data]);
-
-      setConversations(prev =>
-        prev.map(c =>
-          c.id === selected.id
-            ? {
-                ...c,
-                last_message: msgText,
-                last_time: new Date()
-              }
-            : c
-        )
-      );
+      } else {
+        if (file) {
+          const formData = new FormData();
+          formData.append("file", file);
+          if (msgText) formData.append("text", msgText);
+          formData.append("conversationId", selected.id);
+          const res = await API.post("/messenger/messages/upload", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+          setMessages(prev => [...prev, res.data]);
+        } else {
+          const res = await API.post("/messenger/messages", {
+            conversationId: selected.id,
+            text: msgText,
+          });
+          setMessages(prev => [...prev, res.data]);
+          setConversations(prev =>
+            prev.map(c =>
+              c.id === selected.id
+                ? { ...c, last_message: msgText, last_time: new Date() }
+                : c
+            )
+          );
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erreur d'envoi");
     }
+  };
 
-  } catch (err) {
-
-    console.log(err);
-
-    alert("Erreur d'envoi");
-  }
-};
-
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  const displayList = query.trim() ? searchResults : conversations;
+  // ── Helpers ─────────────────────────────────────────────────────────
   const isSearchMode = !!query.trim();
+  const displayList = isSearchMode ? searchResults : conversations;
   const adminNotInConv = admins.filter(a => !conversations.find(c => c.id_user === a.id_user));
   const activeMessages = selected === "group" ? groupMessages : messages;
   const isGroup = selected === "group";
@@ -234,7 +264,7 @@ setConversations(res.data || []);
   return (
     <div className="admin-contact">
 
-      {/* ── SIDEBAR ──────────────────────────────────────────────────────────── */}
+      {/* ── SIDEBAR ──────────────────────────────────────────────────── */}
       <aside className="contacts-panel">
 
         {/* Header + Search */}
@@ -244,7 +274,7 @@ setConversations(res.data || []);
             <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#b0a9d4" }}>🔍</span>
             <input
               type="text"
-              placeholder="Rechercher..."
+              placeholder="Rechercher un admin..."
               value={query}
               onChange={e => setQuery(e.target.value)}
               style={{
@@ -261,11 +291,14 @@ setConversations(res.data || []);
 
         <div className="chat-list">
 
-          {/* Group Swafy */}
+          {/* Group Swafy — toujours visible hors search */}
           {!isSearchMode && (
             <>
               <div className="section-label">Groupe</div>
-              <div className={`group-item ${selected === "group" ? "active" : ""}`} onClick={() => setSelected("group")}>
+              <div
+                className={`group-item ${isGroup ? "active" : ""}`}
+                onClick={() => { setSelected("group"); setFilePreview(null); }}
+              >
                 <div className="group-avatar">S</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e" }}>Swafy</div>
@@ -278,13 +311,12 @@ setConversations(res.data || []);
             </>
           )}
 
-          {/* Admins Swafy */}
+          {/* Admins Swafy (pas encore en conversation) */}
           {!isSearchMode && adminNotInConv.length > 0 && (
             <>
               <div className="section-label">Swafy Admin</div>
               {adminNotInConv.map(admin => (
                 <div key={admin.id_user} className="chat-item" onClick={() => openConversation(admin.id_user, admin)}>
-                  {/* Avatar admin avec lettre S */}
                   <div style={{
                     width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
                     background: "linear-gradient(135deg,#6d56c1,#4f3fa0)",
@@ -300,32 +332,33 @@ setConversations(res.data || []);
             </>
           )}
 
-          {/* Conversations */}
+          {/* Labels */}
           {!isSearchMode && conversations.length > 0 && (
             <div className="section-label">Conversations ({conversations.length})</div>
           )}
           {isSearchMode && (
             <div className="section-label">
-              {searchResults.length > 0 ? `${searchResults.length} résultat(s)` : "Aucun résultat"}
+              {searching ? "Recherche…" : searchResults.length > 0 ? `${searchResults.length} résultat(s)` : "Aucun résultat"}
             </div>
           )}
 
+          {/* Liste conversations ou résultats search */}
           {displayList.map(item => {
             const id = item.id_user;
             const isActive = selected !== "group" && (selected?.id === item.id || selected?.id_user === id);
-            // Admin affiché avec S
             const isAdmin = item.role === "admin";
             return (
               <div
                 key={item.id || item.id_user}
                 className={`chat-item ${isActive ? "active" : ""}`}
                 onClick={() => {
-  if (isSearchMode) {
-    openConversation(item.id_user, item);
-  } else {
-    setSelected(item);
-  }
-}}
+                  if (isSearchMode) {
+                    openConversation(item.id_user, item);
+                  } else {
+                    setSelected(item);
+                    setFilePreview(null);
+                  }
+                }}
               >
                 {isAdmin ? (
                   <div style={{
@@ -354,7 +387,7 @@ setConversations(res.data || []);
         </div>
       </aside>
 
-      {/* ── CHAT WINDOW ──────────────────────────────────────────────────────── */}
+      {/* ── CHAT WINDOW ──────────────────────────────────────────────── */}
       <main className="chat-window">
         {selected ? (
           <>
@@ -394,7 +427,6 @@ setConversations(res.data || []);
                   const isMe = m.sender_id === currentUser.id_user;
                   return (
                     <div key={m.id} style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "72%", display: "flex", flexDirection: "column", gap: 3, animation: "fadeUp 0.2s ease" }}>
-                      {/* Nom dans group */}
                       {isGroup && !isMe && (
                         <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
                           <Avatar user={{ id_user: m.sender_id, prenom_user: m.prenom_user, nom_user: m.nom_user, photo_user: m.photo_user }} size={20} />
@@ -433,10 +465,9 @@ setConversations(res.data || []);
 
             {/* Input bar */}
             <div style={{ padding: "12px 16px", borderTop: "1px solid #ede9ff", display: "flex", alignItems: "center", gap: 8, background: "#fff", flexShrink: 0 }}>
-              {/* File attach */}
               <button
                 onClick={() => fileInputRef.current?.click()}
-                style={{ width: 38, height: 38, borderRadius: 10, border: "1.5px solid #ede9ff", background: "#f7f5ff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+                style={{ width: 38, height: 38, borderRadius: 10, border: "1.5px solid #ede9ff", background: "#f7f5ff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}
                 title="Joindre un fichier"
               >📎</button>
               <input
@@ -446,7 +477,6 @@ setConversations(res.data || []);
                 style={{ display: "none" }}
                 onChange={e => setFilePreview(e.target.files[0] || null)}
               />
-
               <textarea
                 placeholder="Écrire un message... (Entrée pour envoyer)"
                 value={text}
@@ -471,12 +501,13 @@ setConversations(res.data || []);
                   color: (text.trim() || filePreview) ? "#fff" : "#b0a9d4",
                   cursor: (text.trim() || filePreview) ? "pointer" : "default",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0, boxShadow: (text.trim() || filePreview) ? "0 4px 14px rgba(109,86,193,0.35)" : "none",
+                  flexShrink: 0,
+                  boxShadow: (text.trim() || filePreview) ? "0 4px 14px rgba(109,86,193,0.35)" : "none",
                   transition: "all 0.2s",
                 }}
               >
                 <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
             </div>
