@@ -1,450 +1,564 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import API from "../services/api";
-import "./AdminContact.css";
+import PublicationCard from "../components/PublicationCard";
+import Chatbot from "../components/Chatbot";
+import JeuneContact from "./JeuneContact";
+import "./JeuneLayout.css";
 
-const BACKEND = "https://debat-jeune-production.up.railway.app";
-const AVATAR_COLORS = ["#6d56c1", "#2563eb", "#059669", "#d97706", "#dc2626", "#7c3aed"];
+/* ─── helpers ─── */
+const BACKEND =
+  API.defaults.baseURL?.split("/api")[0] ||
+  "https://debat-jeune-production.up.railway.app";
 
-const getInitials = (prenom, nom) =>
-  ((prenom?.[0] || "") + (nom?.[0] || "")).toUpperCase() || "?";
-const getColor = (id) => AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length];
-const formatTime = (d) => {
-  if (!d) return "";
-  const dt = new Date(d), now = new Date(), diff = now - dt;
-  if (diff < 60000) return "À l'instant";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}min`;
-  if (diff < 86400000) return dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+const getAvatar = (photo, sexe) => {
+  if (photo) return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;
+  return sexe === "femme"
+    ? "https://randomuser.me/api/portraits/women/44.jpg"
+    : "https://randomuser.me/api/portraits/men/44.jpg";
 };
 
-function Avatar({ user, size = 42 }) {
-  if (user?.photo_user) {
-    return <img src={user.photo_user} alt="" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />;
-  }
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: "50%", flexShrink: 0,
-      background: getColor(user?.id_user),
-      display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#fff", fontWeight: 700, fontSize: size * 0.35,
-    }}>
-      {getInitials(user?.prenom_user, user?.nom_user)}
-    </div>
-  );
-}
+const PAGES = {
+  HOME:          "home",
+  MESSAGES:      "messages",
+  NOTIFICATIONS: "notifications",
+  SETTINGS:      "settings",
+  PUBLIER:       "publier",
+  CALENDAR:      "calendar",
+  LIVE:          "live",
+};
 
-function FileMessage({ msg, isMe }) {
-  if (!msg.file_url) return null;
-  if (msg.msg_type === "image") {
-    return <a href={msg.file_url} target="_blank" rel="noreferrer"><img src={msg.file_url} alt="" style={{ maxWidth: 200, borderRadius: 10, display: "block", marginTop: msg.text ? 6 : 0 }} /></a>;
-  }
-  if (msg.msg_type === "video") {
-    return <video controls style={{ maxWidth: 200, borderRadius: 10, marginTop: msg.text ? 6 : 0 }}><source src={msg.file_url} /></video>;
-  }
-  return (
-    <a href={msg.file_url} target="_blank" rel="noreferrer" style={{
-      display: "inline-flex", alignItems: "center", gap: 6, marginTop: msg.text ? 6 : 0,
-      padding: "7px 12px", borderRadius: 8, fontSize: 13, textDecoration: "none",
-      background: isMe ? "rgba(255,255,255,0.18)" : "rgba(109,86,193,0.1)",
-      color: isMe ? "#fff" : "#6d56c1",
-    }}>
-      📄 {msg.msg_type === "pdf" ? "PDF" : "Fichier"}
-    </a>
-  );
-}
+/* ════════════════════════════════════════════════════
+   JEUNE LAYOUT
+════════════════════════════════════════════════════ */
+const JeuneLayout = () => {
 
-export default function JeuneContact() {
-  const [conversations, setConversations] = useState([]);
-  const [admins, setAdmins] = useState([]);
-  const [selected, setSelected] = useState(null); // conv | "group" | null
-  const [messages, setMessages] = useState([]);
-  const [groupMessages, setGroupMessages] = useState([]);
-  const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [text, setText] = useState("");
-  const [filePreview, setFilePreview] = useState(null);
-  const [loadingMsgs, setLoadingMsgs] = useState(false);
-  const bottomRef = useRef(null);
-  const socketRef = useRef(null);
-  const searchTimer = useRef(null);
-  const selectedRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  /* ── user ── */
+  const [user] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("user")) || null; }
+    catch { return null; }
+  });
 
-  // ── Socket ──────────────────────────────────────────────────────────────────
+  const navigate = useNavigate();
+
+  /* ── UI ── */
+  const [activePage,     setActivePage]     = useState(PAGES.HOME);
+  const [sidebarOpen,    setSidebarOpen]    = useState(true);   // desktop expand
+  const [mobileOpen,     setMobileOpen]     = useState(false);  // mobile overlay
+
+  /* ── data ── */
+  const [publications,   setPublications]   = useState([]);
+  const [loading,        setLoading]        = useState(true);
+  const [highlightedPub, setHighlightedPub] = useState(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [unreadNotifs,   setUnreadNotifs]   = useState(0);
+  const [notifications,  setNotifications]  = useState([]);
+
+  /* ── publish form ── */
+  const [pubTitle,  setPubTitle]  = useState("");
+  const [pubBody,   setPubBody]   = useState("");
+  const [pubCat,    setPubCat]    = useState("");
+  const [pubVis,    setPubVis]    = useState("public");
+  const [pubBusy,   setPubBusy]   = useState(false);
+
+  /* ════ socket ════ */
   useEffect(() => {
     const token = localStorage.getItem("token");
-    socketRef.current = io(BACKEND, { auth: { token }, transports: ["websocket"] });
-
-    socketRef.current.on("newMessage", (msg) => {
-      if (selectedRef.current !== "group" && selectedRef.current?.id === msg.conversation_id) {
-        setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
-      }
-      setConversations(prev =>
-        prev.map(c => c.id === msg.conversation_id
-          ? { ...c, last_message: msg.text || `[${msg.msg_type}]`, last_time: msg.created_at }
-          : c
-        ).sort((a, b) => new Date(b.last_time) - new Date(a.last_time))
-      );
-    });
-
-    socketRef.current.on("newGroupMessage", (msg) => {
-      setGroupMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
-    });
-
-    socketRef.current.emit("joinGroup");
-    return () => socketRef.current?.disconnect();
+    if (!token) return;
+    const socket = io(BACKEND, { auth: { token }, transports: ["websocket"] });
+    socket.on("connect_error", (e) => console.error("Socket:", e.message));
+    socket.on("new_message", () => setUnreadMessages((n) => n + 1));
+    return () => socket.disconnect();
   }, []);
 
-  useEffect(() => { selectedRef.current = selected; }, [selected]);
-
-  // ── Fetch data ──────────────────────────────────────────────────────────────
-  const fetchConversations = useCallback(async () => {
+  /* ════ fetch ════ */
+  const fetchPublications = useCallback(async () => {
     try {
-      const res = await API.get("/messenger/conversations");
-      setConversations(Array.isArray(res.data) ? res.data : []);
+      setLoading(true);
+      const res = await API.get("/publications");
+      setPublications(Array.isArray(res.data) ? res.data : []);
+    } catch { setPublications([]); }
+    finally   { setLoading(false); }
+  }, []);
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await API.get("/notifications");
+      const list = Array.isArray(res.data) ? res.data : [];
+      setNotifications(list);
+      setUnreadNotifs(list.filter((n) => !n.is_read).length);
     } catch {}
   }, []);
 
-  useEffect(() => { fetchConversations(); }, [fetchConversations]);
-
   useEffect(() => {
-    API.get("/messenger/admins")
-      .then(res => setAdmins(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {});
-    API.get("/messenger/group/messages")
-      .then(res => setGroupMessages(Array.isArray(res.data) ? res.data : []))
-      .catch(() => {});
+    fetchPublications();
+    fetchNotifications();
+    const params = new URLSearchParams(window.location.search);
+    const pubId  = params.get("publication");
+    if (pubId) {
+      setHighlightedPub(parseInt(pubId));
+      setTimeout(() => {
+        document.getElementById(`pub-${pubId}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 900);
+    }
   }, []);
 
-  // ── Search ──────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    clearTimeout(searchTimer.current);
-    if (!query.trim()) { setSearchResults([]); setSearching(false); return; }
-    setSearching(true);
-    searchTimer.current = setTimeout(async () => {
-      try {
-        const res = await API.get(`/messenger/users/search?q=${encodeURIComponent(query)}`);
-        setSearchResults(Array.isArray(res.data) ? res.data : []);
-      } catch { setSearchResults([]); }
-      finally { setSearching(false); }
-    }, 350);
-  }, [query]);
+  /* ════ actions ════ */
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    window.location.href = "/login";
+  };
 
-  // ── Open conversation ───────────────────────────────────────────────────────
-  const openConversation = async (targetId, userInfo) => {
-    setQuery(""); setSearchResults([]);
+  const goTo = (page) => {
+    setActivePage(page);
+    setMobileOpen(false);
+  };
+
+  const markNotifRead = async (id) => {
     try {
-      const res = await API.post("/messenger/conversation", { targetId });
-      const conv = { ...res.data, ...userInfo, id_user: userInfo.id_user || targetId };
-      setSelected(conv);
-      setConversations(prev => {
-        const exists = prev.find(c => c.id === conv.id);
-        return exists ? prev.map(c => c.id === conv.id ? { ...c, ...conv } : c) : [conv, ...prev];
+      await API.put(`/notifications/${id}/read`);
+      fetchNotifications();
+    } catch {}
+  };
+
+  const handlePublierSubmit = async (e) => {
+    e.preventDefault();
+    if (!pubTitle.trim() || !pubBody.trim()) return;
+    try {
+      setPubBusy(true);
+      await API.post("/publications", {
+        titre_publication:   pubTitle,
+        contenu_publication: pubBody,
+        categorie:           pubCat,
+        visibilite:          pubVis,
       });
+      setPubTitle(""); setPubBody(""); setPubCat(""); setPubVis("public");
+      await fetchPublications();
+      setActivePage(PAGES.HOME);
     } catch (err) { console.error(err); }
+    finally { setPubBusy(false); }
   };
 
-  // ── Load messages ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!selected || selected === "group") return;
-    const load = async () => {
-      setLoadingMsgs(true);
-      try {
-        const res = await API.get(`/messenger/messages/${selected.id}`);
-        setMessages(Array.isArray(res.data) ? res.data : []);
-        socketRef.current?.emit("joinConversation", { conversationId: selected.id });
-      } catch {}
-      finally { setLoadingMsgs(false); }
-    };
-    load();
-  }, [selected?.id]);
+  /* ════ nav items ════ */
+  const NAV = [
+    { icon: "⌂",  label: "Accueil",       page: PAGES.HOME },
+    { icon: "✉",  label: "Messages",      page: PAGES.MESSAGES,      badge: unreadMessages || null },
+    { icon: "📅", label: "Calendrier",    page: PAGES.CALENDAR },
+    { icon: "◉",  label: "Live",          page: PAGES.LIVE,          live: true },
+    { icon: "🔔", label: "Notifications", page: PAGES.NOTIFICATIONS, badge: unreadNotifs || null },
+    { icon: "⚙",  label: "Paramètres",   page: PAGES.SETTINGS },
+  ];
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, groupMessages, selected]);
+  /* ════ page content ════ */
+  const renderContent = () => {
+    switch (activePage) {
 
-  // ── Send ────────────────────────────────────────────────────────────────────
-  const send = async () => {
-    if (!text.trim() && !filePreview) return;
-    if (!selected) return;
-    const msgText = text.trim();
-    const file = filePreview;
-    setText(""); setFilePreview(null);
-    try {
-      const formData = new FormData();
-      if (msgText) formData.append("text", msgText);
-      if (file) formData.append("file", file);
-      if (selected === "group") {
-        await API.post("/messenger/group/messages", formData, { headers: { "Content-Type": "multipart/form-data" } });
-      } else {
-        formData.append("conversationId", selected.id);
-        await API.post("/messenger/messages", formData, { headers: { "Content-Type": "multipart/form-data" } });
-      }
-    } catch { alert("Erreur d'envoi"); }
-  };
+      /* ── MESSAGES ── */
+      case PAGES.MESSAGES:
+        return <JeuneContact />;
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-  const displayList = query.trim() ? searchResults : conversations;
-  const isSearchMode = !!query.trim();
-  const adminNotInConv = admins.filter(a => !conversations.find(c => c.id_user === a.id_user));
-  const activeMessages = selected === "group" ? groupMessages : messages;
-  const isGroup = selected === "group";
-
-  return (
-    <div className="admin-contact">
-
-      {/* ── SIDEBAR ──────────────────────────────────────────────────────────── */}
-      <aside className="contacts-panel">
-
-        {/* Header + Search */}
-        <div style={{ padding: "20px 16px 12px", borderBottom: "1px solid #ede9ff" }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 12 }}>💬 Messages</h2>
-          <div style={{ position: "relative" }}>
-            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#b0a9d4" }}>🔍</span>
-            <input
-              type="text"
-              placeholder="Rechercher..."
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              style={{
-                width: "100%", padding: "9px 10px 9px 32px",
-                borderRadius: 10, border: "1.5px solid #ede9ff",
-                background: "#f7f5ff", color: "#1a1a2e",
-                fontSize: 13, outline: "none", boxSizing: "border-box",
-                caretColor: "#6d56c1", fontFamily: "inherit",
-              }}
-            />
-            {searching && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#b0a9d4" }}>⟳</span>}
+      /* ── NOTIFICATIONS ── */
+      case PAGES.NOTIFICATIONS:
+        return (
+          <div className="jl-page">
+            <h2 className="jl-sec-title">🔔 Notifications</h2>
+            {notifications.length === 0 ? (
+              <div className="jl-empty">
+                <span className="jl-empty-ico">🔔</span>
+                <p>Aucune notification pour le moment</p>
+              </div>
+            ) : notifications.map((n, i) => (
+              <div
+                key={n.id_notification}
+                className={`jl-notif-item${n.is_read ? "" : " unread"}`}
+                style={{ animationDelay: `${i * 0.06}s` }}
+                onClick={() => markNotifRead(n.id_notification)}
+              >
+                <div className="jl-notif-ico">
+                  {n.type_notification === "new_post" ? "📝"
+                 : n.type_notification === "publication_comment" ? "💬" : "🔔"}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <p className="jl-notif-msg">{n.message}</p>
+                  <p className="jl-notif-time">
+                    {new Date(n.created_at).toLocaleString("fr-FR")}
+                  </p>
+                </div>
+                {!n.is_read && <span className="jl-notif-dot" />}
+              </div>
+            ))}
           </div>
-        </div>
+        );
 
-        <div className="chat-list">
-
-          {/* Group Swafy */}
-          {!isSearchMode && (
-            <>
-              <div className="section-label">Groupe</div>
-              <div className={`group-item ${selected === "group" ? "active" : ""}`} onClick={() => setSelected("group")}>
-                <div className="group-avatar">S</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e" }}>Swafy</div>
-                  <div style={{ fontSize: 12, color: "#9e97c0" }}>
-                    {groupMessages.length > 0 ? groupMessages[groupMessages.length - 1].text || "[fichier]" : "Canal général"}
+      /* ── PUBLIER ── */
+      case PAGES.PUBLIER:
+        return (
+          <div className="jl-page">
+            <h2 className="jl-sec-title">✦ Nouvelle publication</h2>
+            <div className="jl-card jl-form-card">
+              <form onSubmit={handlePublierSubmit}>
+                <div className="jl-fg">
+                  <label className="jl-fl">Titre</label>
+                  <input className="jl-fi" placeholder="Un titre accrocheur…"
+                    value={pubTitle} onChange={(e) => setPubTitle(e.target.value)} required />
+                </div>
+                <div className="jl-fg">
+                  <label className="jl-fl">Contenu</label>
+                  <textarea className="jl-fi jl-fi-ta"
+                    placeholder="Partagez vos idées, opinions ou expériences…"
+                    value={pubBody} onChange={(e) => setPubBody(e.target.value)} required />
+                </div>
+                <div className="jl-form-row">
+                  <div className="jl-fg">
+                    <label className="jl-fl">Catégorie</label>
+                    <select className="jl-fi" value={pubCat} onChange={(e) => setPubCat(e.target.value)}>
+                      <option value="">Sélectionner…</option>
+                      <option value="education">Éducation</option>
+                      <option value="environnement">Environnement</option>
+                      <option value="culture">Culture</option>
+                      <option value="politique">Politique</option>
+                      <option value="sante">Santé</option>
+                      <option value="technologie">Technologie</option>
+                    </select>
+                  </div>
+                  <div className="jl-fg">
+                    <label className="jl-fl">Visibilité</label>
+                    <select className="jl-fi" value={pubVis} onChange={(e) => setPubVis(e.target.value)}>
+                      <option value="public">Public</option>
+                      <option value="membres">Membres seulement</option>
+                    </select>
                   </div>
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 700, background: "#ede9ff", color: "#6d56c1", padding: "2px 6px", borderRadius: 6 }}>GROUPE</span>
-              </div>
-            </>
-          )}
+                <div className="jl-media-row">
+                  <button type="button" className="jl-media-btn">📷 Photo</button>
+                  <button type="button" className="jl-media-btn">🎬 Vidéo</button>
+                  <button type="button" className="jl-media-btn">🔗 Lien</button>
+                </div>
+                <button type="submit" className="jl-submit-btn" disabled={pubBusy}>
+                  {pubBusy ? "Publication en cours…" : "✦ Publier maintenant"}
+                </button>
+              </form>
+            </div>
 
-          {/* Admins Swafy */}
-          {!isSearchMode && adminNotInConv.length > 0 && (
-            <>
-              <div className="section-label">Swafy Admin</div>
-              {adminNotInConv.map(admin => (
-                <div key={admin.id_user} className="chat-item" onClick={() => openConversation(admin.id_user, admin)}>
-                  {/* Avatar admin avec lettre S */}
-                  <div style={{
-                    width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                    background: "linear-gradient(135deg,#6d56c1,#4f3fa0)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#fff", fontWeight: 800, fontSize: 18,
-                  }}>S</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e" }}>Swafy</div>
-                    <div style={{ fontSize: 12, color: "#9e97c0" }}>👑 Équipe Swafy</div>
+            <h2 className="jl-sec-title" style={{ marginTop: 12 }}>Mes publications récentes</h2>
+            {publications.slice(0, 2).map((pub) => (
+              <PublicationCard key={pub.id_publication} publication={pub} onUpdate={fetchPublications} />
+            ))}
+          </div>
+        );
+
+      /* ── CALENDAR ── */
+      case PAGES.CALENDAR:
+        return (
+          <div className="jl-page">
+            <h2 className="jl-sec-title">📅 Calendrier des événements</h2>
+            {[
+              { ico: "📚", title: "Débat : Réforme éducative",       date: "Lun 12 Mai · 18h00" },
+              { ico: "🌱", title: "Live : Environnement & Jeunesse", date: "Mer 14 Mai · 20h00" },
+              { ico: "📊", title: "Enquête nationale : Emploi",      date: "Ven 16 Mai · Toute la journée" },
+              { ico: "🎤", title: "Atelier : Prise de parole",       date: "Sam 17 Mai · 10h00" },
+            ].map((ev, i) => (
+              <div className="jl-event-item" key={i} style={{ animationDelay: `${i * 0.08}s` }}>
+                <div className="jl-event-dot">{ev.ico}</div>
+                <div>
+                  <p className="jl-event-title">{ev.title}</p>
+                  <p className="jl-event-meta">{ev.date}</p>
+                </div>
+                <button className="jl-event-btn">S'inscrire</button>
+              </div>
+            ))}
+          </div>
+        );
+
+      /* ── LIVE ── */
+      case PAGES.LIVE:
+        return (
+          <div className="jl-page">
+            <h2 className="jl-sec-title">◉ Sessions Live</h2>
+            <div className="jl-live-banner">
+              <div className="jl-live-top">
+                <span className="jl-live-badge">● LIVE</span>
+                <span className="jl-live-desc">Débat : L'avenir de la jeunesse tunisienne</span>
+              </div>
+              <div className="jl-live-screen">
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 40, marginBottom: 8 }}>🎙️</div>
+                  <p style={{ color: "rgba(255,255,255,0.75)", fontSize: 13 }}>342 spectateurs en direct</p>
+                </div>
+              </div>
+              <button className="jl-submit-btn">Rejoindre le Live →</button>
+            </div>
+            <h2 className="jl-sec-title" style={{ marginTop: 10 }}>Prochains lives</h2>
+            {[
+              { title: "Santé mentale des jeunes",     date: "Demain · 19h00" },
+              { title: "Entrepreneuriat & Innovation",  date: "Jeudi · 20h00" },
+            ].map((l, i) => (
+              <div className="jl-event-item" key={i} style={{ animationDelay: `${i * 0.08}s` }}>
+                <div className="jl-event-dot">🎙️</div>
+                <div>
+                  <p className="jl-event-title">{l.title}</p>
+                  <p className="jl-event-meta">{l.date}</p>
+                </div>
+                <button className="jl-event-btn">Rappel</button>
+              </div>
+            ))}
+          </div>
+        );
+
+      /* ── SETTINGS ── */
+      case PAGES.SETTINGS:
+        return (
+          <div className="jl-page">
+            <h2 className="jl-sec-title">⚙ Paramètres</h2>
+            {[
+              { ico: "👤", label: "Informations personnelles", sub: "Nom, photo, bio",      path: "/profile" },
+              { ico: "🔔", label: "Notifications",             sub: "Email, push, SMS" },
+              { ico: "🔒", label: "Confidentialité",           sub: "Visibilité du profil" },
+              { ico: "🎨", label: "Apparence",                 sub: "Thème, langue" },
+              { ico: "🛡️", label: "Sécurité",                  sub: "Mot de passe, 2FA" },
+            ].map((s, i) => (
+              <div
+                key={i}
+                className="jl-settings-item"
+                style={{ animationDelay: `${i * 0.07}s`, cursor: s.path ? "pointer" : "default" }}
+                onClick={() => s.path && navigate(s.path)}
+              >
+                <div className="jl-settings-ico">{s.ico}</div>
+                <div>
+                  <p className="jl-settings-label">{s.label}</p>
+                  <p className="jl-settings-sub">{s.sub}</p>
+                </div>
+                <span className="jl-settings-arr">›</span>
+              </div>
+            ))}
+          </div>
+        );
+
+      /* ── HOME ── */
+      default:
+        return (
+          <div className="jl-page">
+
+            {/* Welcome */}
+            <section className="jl-welcome">
+              <div>
+                <p className="jl-welcome-tag">Tableau de bord</p>
+                <h1 className="jl-welcome-h1">
+                  Bonjour, <span className="jl-welcome-name">{user?.prenom_user || "Jeune"}</span> 👋
+                </h1>
+                <p className="jl-welcome-sub">
+                  Bienvenue dans votre espace — explorez, publiez, débattez.
+                </p>
+              </div>
+              <div className="jl-welcome-art">
+                <div className="jl-ring" /><div className="jl-ring" /><div className="jl-ring" />
+                <div className="jl-ring-center">✦</div>
+              </div>
+            </section>
+
+            {/* Stats */}
+            <div className="jl-stats">
+              {[
+                { label: "Profil",       sub: "Compte actif",                          icon: "👤", color: "#5a3fa0", action: () => navigate("/profile") },
+                { label: "Publications", sub: `${publications?.length || 0} posts`,    icon: "✦",  color: "#3b82f6", action: () => setActivePage(PAGES.PUBLIER) },
+                { label: "Live",         sub: "Débats en direct",                      icon: "◉",  color: "#ec4899" },
+                { label: "Messages",     sub: unreadMessages ? `${unreadMessages} non lus` : "Aucun message",
+                                                                                       icon: "✉",  color: "#10b981", action: () => setActivePage(PAGES.MESSAGES) },
+              ].map((c, i) => (
+                <div
+                  key={i}
+                  className="jl-stat-card"
+                  style={{ "--accent": c.color, animationDelay: `${i * 0.08}s`, cursor: c.action ? "pointer" : "default" }}
+                  onClick={c.action}
+                >
+                  <div className="jl-stat-ico">{c.icon}</div>
+                  <div>
+                    <p className="jl-stat-label">{c.label}</p>
+                    <p className="jl-stat-sub">{c.sub}</p>
                   </div>
                 </div>
               ))}
-            </>
-          )}
-
-          {/* Conversations */}
-          {!isSearchMode && conversations.length > 0 && (
-            <div className="section-label">Conversations ({conversations.length})</div>
-          )}
-          {isSearchMode && (
-            <div className="section-label">
-              {searchResults.length > 0 ? `${searchResults.length} résultat(s)` : "Aucun résultat"}
             </div>
-          )}
 
-          {displayList.map(item => {
-            const id = item.id_user;
-            const isActive = selected !== "group" && (selected?.id === item.id || selected?.id_user === id);
-            // Admin affiché avec S
-            const isAdmin = item.role === "admin";
-            return (
-              <div
-                key={item.id || item.id_user}
-                className={`chat-item ${isActive ? "active" : ""}`}
-                onClick={() => isSearchMode ? openConversation(id, item) : setSelected(item)}
-              >
-                {isAdmin ? (
-                  <div style={{
-                    width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                    background: "linear-gradient(135deg,#6d56c1,#4f3fa0)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#fff", fontWeight: 800, fontSize: 18,
-                  }}>S</div>
-                ) : (
-                  <Avatar user={item} size={42} />
-                )}
-                <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>
-                      {isAdmin ? "Swafy" : `${item.prenom_user} ${item.nom_user}`}
-                    </span>
-                    {item.last_time && <span style={{ fontSize: 10, color: "#b0a9d4", flexShrink: 0, marginLeft: 4 }}>{formatTime(item.last_time)}</span>}
-                  </div>
-                  <p style={{ fontSize: 12, color: "#9e97c0", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {isSearchMode ? (isAdmin ? "👑 Admin" : "👤 Membre") : (item.last_message || "Nouvelle conversation")}
-                  </p>
+            {/* Banners */}
+            <div className="jl-banners">
+              <div className="jl-banner jl-ban-live">
+                <div className="jl-banner-body">
+                  <span className="jl-banner-tag">EN DIRECT</span>
+                  <h2>Sessions Live<br />Interactives</h2>
+                  <button className="jl-banner-btn" onClick={() => goTo(PAGES.LIVE)}>Rejoindre →</button>
                 </div>
+                <img
+                  src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300&q=80"
+                  alt="live" className="jl-banner-img"
+                  onError={(e) => { e.target.style.display = "none"; }}
+                />
               </div>
-            );
-          })}
+              <div className="jl-banner jl-ban-enquete">
+                <div className="jl-banner-body">
+                  <span className="jl-banner-tag">NOUVEAU</span>
+                  <h2>Participez aux<br />Enquêtes</h2>
+                  <button className="jl-banner-btn">Participer →</button>
+                </div>
+                <img
+                  src="https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=300&q=80"
+                  alt="enquete" className="jl-banner-img"
+                  onError={(e) => { e.target.style.display = "none"; }}
+                />
+              </div>
+            </div>
+
+            {/* Feed */}
+            <h2 className="jl-sec-title">Fil d'actualité</h2>
+            {loading ? (
+              <div className="jl-spinner-wrap"><div className="jl-spinner" /></div>
+            ) : publications.length === 0 ? (
+              <div className="jl-empty">
+                <span className="jl-empty-ico">✦</span>
+                <p>Aucune publication pour le moment</p>
+              </div>
+            ) : (
+              publications.map((pub) => (
+                <div
+                  key={pub.id_publication}
+                  id={`pub-${pub.id_publication}`}
+                  className={highlightedPub === pub.id_publication ? "jl-highlighted" : ""}
+                >
+                  <PublicationCard publication={pub} onUpdate={fetchPublications} />
+                </div>
+              ))
+            )}
+          </div>
+        );
+    }
+  };
+
+  /* ════════════════════════════════════════════════════
+     JSX
+  ════════════════════════════════════════════════════ */
+  return (
+    <div className="jl-root">
+      {/* bg orbs */}
+      <div className="jl-orb jl-orb1" aria-hidden="true" />
+      <div className="jl-orb jl-orb2" aria-hidden="true" />
+      <div className="jl-orb jl-orb3" aria-hidden="true" />
+
+      {/* mobile overlay */}
+      {mobileOpen && (
+        <div className="jl-overlay" onClick={() => setMobileOpen(false)} />
+      )}
+
+      {/* ══ SIDEBAR ══ */}
+      <aside
+        className={[
+          "jl-sidebar",
+          sidebarOpen ? "sb-open" : "sb-col",
+          mobileOpen  ? "sb-mobile" : "",
+        ].join(" ")}
+      >
+        {/* Logo */}
+        <div className="jl-sb-logo" onClick={() => setSidebarOpen((o) => !o)}>
+          <div className="jl-logo-ico">S</div>
+          <span className="jl-logo-txt">Swafy</span>
         </div>
+
+        {/* Menu toggle btn — same as AdminDashboard */}
+        <button className="jl-menu-btn" onClick={() => setSidebarOpen((o) => !o)}>
+          <span>☰</span>
+          <span className="jl-menu-label">Menu</span>
+        </button>
+
+        {/* Nav */}
+        <nav className="jl-nav">
+          {NAV.map((item, idx) => (
+            <button
+              key={idx}
+              className={`jl-nav-item${activePage === item.page ? " active" : ""}`}
+              onClick={() => goTo(item.page)}
+            >
+              <span className="jl-nav-ico">{item.icon}</span>
+              <span className="jl-nav-lbl">{item.label}</span>
+              {item.badge && <span className="jl-badge">{item.badge}</span>}
+              {item.live  && <span className="jl-badge-live">LIVE</span>}
+            </button>
+          ))}
+        </nav>
+
+        {/* Logout */}
+        <button className="jl-exit-btn" onClick={handleLogout}>
+          <span className="jl-nav-ico">↩</span>
+          <span className="jl-nav-lbl">Déconnexion</span>
+        </button>
       </aside>
 
-      {/* ── CHAT WINDOW ──────────────────────────────────────────────────────── */}
-      <main className="chat-window">
-        {selected ? (
-          <>
-            {/* Header */}
-            <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, background: "#fff", borderBottom: "1px solid #ede9ff", flexShrink: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-              {isGroup ? (
-                <div className="group-avatar" style={{ width: 42, height: 42, fontSize: 15 }}>S</div>
-              ) : (
-                selected.role === "admin" ? (
-                  <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#6d56c1,#4f3fa0)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 18, flexShrink: 0 }}>S</div>
-                ) : (
-                  <Avatar user={selected} size={42} />
-                )
-              )}
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a2e" }}>
-                  {isGroup ? "Swafy" : (selected.role === "admin" ? "Swafy" : `${selected.prenom_user} ${selected.nom_user}`)}
-                </div>
-                <div style={{ fontSize: 11, color: "#059669", display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#059669", display: "inline-block" }} />
-                  {isGroup ? "Canal général" : "En ligne"}
-                </div>
-              </div>
-            </div>
+      {/* ══ MAIN ══ */}
+      <main className={`jl-main${sidebarOpen ? " ml-open" : " ml-col"}`}>
 
-            {/* Messages */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 10, background: "#f4f2fb" }}>
-              {loadingMsgs ? (
-                <div style={{ margin: "auto", color: "#b0a9d4", fontSize: 13 }}>Chargement…</div>
-              ) : activeMessages.length === 0 ? (
-                <div style={{ margin: "auto", textAlign: "center", color: "#b0a9d4", animation: "fadeUp 0.4s ease" }}>
-                  <div style={{ fontSize: 44, marginBottom: 10 }}>💬</div>
-                  <div style={{ fontWeight: 600, color: "#6b6b8a" }}>Démarrez la conversation</div>
-                </div>
-              ) : (
-                activeMessages.map(m => {
-                  const isMe = m.sender_id === currentUser.id_user;
-                  return (
-                    <div key={m.id} style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "72%", display: "flex", flexDirection: "column", gap: 3, animation: "fadeUp 0.2s ease" }}>
-                      {/* Nom dans group */}
-                      {isGroup && !isMe && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
-                          <Avatar user={{ id_user: m.sender_id, prenom_user: m.prenom_user, nom_user: m.nom_user, photo_user: m.photo_user }} size={20} />
-                          <span style={{ fontSize: 11, color: "#6d56c1", fontWeight: 600 }}>{m.prenom_user} {m.nom_user}</span>
-                        </div>
-                      )}
-                      <div style={{
-                        background: isMe ? "linear-gradient(135deg,#6d56c1,#4f3fa0)" : "#ffffff",
-                        color: isMe ? "#ffffff" : "#1a1a2e",
-                        padding: "10px 14px",
-                        borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-                        fontSize: 13.5, lineHeight: 1.55,
-                        boxShadow: isMe ? "0 4px 14px rgba(109,86,193,0.3)" : "0 1px 6px rgba(0,0,0,0.07)",
-                        border: isMe ? "none" : "1px solid #ede9ff",
-                      }}>
-                        {m.text && <div>{m.text}</div>}
-                        <FileMessage msg={m} isMe={isMe} />
-                      </div>
-                      <span style={{ fontSize: 10, color: "#b0a9d4", textAlign: isMe ? "right" : "left", paddingInline: 4 }}>
-                        {formatTime(m.created_at)}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={bottomRef} />
-            </div>
+        {/* Topbar */}
+        <div className="jl-topbar">
+          <button
+            className="jl-burger"
+            onClick={() => {
+              if (window.innerWidth < 860) setMobileOpen((o) => !o);
+              else setSidebarOpen((o) => !o);
+            }}
+          >
+            ☰
+          </button>
+          <span className="jl-topbar-title">Swafy</span>
+          <div className="jl-topbar-ava" onClick={() => navigate("/profile")}>
+            <img
+              src={getAvatar(user?.photo_user, user?.sexe)}
+              alt="avatar"
+              onError={(e) => { e.target.src = "https://randomuser.me/api/portraits/men/44.jpg"; }}
+            />
+          </div>
+        </div>
 
-            {/* File preview */}
-            {filePreview && (
-              <div className="file-preview-bar">
-                <span>📎 {filePreview.name}</span>
-                <button onClick={() => setFilePreview(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}>✕</button>
-              </div>
-            )}
-
-            {/* Input bar */}
-            <div style={{ padding: "12px 16px", borderTop: "1px solid #ede9ff", display: "flex", alignItems: "center", gap: 8, background: "#fff", flexShrink: 0 }}>
-              {/* File attach */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                style={{ width: 38, height: 38, borderRadius: 10, border: "1.5px solid #ede9ff", background: "#f7f5ff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-                title="Joindre un fichier"
-              >📎</button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*,application/pdf,.doc,.docx"
-                style={{ display: "none" }}
-                onChange={e => setFilePreview(e.target.files[0] || null)}
-              />
-
-              <textarea
-                placeholder="Écrire un message... (Entrée pour envoyer)"
-                value={text}
-                onChange={e => setText(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                rows={1}
-                style={{
-                  flex: 1, padding: "10px 14px",
-                  borderRadius: 14, border: "1.5px solid #ede9ff",
-                  background: "#f7f5ff", color: "#1a1a2e",
-                  fontSize: 13.5, outline: "none", resize: "none",
-                  fontFamily: "inherit", caretColor: "#6d56c1",
-                  minHeight: 40, maxHeight: 120,
-                }}
-              />
-              <button
-                onClick={send}
-                disabled={!text.trim() && !filePreview}
-                style={{
-                  width: 42, height: 42, borderRadius: 12, border: "none",
-                  background: (text.trim() || filePreview) ? "linear-gradient(135deg,#6d56c1,#4f3fa0)" : "#e8e3ff",
-                  color: (text.trim() || filePreview) ? "#fff" : "#b0a9d4",
-                  cursor: (text.trim() || filePreview) ? "pointer" : "default",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0, boxShadow: (text.trim() || filePreview) ? "0 4px 14px rgba(109,86,193,0.35)" : "none",
-                  transition: "all 0.2s",
-                }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            </div>
-          </>
+        {/* Content */}
+        {activePage === PAGES.MESSAGES ? (
+          <div className="jl-messages-full">
+            <JeuneContact />
+          </div>
         ) : (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, background: "#f4f2fb" }}>
-            <div style={{ fontSize: 52, filter: "drop-shadow(0 4px 12px rgba(109,86,193,0.2))" }}>💬</div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e" }}>Swafy Messages</p>
-            <p style={{ fontSize: 13, color: "#b0a9d4" }}>Sélectionnez une conversation ou rejoignez le groupe</p>
+          <div className="jl-scroll">
+            {renderContent()}
           </div>
         )}
       </main>
+
+      {/* ══ RIGHT SIDEBAR ══ */}
+      {activePage !== PAGES.MESSAGES && (
+        <aside className="jl-right">
+          {/* Profile card */}
+          <div className="jl-profile-card" onClick={() => navigate("/profile")}>
+            <div className="jl-prow">
+              <img
+                className="jl-pava"
+                src={getAvatar(user?.photo_user, user?.sexe)}
+                alt="avatar"
+                onError={(e) => { e.target.src = "https://randomuser.me/api/portraits/men/44.jpg"; }}
+              />
+              <div className="jl-pinfo">
+                <p className="jl-pname">{user?.prenom_user} {user?.nom_user}</p>
+                <p className="jl-pemail">{user?.email_user}</p>
+              </div>
+              <span className="jl-parr">→</span>
+            </div>
+            <span className="jl-prole">● Jeune membre · Swafy</span>
+          </div>
+
+          {/* Chatbot */}
+          <div className="jl-chatbot-wrap">
+            <Chatbot />
+          </div>
+        </aside>
+      )}
     </div>
   );
-}
+};
+
+export default JeuneLayout;
