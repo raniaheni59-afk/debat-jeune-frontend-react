@@ -26,6 +26,7 @@ export default function AdminContact() {
   const [conversations, setConversations] = useState([]);
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [groupMessages, setGroupMessages] = useState([]);
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -56,7 +57,19 @@ export default function AdminContact() {
           )
           .sort((a, b) => new Date(b.last_time) - new Date(a.last_time))
       );
-    });
+    }
+    
+  );
+  socketRef.current.on("newGroupMessage", (msg) => {
+  setGroupMessages((prev) =>
+    prev.find((m) => m.id === msg.id)
+      ? prev
+      : [...prev, msg]
+  );
+});
+
+socketRef.current.emit("joinGroup");
+    
 
     return () => socketRef.current?.disconnect();
   }, []);
@@ -86,6 +99,18 @@ export default function AdminContact() {
       finally { setSearching(false); }
     }, 350);
   }, [query]);
+
+  useEffect(() => {
+  API.get("/messenger/group/messages")
+    .then((res) => {
+      setGroupMessages(
+        Array.isArray(res.data)
+          ? res.data
+          : []
+      );
+    })
+    .catch(console.error);
+}, []);
 
   const openConversation = async (targetId, userInfo) => {
     setQuery("");
@@ -118,7 +143,7 @@ export default function AdminContact() {
   };
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || selected === "group") return;
     const load = async () => {
       try {
         setLoadingMsgs(true);
@@ -135,8 +160,8 @@ export default function AdminContact() {
   }, [selected?.id]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+}, [messages, groupMessages]);
 
   const send = async () => {
 
@@ -148,30 +173,87 @@ export default function AdminContact() {
 
   try {
 
-    const res = await API.post("/messenger/messages", {
-      conversationId: selected.id,
-      text: msgText,
-    });
+    if (selected === "group") {
 
-    console.log("ADMIN MESSAGE SENT", res.data);
+      await API.post(
+        "/messenger/group/messages",
+        {
+          text: msgText,
+        }
+      );
+
+    } else {
+
+      await API.post(
+        "/messenger/messages",
+        {
+          conversationId: selected.id,
+          text: msgText,
+        }
+      );
+
+    }
 
   } catch (err) {
 
-    console.log("ADMIN SEND ERROR", err);
-    console.log("ADMIN SEND RESPONSE", err.response);
+    console.log("SEND ERROR", err);
 
   }
 };
 
   const displayList = query.trim() ? searchResults : conversations;
   const isSearchMode = !!query.trim();
+  const isGroup = selected === "group";
+
+const activeMessages =
+  isGroup
+    ? groupMessages
+    : messages;
 
   return (
+    
     <div className="admin-contact">
-
+      
       {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
       <aside className="contacts-panel">
+        <div
+  className={`chat-item ${
+    selected === "group" ? "active" : ""
+  }`}
+  onClick={() => setSelected("group")}
+>
+  <div style={{
+    width: 42,
+    height: 42,
+    borderRadius: "50%",
+    background: "linear-gradient(135deg,#7c5cbf,#5a3fa0)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontWeight: 700,
+  }}>
+    S
+  </div>
 
+  <div style={{ marginLeft: 10 }}>
+    <div style={{
+      fontWeight: 600,
+      fontSize: 14
+    }}>
+      Swafy Group
+    </div>
+
+    <div style={{
+      fontSize: 12,
+      color: "#9e97c0"
+    }}>
+      Canal général
+    </div>
+  </div>
+</div>
+
+        {/* Header + Search */}
         <div style={{ padding: "20px 16px 10px", borderBottom: "1px solid #e8e8f0" }}>
           <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 12 }}>
             💬 Messages
@@ -278,7 +360,9 @@ export default function AdminContact() {
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: "50%",
-                background: getColor(selected.id_user),
+                background: isGroup
+  ? "linear-gradient(135deg,#7c5cbf,#5a3fa0)"
+  : getColor(selected.id_user),
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "#fff", fontWeight: 700, fontSize: 15,
               }}>
@@ -286,7 +370,10 @@ export default function AdminContact() {
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#1a1a2e" }}>
-                  {selected.prenom_user} {selected.nom_user}
+                  {isGroup
+  ? "Swafy Group"
+  : `${selected.prenom_user} ${selected.nom_user}`
+}
                 </div>
                 <div style={{ fontSize: 11, color: "#22c55e" }}>● En ligne</div>
               </div>
@@ -301,13 +388,13 @@ export default function AdminContact() {
             }}>
               {loadingMsgs ? (
                 <div style={{ margin: "auto", color: "#9e97c0", fontSize: 13 }}>Chargement…</div>
-              ) : messages.length === 0 ? (
+              ) : activeMessages.length === 0 ? (
                 <div style={{ margin: "auto", color: "#9e97c0", fontSize: 13, textAlign: "center" }}>
                   <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
                   Démarrez la conversation !
                 </div>
               ) : (
-                messages.map((m) => {
+                activeMessages.map((m) => {
                   const isMe = m.sender_id === currentUser.id_user;
                   return (
                     <div key={m.id} style={{

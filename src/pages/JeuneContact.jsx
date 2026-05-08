@@ -104,9 +104,14 @@ export default function JeuneContact() {
   const fetchConversations = useCallback(async () => {
     try {
       const res = await API.get("/messenger/conversations");
-      setConversations(Array.isArray(res.data) ? res.data : []);
-    } catch {}
+
+setConversations(res.data || []);
+    } catch (err) {
+      console.error("conversations error:", err);
+    }
   }, []);
+
+
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
@@ -307,7 +312,13 @@ export default function JeuneContact() {
               <div
                 key={item.id || item.id_user}
                 className={`chat-item ${isActive ? "active" : ""}`}
-                onClick={() => isSearchMode ? openConversation(id, item) : setSelected(item)}
+                onClick={() => {
+  if (isSearchMode) {
+    openConversation(item.id_user, item);
+  } else {
+    setSelected(item);
+  }
+}}
               >
                 {isAdmin ? (
                   <div style={{
