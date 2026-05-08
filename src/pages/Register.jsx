@@ -21,65 +21,51 @@ export default function Register() {
   const [codeSent, setCodeSent] = useState(false);
   const [isParentRedirect, setIsParentRedirect] = useState(false);
 
- 
   useEffect(() => {
-  if (form.date_naissance) {
-    const birth = new Date(form.date_naissance);
-    const today = new Date();
-    let calculatedAge = today.getFullYear() - birth.getFullYear();
-    if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) {
-      calculatedAge--;
+    if (form.date_naissance) {
+      const birth = new Date(form.date_naissance);
+      const today = new Date();
+      let calculatedAge = today.getFullYear() - birth.getFullYear();
+      if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) {
+        calculatedAge--;
+      }
+      setAge(calculatedAge);
+      if (calculatedAge < 12) {
+        setIsParentRedirect(true);
+        setMessage({ type: "error", text: "⚠️ Tu as moins de 12 ans. Accès refusé." });
+      } else {
+        setIsParentRedirect(false);
+        setMessage({ type: "", text: "" });
+      }
     }
-    setAge(calculatedAge);
-    if (calculatedAge < 12) {
-      setIsParentRedirect(true);
-      setMessage({ type: "error", text: "⚠️ Tu as moins de 12 ans. Redirection vers l'Espace Parent..." });
-    } else {
-      setIsParentRedirect(false);
-      setMessage({ type: "", text: "" });
-    }
-  }
-}, [form.date_naissance]);
+  }, [form.date_naissance]);
 
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const stepParam = params.get("step");
-  const emailParam = params.get("email");
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const stepParam = params.get("step");
+    const emailParam = params.get("email");
 
-  if (stepParam === "3" && emailParam) {
-    const savedForm = sessionStorage.getItem("registerForm");
-
-    if (savedForm) {
-      setForm(prev => ({
-        ...JSON.parse(savedForm),
-        email_user: emailParam
-      }));
-    } else {
-      setForm(prev => ({
-        ...prev,
-        email_user: emailParam
-      }));
-    }
-
-    setOwnerConfirmed(true);
-    setStep(3);
-
-    API.post("/auth/send-password-code", { email: emailParam })
-      .then(() => {
-        setCodeSent(true);
-        setMessage({
-          type: "success",
-          text: "✅ Code secret envoyé !"
+    if (stepParam === "3" && emailParam) {
+      const savedForm = sessionStorage.getItem("registerForm");
+      if (savedForm) {
+        setForm(prev => ({ ...JSON.parse(savedForm), email_user: emailParam }));
+      } else {
+        setForm(prev => ({ ...prev, email_user: emailParam }));
+      }
+      setOwnerConfirmed(true);
+      setStep(3);
+      API.post("/auth/send-password-code", { email: emailParam })
+        .then(() => {
+          setCodeSent(true);
+          setMessage({ type: "success", text: "✅ Code secret envoyé à votre email !" });
+        })
+        .catch((err) => {
+          const msg = err.response?.data?.message || "Erreur envoi code.";
+          setMessage({ type: "error", text: msg });
         });
-      })
-      .catch(() => {
-        setMessage({
-          type: "error",
-          text: "Erreur envoi code."
-        });
-      });
-  }
-}, []);
+    }
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => {
@@ -90,13 +76,13 @@ useEffect(() => {
     });
   };
 
- const handleNextToEmail = (e) => {
-  e.preventDefault();
-  sessionStorage.setItem("registerForm", JSON.stringify(form));
-  setStep(2);
-};
+  const handleNextToEmail = (e) => {
+    e.preventDefault();
+    if (age !== null && age < 12) return alert("Accès refusé : Moins de 12 ans.");
+    sessionStorage.setItem("registerForm", JSON.stringify(form));
+    setStep(2);
+  };
 
-  // STEP 2: Send Owner Check
   const sendOwnerCheck = async () => {
     if (!form.email_user.includes("@")) return alert("Email invalide");
     setLoading(true);
@@ -108,63 +94,36 @@ useEffect(() => {
         prenom: form.prenom_user
       });
       setMessage({ type: "success", text: res.data.message });
-      // Ma na3mlouch setOwnerConfirmed houni, lezem user yclicki fi email
     } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.message || "Erreur envoi email." });
-    }
-    setLoading(false);
-  };
-
-  const checkOwnerStatus = async () => {
-    setLoading(true);
-    try {
-      const res = await API.post("/auth/check-owner-status", { email: form.email_user });
-      if (res.data.verified) {
-        setOwnerConfirmed(true);
-        setMessage({ type: "success", text: "✅ Propriétaire confirmé !" });
-        setStep(3);
-      } else {
-        alert("❌ Vous n'avez pas encore cliqué sur 'OUI' dans l'email.");
-      }
-    } catch (err) {
-      alert("Erreur vérification.");
-    }
-    setLoading(false);
-  };
-
-  // STEP 3: Send Password Code
-  const sendPasswordCode = async () => {
-    setLoading(true);
-    try {
-      const res = await API.post("/auth/send-password-code", { email: form.email_user });
-      setCodeSent(true);
-      setMessage({ type: "success", text: res.data.message });
-    } catch (err) {
-      setMessage({ type: "error", text: err.response?.data?.message || "Erreur envoi code." });
+      // ✅ Erreur claire
+      const msg = err.response?.data?.message || "Erreur envoi email.";
+      setMessage({ type: "error", text: msg });
     }
     setLoading(false);
   };
 
   const handleFinalSubmit = async (e) => {
-  e.preventDefault();
-  if (!form.mot_de_passe_user) return alert("Veuillez coller le code reçu.");
-  setLoading(true);
-  try {
-    await API.post("/auth/register-final", { ...form });
-    // بعد الإنسكريبشن، دخّلو مباشرة
-    const loginRes = await API.post("/auth/login", {
-      email_user: form.email_user,
-      mot_de_passe_user: form.mot_de_passe_user
-    });
-    localStorage.setItem("token", loginRes.data.token);
-    localStorage.setItem("user", JSON.stringify(loginRes.data.user));
-    alert("🎉 Inscription réussie !");
-    navigate("/jeune");
-  } catch (err) {
-    setMessage({ type: "error", text: err.response?.data?.message || "Erreur inscription." });
-  }
-  setLoading(false);
-};
+    e.preventDefault();
+    if (!form.mot_de_passe_user) return alert("Veuillez coller le code reçu.");
+    setLoading(true);
+    try {
+      await API.post("/auth/register-final", { ...form });
+      const loginRes = await API.post("/auth/login", {
+        email_user: form.email_user,
+        mot_de_passe_user: form.mot_de_passe_user
+      });
+      localStorage.setItem("token", loginRes.data.token);
+      localStorage.setItem("user", JSON.stringify(loginRes.data.user));
+      sessionStorage.removeItem("registerForm");
+      alert("🎉 Inscription réussie !");
+      navigate("/jeune");
+    } catch (err) {
+      const msg = err.response?.data?.message || "Erreur inscription.";
+      setMessage({ type: "error", text: msg });
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="register-page">
       <div className="register-bg-shape register-shape-top-left"></div>
@@ -197,7 +156,7 @@ useEffect(() => {
               <form onSubmit={handleNextToEmail} className="register-form-grid">
                 <div className="input-group"><label>Nom *</label><input name="nom_user" value={form.nom_user} onChange={handleChange} required /></div>
                 <div className="input-group"><label>Prénom *</label><input name="prenom_user" value={form.prenom_user} onChange={handleChange} required /></div>
-                
+
                 <div className="input-group">
                   <label>Date Naissance *</label>
                   <input type="date" name="date_naissance" value={form.date_naissance} onChange={handleChange} required />
@@ -243,35 +202,36 @@ useEffect(() => {
 
                 <div className="input-group">
                   <label>Ville *</label>
-                  <input 
-                    name="ville" 
-                    placeholder="Ex: Carthage, El Menzah..." 
-                    value={form.ville} 
-                    onChange={handleChange} 
-                    disabled={!form.delegation} 
-                    required 
+                  <input
+                    name="ville"
+                    placeholder="Ex: Carthage, El Menzah..."
+                    value={form.ville}
+                    onChange={handleChange}
+                    disabled={!form.delegation}
+                    required
                   />
                 </div>
 
                 <div className="input-group full-width">
                   <label>Établissement *</label>
-                  <input 
-                    name="etablissement" 
-                    placeholder="Nom de ton école/fac" 
-                    value={form.etablissement} 
-                    onChange={handleChange} 
-                    disabled={!form.delegation} 
-                    required 
+                  {/* ✅ Fix: moch disabled ki statut = autre */}
+                  <input
+                    name="etablissement"
+                    placeholder="Nom de ton école/fac/entreprise..."
+                    value={form.etablissement}
+                    onChange={handleChange}
+                    disabled={!form.delegation && form.statut !== "autre"}
+                    required
                   />
                 </div>
 
                 {isParentRedirect ? (
-                  <button type="button" onClick={() => navigate("/parent-space")} className="register-submit-btn full-width" style={{background: '#f39c12'}}>
-                    Aller à l'Espace Parent
-                  </button>
+                  <div className="register-message error" style={{gridColumn: "1/-1"}}>
+                    ⚠️ Accès refusé : Tu as moins de 12 ans.
+                  </div>
                 ) : (
                   <button type="submit" className="register-submit-btn full-width">
-                    Suivant
+                    Suivant →
                   </button>
                 )}
               </form>
@@ -279,51 +239,51 @@ useEffect(() => {
 
             {/* STEP 2 */}
             {step === 2 && (
-  <div className="step-content">
-    <p>Entrez votre email. Nous allons vérifier que c'est bien vous.</p>
-    <div className="input-group full-width">
-      <label>Email *</label>
-      <input type="email" name="email_user" value={form.email_user} onChange={handleChange} placeholder="votre@email.com" />
-    </div>
-    <button onClick={sendOwnerCheck} className="register-submit-btn full-width" disabled={loading}>
-      {loading ? "Envoi..." : "Envoyer Vérification"}
-    </button>
-    <p style={{marginTop: 15, color: "#666", fontSize: 14}}>
-      ✉️ Cliquez sur "OUI" dans l'email pour continuer automatiquement.
-    </p>
-  </div>
-)}
+              <div className="step-content">
+                <p>Entrez votre email. Nous allons vérifier que c'est bien vous.</p>
+                <div className="input-group full-width">
+                  <label>Email *</label>
+                  <input type="email" name="email_user" value={form.email_user} onChange={handleChange} placeholder="votre@email.com" />
+                </div>
+                <button onClick={sendOwnerCheck} className="register-submit-btn full-width" disabled={loading}>
+                  {loading ? "Envoi..." : "Envoyer Vérification"}
+                </button>
+                <p style={{ marginTop: 15, color: "#666", fontSize: 14 }}>
+                  ✉️ Cliquez sur "OUI" dans l'email pour continuer automatiquement.
+                </p>
+              </div>
+            )}
 
             {/* STEP 3 */}
             {step === 3 && (
-  <form onSubmit={handleFinalSubmit} className="step-content">
-    <p>Nous avons envoyé un <strong>Code Secret</strong> à votre email. Copiez-le et collez-le ici.</p>
-    
-    {!codeSent && (
-      <p style={{color: "#667eea"}}>⏳ Envoi du code en cours...</p>
-    )}
+              <form onSubmit={handleFinalSubmit} className="step-content">
+                <p>Nous avons envoyé un <strong>Code Secret</strong> à votre email. Copiez-le et collez-le ici.</p>
 
-    {codeSent && (
-      <>
-        <div className="input-group full-width">
-          <label>Code Secret (Mot de passe) *</label>
-          <input 
-            type="text" 
-            name="mot_de_passe_user" 
-            value={form.mot_de_passe_user} 
-            onChange={handleChange} 
-            placeholder="Collez le code ici..." 
-            autoComplete="off"
-            required 
-          />
-        </div>
-        <button type="submit" className="register-submit-btn full-width" disabled={loading}>
-          {loading ? "Création..." : "Confirmer & Accéder"}
-        </button>
-      </>
-    )}
-  </form>
-)}
+                {!codeSent && (
+                  <p style={{ color: "#667eea" }}>⏳ Envoi du code en cours...</p>
+                )}
+
+                {codeSent && (
+                  <>
+                    <div className="input-group full-width">
+                      <label>Code Secret *</label>
+                      <input
+                        type="text"
+                        name="mot_de_passe_user"
+                        value={form.mot_de_passe_user}
+                        onChange={handleChange}
+                        placeholder="Collez le code ici..."
+                        autoComplete="off"
+                        required
+                      />
+                    </div>
+                    <button type="submit" className="register-submit-btn full-width" disabled={loading}>
+                      {loading ? "Création..." : "Confirmer & Accéder"}
+                    </button>
+                  </>
+                )}
+              </form>
+            )}
 
             <div className="register-login-link">
               Déjà inscrit ? <Link to="/login">Se connecter</Link>
@@ -335,12 +295,11 @@ useEffect(() => {
   );
 }
 
-// Données complètes des 24 gouvernorats de Tunisie
 const DATA_TUNISIE_COMPLETE = {
   gouvernorats: [
-    "Ariana", "Béja", "Ben Arous", "Bizerte", "Gabès", "Gafsa", "Jendouba", 
-    "Kairouan", "Kasserine", "Kebili", "Kef", "Mahdia", "Manouba", "Medenine", 
-    "Monastir", "Nabeul", "Sfax", "Sidi Bouzid", "Siliana", "Sousse", 
+    "Ariana", "Béja", "Ben Arous", "Bizerte", "Gabès", "Gafsa", "Jendouba",
+    "Kairouan", "Kasserine", "Kebili", "Kef", "Mahdia", "Manouba", "Medenine",
+    "Monastir", "Nabeul", "Sfax", "Sidi Bouzid", "Siliana", "Sousse",
     "Tataouine", "Tozeur", "Tunis", "Zaghouan"
   ],
   delegations: {
