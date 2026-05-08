@@ -277,59 +277,7 @@ export default function JeuneLayout() {
             </button>
           </div>
 
-          {rightTab === "profile" ? (
-            <div className="jl-profile-panel">
-              {/* Avatar */}
-              <div className="jl-rp-avatar-wrap" onClick={() => setActivePage(PAGES.PROFILE)}>
-                <img
-                  src={getAvatar(user?.photo_user, user?.sexe)}
-                  alt="avatar"
-                  className="jl-rp-avatar"
-                  onError={e => e.target.src = "https://randomuser.me/api/portraits/men/44.jpg"}
-                />
-                <span className="jl-rp-online" />
-              </div>
-              <p className="jl-rp-name">{user?.prenom_user} {user?.nom_user}</p>
-              <p className="jl-rp-email">{user?.email_user}</p>
-              <span className="jl-rp-role">● Jeune membre · Swafy</span>
-
-              {/* Stats */}
-              <div className="jl-rp-stats">
-                <div className="jl-rp-stat">
-                  <span className="jl-rp-num">{publications.length}</span>
-                  <span className="jl-rp-lbl">Posts</span>
-                </div>
-                <div className="jl-rp-divider" />
-                <div className="jl-rp-stat">
-                  <span className="jl-rp-num">{unreadNotifs}</span>
-                  <span className="jl-rp-lbl">Notifs</span>
-                </div>
-                <div className="jl-rp-divider" />
-                <div className="jl-rp-stat">
-                  <span className="jl-rp-num">{unreadMsgs}</span>
-                  <span className="jl-rp-lbl">Messages</span>
-                </div>
-              </div>
-
-              <button className="jl-rp-btn" onClick={() => setActivePage(PAGES.PROFILE)}>
-                Voir mon profil →
-              </button>
-            </div>
-          ) : (
-            <div className="jl-chatbot-panel">
-              <div className="jl-chatbot-header">
-                <span>🤖</span>
-                <div>
-                  <p className="jl-chatbot-title">Assistant IA</p>
-                  <p className="jl-chatbot-sub">Disponible 24h/24</p>
-                </div>
-                <span className="jl-chatbot-live-dot">● Live</span>
-              </div>
-              <div className="jl-chatbot-body">
-                <Chatbot />
-              </div>
-            </div>
-          )}
+          {/* Tab content */}
         </aside>
       )}
     </div>
