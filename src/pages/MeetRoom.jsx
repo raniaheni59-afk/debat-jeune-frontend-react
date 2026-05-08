@@ -65,9 +65,10 @@ export default function MeetRoom() {
 
   const safeShareLink = useMemo(() => {
     if (roomRole === "host") {
+      // ✅ الـ host يشارك لينك الـ viewers (vt=) مش لينك تاعو
       return (
         localStorage.getItem("currentLiveViewerLink") ||
-        `${window.location.origin}/live/${roomCode}`
+        `${window.location.origin}/meet/${roomCode}`
       );
     }
     return window.location.href;
@@ -287,7 +288,7 @@ setRoomRole(requestedRole);
         localStreamRef.current.getTracks().forEach((t) => t.stop());
       }
     };
-  }, [roomCode, accessToken, requestedRole, userName]);
+  }, [roomCode, accessToken, requestedRole]); // ✅ userName مش هنا — يتغير = reconnect loop
 
   const toggleAudio = () => {
     const stream = localStreamRef.current;
