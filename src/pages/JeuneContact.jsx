@@ -167,29 +167,64 @@ export default function JeuneContact() {
   }, [messages, groupMessages, selected]);
 
   // ── Send ────────────────────────────────────────────────────────────────────
-  const send = async () => {
-    if (!text.trim() && !filePreview) return;
-    if (!selected) return;
-    const msgText = text.trim();
-    const file = filePreview;
-    setText(""); setFilePreview(null);
-    try {
-      await API.post("/messenger/group/messages", {
-  text: msgText,
-});
-      if (file) formData.append("file", file);
-      if (selected === "group") {
-        await API.post("/messenger/group/messages", formData, { headers: { "Content-Type": "multipart/form-data" } });
-      } else {
-        formData.append("conversationId", selected.id);
-        await API.post("/messenger/messages", formData, { headers: { "Content-Type": "multipart/form-data" } });
+ const send = async () => {
+  if (!text.trim() && !filePreview) return;
+  if (!selected) return;
+
+  const msgText = text.trim();
+  const file = filePreview;
+
+  setText("");
+  setFilePreview(null);
+
+  try {
+    // ✅ GROUP MESSAGE
+    if (selected === "group") {
+
+      const res = await API.post("/messenger/group/messages", {
+        text: msgText,
+      });
+
+      console.log("GROUP MESSAGE SENT", res.data);
+
+    } else {
+
+      // ✅ PRIVATE MESSAGE
+      const formData = new FormData();
+
+      if (msgText) {
+        formData.append("text", msgText);
       }
-    } catch (err) {
-  console.log("ERROR", err);
-  console.log("ERROR RESPONSE", err.response);
-  alert("Erreur d'envoi");
-}
-  };
+
+      if (file) {
+        formData.append("file", file);
+      }
+
+      formData.append("conversationId", selected.id);
+
+      const res = await API.post(
+        "/messenger/messages",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+
+      console.log("PRIVATE MESSAGE SENT", res.data);
+    }
+
+  } catch (err) {
+
+    console.log("SEND ERROR", err);
+    console.log("SEND ERROR RESPONSE", err.response);
+
+    if (err.response?.status >= 500) {
+      alert("Erreur serveur");
+    }
+  }
+};
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   const displayList = query.trim() ? searchResults : conversations;
