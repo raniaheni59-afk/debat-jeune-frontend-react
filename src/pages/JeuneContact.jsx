@@ -183,7 +183,11 @@ export default function JeuneContact() {
         formData.append("conversationId", selected.id);
         await API.post("/messenger/messages", formData, { headers: { "Content-Type": "multipart/form-data" } });
       }
-    } catch { alert("Erreur d'envoi"); }
+    } catch (err) {
+  console.log("ERROR", err);
+  console.log("ERROR RESPONSE", err.response);
+  alert("Erreur d'envoi");
+}
   };
 
   // ── Helpers ─────────────────────────────────────────────────────────────────

@@ -147,9 +147,11 @@ export default function AdminContact() {
         conversationId: selected.id,
         text: msgText,
       });
-    } catch {
-      alert("Erreur d'envoi");
-    }
+    } catch (err) {
+  console.log("ERROR", err);
+  console.log("ERROR RESPONSE", err.response);
+  alert("Erreur d'envoi");
+}
   };
 
   const displayList = query.trim() ? searchResults : conversations;
