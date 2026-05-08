@@ -174,8 +174,9 @@ export default function JeuneContact() {
     const file = filePreview;
     setText(""); setFilePreview(null);
     try {
-      const formData = new FormData();
-      if (msgText) formData.append("text", msgText);
+      await API.post("/messenger/group/messages", {
+  text: msgText,
+});
       if (file) formData.append("file", file);
       if (selected === "group") {
         await API.post("/messenger/group/messages", formData, { headers: { "Content-Type": "multipart/form-data" } });
