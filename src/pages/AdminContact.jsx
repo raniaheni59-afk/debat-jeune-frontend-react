@@ -216,42 +216,7 @@ const activeMessages =
       
       {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
       <aside className="contacts-panel">
-        <div
-  className={`chat-item ${
-    selected === "group" ? "active" : ""
-  }`}
-  onClick={() => setSelected("group")}
->
-  <div style={{
-    width: 42,
-    height: 42,
-    borderRadius: "50%",
-    background: "linear-gradient(135deg,#7c5cbf,#5a3fa0)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#fff",
-    fontWeight: 700,
-  }}>
-    S
-  </div>
-
-  <div style={{ marginLeft: 10 }}>
-    <div style={{
-      fontWeight: 600,
-      fontSize: 14
-    }}>
-      Swafy Group
-    </div>
-
-    <div style={{
-      fontSize: 12,
-      color: "#9e97c0"
-    }}>
-      Canal général
-    </div>
-  </div>
-</div>
+        
 
         {/* Header + Search */}
         <div style={{ padding: "20px 16px 10px", borderBottom: "1px solid #e8e8f0" }}>
@@ -297,6 +262,43 @@ const activeMessages =
 
         <div className="chat-list">
           {displayList.length === 0 && !searching && (
+            <div
+  className={`chat-item ${selected === "group" ? "active" : ""}`}
+  onClick={() => setSelected("group")}
+>
+  <div style={{
+    width: 42,
+    height: 42,
+    borderRadius: "50%",
+    background: "linear-gradient(135deg,#7c5cbf,#5a3fa0)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#fff",
+    fontWeight: 700,
+  }}>
+    S
+  </div>
+
+  <div style={{ marginLeft: 10 }}>
+    <div style={{
+      fontWeight: 600,
+      fontSize: 14
+    }}>
+      Swafy Group
+    </div>
+
+    <div style={{
+      fontSize: 12,
+      color: "#9e97c0"
+    }}>
+      Canal général
+    </div>
+  </div>
+</div>
+          )}
+
+          {!isSearchMode && conversations.length === 0 && (
             <div style={{ padding: "30px 16px", textAlign: "center", color: "#9e97c0", fontSize: 13 }}>
               {isSearchMode ? "Aucun résultat" : "Aucune conversation"}
             </div>

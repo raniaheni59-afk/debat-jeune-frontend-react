@@ -79,9 +79,9 @@ export default function JeuneContact() {
     socketRef.current = io(BACKEND, { auth: { token }, transports: ["websocket"] });
 
     socketRef.current.on("newMessage", (msg) => {
-      if (selectedRef.current !== "group" && selectedRef.current?.id === msg.conversation_id) {
-        setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
-      }
+  if (selectedRef.current !== "group" && selectedRef.current?.id === msg.conversation_id) {
+    setMessages(prev => prev.find(m => m.id === msg.id) ? prev : [...prev, msg]);
+  }
       setConversations(prev =>
         prev.map(c => c.id === msg.conversation_id
           ? { ...c, last_message: msg.text || `[${msg.msg_type}]`, last_time: msg.created_at }
@@ -173,8 +173,8 @@ setConversations(res.data || []);
 
   // ── Send ────────────────────────────────────────────────────────────────────
  const send = async () => {
-  if (!text.trim()) return;
-  if (!selected) return;
+
+  if (!text.trim() || !selected) return;
 
   const msgText = text.trim();
 
@@ -189,7 +189,7 @@ setConversations(res.data || []);
         { text: msgText }
       );
 
-      console.log("GROUP SENT", res.data);
+      setGroupMessages(prev => [...prev, res.data]);
 
     } else {
 
@@ -201,17 +201,24 @@ setConversations(res.data || []);
         }
       );
 
-      console.log("PRIVATE SENT", res.data);
+      setMessages(prev => [...prev, res.data]);
+
+      setConversations(prev =>
+        prev.map(c =>
+          c.id === selected.id
+            ? {
+                ...c,
+                last_message: msgText,
+                last_time: new Date()
+              }
+            : c
+        )
+      );
     }
 
   } catch (err) {
 
-    console.log("SEND ERROR", err);
-
-    console.log(
-      "SEND ERROR RESPONSE",
-      err.response?.data
-    );
+    console.log(err);
 
     alert("Erreur d'envoi");
   }
