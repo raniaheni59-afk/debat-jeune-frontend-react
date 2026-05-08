@@ -430,7 +430,17 @@ export default function JeuneContact() {
                   const isMe = Number(m.sender_id) === myId;
 
                     return (
-                    <div key={m.id} style={{ alignSelf: isMe ? "flex-end" : "flex-start", maxWidth: "72%", display: "flex", flexDirection: "column", gap: 3, animation: "fadeUp 0.2s ease" }}>
+                    <div
+  key={m.id}
+  style={{
+    marginLeft: isMe ? "auto" : 0,
+    marginRight: isMe ? 0 : "auto",
+    maxWidth: "72%",
+    display: "flex",
+    flexDirection: "column",
+    gap: 3,
+  }}
+>
                       {isGroup && !isMe && (
                         <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
                           <Avatar user={{ id_user: m.sender_id, prenom_user: m.prenom_user, nom_user: m.nom_user, photo_user: m.photo_user }} size={20} />

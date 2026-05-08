@@ -322,8 +322,9 @@ export default function AdminContact() {
                 </div>
               ) : (
                 activeMessages.map((m) => {
-                  // ✅ FIX: Number() pour comparaison correcte
+                  
                   const isMe = Number(m.sender_id) === myId;
+                  const myId = Number(currentUser.id_user);
                   return (
                     <div key={m.id} style={{
                       alignSelf: isMe ? "flex-end" : "flex-start",
@@ -331,7 +332,13 @@ export default function AdminContact() {
                       animation: "fadeUp 0.2s ease",
                     }}>
                       {isGroup && !isMe && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
+                        <div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+  }}
+>
                           <Avatar prenom={m.prenom_user} nom={m.nom_user} id={m.sender_id} size={18} />
                           <span style={{ fontSize: 11, color: "#7c5cbf", fontWeight: 600 }}>{m.prenom_user} {m.nom_user}</span>
                         </div>
