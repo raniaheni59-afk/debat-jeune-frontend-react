@@ -168,61 +168,47 @@ export default function JeuneContact() {
 
   // ── Send ────────────────────────────────────────────────────────────────────
  const send = async () => {
-  if (!text.trim() && !filePreview) return;
+  if (!text.trim()) return;
   if (!selected) return;
 
   const msgText = text.trim();
-  const file = filePreview;
 
   setText("");
-  setFilePreview(null);
 
   try {
-    // ✅ GROUP MESSAGE
+
     if (selected === "group") {
 
-      const res = await API.post("/messenger/group/messages", {
-        text: msgText,
-      });
+      const res = await API.post(
+        "/messenger/group/messages",
+        { text: msgText }
+      );
 
-      console.log("GROUP MESSAGE SENT", res.data);
+      console.log("GROUP SENT", res.data);
 
     } else {
 
-      // ✅ PRIVATE MESSAGE
-      const formData = new FormData();
-
-      if (msgText) {
-        formData.append("text", msgText);
-      }
-
-      if (file) {
-        formData.append("file", file);
-      }
-
-      formData.append("conversationId", selected.id);
-
       const res = await API.post(
         "/messenger/messages",
-        formData,
         {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
+          conversationId: selected.id,
+          text: msgText,
         }
       );
 
-      console.log("PRIVATE MESSAGE SENT", res.data);
+      console.log("PRIVATE SENT", res.data);
     }
 
   } catch (err) {
 
     console.log("SEND ERROR", err);
-    console.log("SEND ERROR RESPONSE", err.response);
 
-    if (err.response?.status >= 500) {
-      alert("Erreur serveur");
-    }
+    console.log(
+      "SEND ERROR RESPONSE",
+      err.response?.data
+    );
+
+    alert("Erreur d'envoi");
   }
 };
 
