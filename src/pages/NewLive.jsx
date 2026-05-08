@@ -1,280 +1,217 @@
-import React, { useState } from "react";
+/**
+ * NewLive.jsx
+ * Admin يبدأ live → يحصل على hostLink + viewerLink
+ * يُحوَّل مباشرة لـ MeetRoom كـ host
+ */
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 
-// ✅ CSS داخل نفس الملف
-const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  .new-live-wrapper {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #1a0533 0%, #2d0f5e 50%, #1a0533 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 40px 20px;
-    font-family: 'Inter', sans-serif;
-  }
-  .new-live-container {
-    background: rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 24px;
-    width: 100%;
-    max-width: 720px;
-    padding: 48px;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.4);
-  }
-  .new-live-header { text-align: center; margin-bottom: 40px; }
-  .header-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: linear-gradient(135deg, #8b2fc9, #c44dff);
-    color: white;
-    padding: 8px 20px;
-    border-radius: 50px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 2px;
-    margin-bottom: 20px;
-    text-transform: uppercase;
-  }
-  .live-dot {
-    width: 10px; height: 10px; background: #ff4444;
-    border-radius: 50%; animation: pulseDot 1.5s infinite;
-  }
-  @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.4); } }
-  .new-live-header h1 {
-    font-size: 28px; font-weight: 800; color: #fff; margin: 0 0 12px 0;
-    background: linear-gradient(135deg, #fff, #d4a8ff);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  }
-  .new-live-header p { color: rgba(255,255,255,0.55); font-size: 14px; }
-  .divider { width: 60px; height: 3px; background: linear-gradient(135deg, #8b2fc9, #c44dff); border-radius: 10px; margin: 16px auto 0; }
-  .new-live-form { display: flex; flex-direction: column; gap: 22px; }
-  .form-group { display: flex; flex-direction: column; gap: 8px; }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .nl-label { color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
-  .required { color: #ff6b9d; margin-left: 2px; }
-  .nl-input, .nl-textarea, .nl-select {
-    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 12px; color: #fff; font-size: 14px; padding: 14px 18px;
-    outline: none; width: 100%; font-family: 'Inter', sans-serif;
-  }
-  .nl-input::placeholder { color: rgba(255,255,255,0.28); }
-  .nl-input:focus, .nl-textarea:focus, .nl-select:focus {
-    border-color: #a855f7; background: rgba(168,85,247,0.1);
-    box-shadow: 0 0 0 3px rgba(168,85,247,0.18);
-  }
-  .nl-select option { background: #2d0f5e; color: #fff; }
-  .nl-textarea { resize: vertical; min-height: 115px; }
-  .error-msg { color: #ff7070; font-size: 12px; font-weight: 500; padding-left: 4px; }
-  .form-actions { display: flex; justify-content: flex-end; gap: 14px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.07); }
-  .nl-btn-cancel {
-    background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.18);
-    color: rgba(255,255,255,0.75); padding: 13px 28px; border-radius: 12px;
-    font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s;
-  }
-  .nl-btn-cancel:hover { background: rgba(255,255,255,0.13); color: #fff; transform: translateY(-2px); }
-  .nl-btn-submit {
-    background: linear-gradient(135deg, #8b2fc9, #c44dff); border: none; color: white;
-    padding: 13px 32px; border-radius: 12px; font-size: 14px; font-weight: 700;
-    cursor: pointer; transition: all 0.3s; box-shadow: 0 4px 20px rgba(138,43,226,0.4);
-  }
-  .nl-btn-submit:hover { transform: translateY(-3px); box-shadow: 0 8px 30px rgba(138,43,226,0.6); }
-  .confirm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(10px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
-  .confirm-modal {
-    background: linear-gradient(145deg, #1e0645, #2d0f5e); border: 1px solid rgba(168,85,247,0.3);
-    border-radius: 24px; padding: 48px 40px; max-width: 500px; width: 90%; text-align: center;
-    animation: slideUpModal 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-  @keyframes slideUpModal { from { opacity: 0; transform: translateY(40px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
-  .confirm-emoji { font-size: 54px; margin-bottom: 18px; animation: bounceIn 0.5s; }
-  @keyframes bounceIn { from { transform: scale(0); } to { transform: scale(1); } }
-  .confirm-modal h2 { color: #fff; font-size: 22px; font-weight: 800; margin: 0 0 10px 0; background: linear-gradient(135deg, #fff, #d4a8ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-  .confirm-modal p { color: rgba(255,255,255,0.65); font-size: 14px; line-height: 1.7; margin: 0 0 24px 0; }
-  .confirm-modal p strong { color: #d4a8ff; font-weight: 600; }
-  .confirm-details-box { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 18px 20px; margin-bottom: 28px; text-align: left; }
-  .confirm-detail-row { display: flex; align-items: flex-start; gap: 10px; color: rgba(255,255,255,0.7); font-size: 13px; line-height: 1.5; }
-  .confirm-detail-label { color: rgba(255,255,255,0.4); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px; }
-  .confirm-detail-value { color: rgba(255,255,255,0.85); font-size: 13px; font-weight: 500; word-break: break-all; }
-  .confirm-actions { display: flex; gap: 14px; justify-content: center; }
-  .nl-btn-confirm {
-    background: linear-gradient(135deg, #8b2fc9, #c44dff); border: none; color: white;
-    padding: 13px 36px; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer;
-    transition: all 0.3s; box-shadow: 0 4px 20px rgba(138,43,226,0.4);
-  }
-  .nl-btn-confirm:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
-  .spinner { width: 17px; height: 17px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.75s linear infinite; display: inline-block; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  @media (max-width: 640px) {
-    .new-live-container { padding: 30px 22px; border-radius: 18px; }
-    .new-live-header h1 { font-size: 22px; }
-    .form-row { grid-template-columns: 1fr; gap: 22px; }
-    .form-actions { flex-direction: column-reverse; }
-    .nl-btn-cancel, .nl-btn-submit { width: 100%; justify-content: center; }
-  }
-`;
+const THEMATIQUES = [
+  "Sciences & Innovation", "Environnement & Développement Durable",
+  "Technologie & Numérique", "Santé & Bien-être",
+  "Éducation & Formation", "Citoyenneté & Société", "Autre",
+];
 
-export default function NewLive({ onSuccess, onError, onCancel } = {}) {
+export default function NewLive({ onCancel }) {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ title: "", description: "", link: "", date: "", time: "", thematique: "" });
+  const [form, setForm] = useState({ title: "", description: "", date: "", time: "", thematique: "" });
   const [errors, setErrors] = useState({});
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [step, setStep]     = useState("form");   // form | confirm | success
   const [loading, setLoading] = useState(false);
-  const thematiques = ["Sciences & Innovation", "Environnement & Développement Durable", "Technologie & Numérique", "Santé & Bien-être", "Éducation & Formation", "Citoyenneté & Société", "Autre"];
+  const [result, setResult]   = useState(null);
+
+  const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: "" })); };
 
   const validate = () => {
-    const newErrors = {};
-    if (!formData.title.trim()) newErrors.title = "Le titre est obligatoire.";
-    if (!formData.description.trim()) newErrors.description = "La description est obligatoire.";
-    if (!formData.link.trim()) newErrors.link = "Le lien de diffusion est obligatoire.";
-    else if (!/^https?:\/\/.+/.test(formData.link.trim())) newErrors.link = "Le lien de diffusion n'est pas valide.";
-    if (!formData.date) newErrors.date = "La date est obligatoire.";
-    else {
-      const selectedDateTime = new Date(`${formData.date}T${formData.time || "00:00"}`);
-      if (selectedDateTime < new Date()) newErrors.date = "Veuillez saisir une date future.";
+    const e = {};
+    if (!form.title.trim())      e.title = "Titre obligatoire";
+    if (!form.description.trim()) e.description = "Description obligatoire";
+    if (!form.date)              e.date = "Date obligatoire";
+    else if (new Date(`${form.date}T${form.time||"00:00"}`) < new Date()) e.date = "Date future requise";
+    if (!form.time)              e.time = "Heure obligatoire";
+    if (!form.thematique)        e.thematique = "Thématique obligatoire";
+    setErrors(e);
+    return !Object.keys(e).length;
+  };
+
+  const handleCreate = async () => {
+    setLoading(true);
+    try {
+      const res = await API.post("/api/lives/session/create", {
+        title: form.title, description: form.description,
+        date: form.date, time: form.time,
+        thematique: form.thematique, status: "En cours", category: "other",
+      });
+
+      if (!res.data?.success) throw new Error(res.data?.message || "Erreur");
+
+      const { hostLink, viewerLink, roomCode, hostAccessToken } = res.data;
+
+      // Sauvegarder viewerLink pour le partage depuis MeetRoom
+      localStorage.setItem("currentLiveViewerLink", viewerLink);
+
+      setResult({ hostLink, viewerLink, roomCode });
+      setStep("success");
+
+      // Redirection automatique vers MeetRoom en tant que host
+      setTimeout(() => {
+        navigate(`/meet/${roomCode}?at=${hostAccessToken}`);
+      }, 2000);
+
+    } catch (err) {
+      alert("❌ " + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
     }
-    if (!formData.time) newErrors.time = "L'heure est obligatoire.";
-    if (!formData.thematique) newErrors.thematique = "La thématique est obligatoire.";
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: "" }));
+  const fmtDate = () => {
+    if (!form.date) return "";
+    return new Date(`${form.date}T${form.time || "00:00"}`).toLocaleDateString("fr-FR", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    }) + (form.time ? ` à ${form.time}` : "");
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (validate()) setShowConfirm(true);
-  };
-
-    // ✅ دالة التأكيد النهائية (مع التحويل للصفحة)
- // ✅ Fonction handleConfirm modifiée
-const handleConfirm = async () => {
-  setLoading(true);
-
-  try {
-    const res = await API.post("/lives/session/create", {
-      title: formData.title,
-      description: formData.description,
-      date: formData.date,
-      time: formData.time,
-      thematique: formData.thematique,
-      status: "Programmé",
-      category: "other",
-    });
-
-    console.log("✅ Live créé avec succès:", res.data);
-
-    setShowConfirm(false);
-    setLoading(false);
-
-    // ✅ Redirection vers CalendarPage avec message de succès
-    navigate("/calendar", {
-      state: {
-        message: `✅ Live "${formData.title}" programmé avec succès !`,
-        refresh: true,
-      },
-    });
-  } catch (err) {
-    console.log("❌ Erreur:", err.response?.data || err.message);
-    setShowConfirm(false);
-    setLoading(false);
-    alert("❌ Erreur lors de l'enregistrement. Veuillez réessayer.");
-  }
-};
-  const formatDateDisplay = (date, time) => {
-    if (!date) return "";
-    const d = new Date(`${date}T${time || "00:00"}`);
-    return d.toLocaleDateString("fr-FR", { weekday: "long", year: "numeric", month: "long", day: "numeric" }) + (time ? ` à ${time}` : "");
-  };
-
-  return (
-    <>
-      <style>{styles}</style>
-      <div className="new-live-wrapper">
-        <div className="new-live-container">
-          <div className="new-live-header">
-            <div className="header-badge"><span className="live-dot"></span>Nouvelle Session</div>
-            <h1>Créer un nouveau Live</h1>
-            <p>Remplissez les informations ci-dessous pour programmer votre session de débat en direct</p>
-            <div className="divider"></div>
+  /* ── SUCCESS ── */
+  if (step === "success" && result) return (
+    <div style={W.page}>
+      <style>{ANIM}</style>
+      <div style={W.card}>
+        <div style={{ fontSize: 54, marginBottom: 16, animation: "bounceIn .5s" }}>🎙️</div>
+        <h2 style={W.h2}>Live créé avec succès !</h2>
+        <p style={W.sub}>Redirection vers la salle en cours…</p>
+        <div style={W.linkBox}>
+          <label style={W.linkLabel}>🔗 Lien pour les participants</label>
+          <div style={W.linkRow}>
+            <code style={W.linkCode}>{result.viewerLink}</code>
+            <button onClick={() => navigator.clipboard.writeText(result.viewerLink)} style={W.copyBtn}>📋</button>
           </div>
-          <form className="new-live-form" onSubmit={handleSubmit}>
-            {/* Titre */}
-            <div className="form-group">
-              <label className="nl-label" htmlFor="title"><span className="label-icon">📌</span>Titre du Live <span className="required">*</span></label>
-              <input className={`nl-input ${errors.title ? "input-error-field" : ""}`} type="text" id="title" name="title" placeholder="Ex : Débat sur l'innovation..." value={formData.title} onChange={handleChange} />
-              {errors.title && <span className="error-msg">⚠ {errors.title}</span>}
-            </div>
-            {/* Description */}
-            <div className="form-group">
-              <label className="nl-label" htmlFor="description"><span className="label-icon">📝</span>Description <span className="required">*</span></label>
-              <textarea className={`nl-textarea ${errors.description ? "input-error-field" : ""}`} id="description" name="description" placeholder="Décrivez le contenu..." value={formData.description} onChange={handleChange} rows={4} />
-              {errors.description && <span className="error-msg">⚠ {errors.description}</span>}
-            </div>
-            {/* Lien */}
-            <div className="form-group">
-              <label className="nl-label" htmlFor="link"><span className="label-icon">🔗</span>Lien de diffusion <span className="required">*</span></label>
-              <input className={`nl-input ${errors.link ? "input-error-field" : ""}`} type="text" id="link" name="link" placeholder="https://zoom.us/j/..." value={formData.link} onChange={handleChange} />
-              {errors.link && <span className="error-msg">⚠ {errors.link}</span>}
-            </div>
-            {/* Date & Heure */}
-            <div className="form-row">
-              <div className="form-group">
-                <label className="nl-label" htmlFor="date"><span className="label-icon">📅</span>Date <span className="required">*</span></label>
-                <input className={`nl-input ${errors.date ? "input-error-field" : ""}`} type="date" id="date" name="date" value={formData.date} onChange={handleChange} />
-                {errors.date && <span className="error-msg">⚠ {errors.date}</span>}
-              </div>
-              <div className="form-group">
-                <label className="nl-label" htmlFor="time"><span className="label-icon">🕐</span>Heure <span className="required">*</span></label>
-                <input className={`nl-input ${errors.time ? "input-error-field" : ""}`} type="time" id="time" name="time" value={formData.time} onChange={handleChange} />
-                {errors.time && <span className="error-msg">⚠ {errors.time}</span>}
-              </div>
-            </div>
-            {/* Thématique */}
-            <div className="form-group">
-              <label className="nl-label" htmlFor="thematique"><span className="label-icon">🎯</span>Thématique <span className="required">*</span></label>
-              <select className={`nl-select ${errors.thematique ? "input-error-field" : ""}`} id="thematique" name="thematique" value={formData.thematique} onChange={handleChange}>
-                <option value="">-- Sélectionnez --</option>
-                {thematiques.map((t, i) => <option key={i} value={t}>{t}</option>)}
-              </select>
-              {errors.thematique && <span className="error-msg">⚠ {errors.thematique}</span>}
-            </div>
-            {/* Actions */}
-            <div className="form-actions">
-              <button type="button" className="nl-btn-cancel" onClick={() => onCancel ? onCancel() : navigate(-1)}>Annuler</button>
-              <button type="submit" className="nl-btn-submit"><span className="live-dot-sm"></span>Créer le Live</button>
-            </div>
-          </form>
         </div>
-        {/* Modal Confirmation */}
-        {showConfirm && (
-          <div className="confirm-overlay">
-            <div className="confirm-modal">
-              <span className="confirm-emoji">🎙️</span>
-              <h2>Confirmer la création</h2>
-              <p>Voulez-vous vraiment créer le live <strong>« {formData.title} »</strong> ?</p>
-              <div className="confirm-details-box">
-                <div className="confirm-detail-row"><span>📅</span><div><span className="confirm-detail-label">Date & Heure</span><span className="confirm-detail-value">{formatDateDisplay(formData.date, formData.time)}</span></div></div>
-                <div className="confirm-detail-row"><span>🎯</span><div><span className="confirm-detail-label">Thématique</span><span className="confirm-detail-value">{formData.thematique}</span></div></div>
-                <div className="confirm-detail-row"><span>🔗</span><div><span className="confirm-detail-label">Lien</span><span className="confirm-detail-value">{formData.link}</span></div></div>
-              </div>
-              <div className="confirm-actions">
-                <button className="nl-btn-cancel" onClick={() => setShowConfirm(false)} disabled={loading}>Annuler</button>
-                <button className="nl-btn-confirm" onClick={handleConfirm} disabled={loading}>
-                  {loading ? <span className="spinner"></span> : "✓ Confirmer"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <div style={W.spinner} />
       </div>
-    </>
+    </div>
+  );
+
+  /* ── CONFIRM ── */
+  if (step === "confirm") return (
+    <div style={W.page}>
+      <style>{ANIM}</style>
+      <div style={W.card}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+        <h2 style={W.h2}>Confirmer le live</h2>
+        <div style={W.detailBox}>
+          {[
+            ["📌 Titre",      form.title],
+            ["📅 Date",       fmtDate()],
+            ["🎯 Thématique", form.thematique],
+          ].map(([k, v]) => (
+            <div key={k} style={W.detailRow}>
+              <span style={W.detailKey}>{k}</span>
+              <span style={W.detailVal}>{v}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+          <button onClick={() => setStep("form")} style={W.ghost} disabled={loading}>← Modifier</button>
+          <button onClick={handleCreate} style={W.primary} disabled={loading}>
+            {loading ? <span style={W.spinner} /> : "🚀 Démarrer maintenant"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* ── FORM ── */
+  return (
+    <div style={W.page}>
+      <style>{ANIM}</style>
+      <div style={W.card}>
+        <div style={W.badge}><span style={W.dot} />Nouvelle Session</div>
+        <h1 style={W.h1}>Créer un Live</h1>
+        <p style={W.sub}>Remplissez les informations pour programmer et démarrer votre live</p>
+
+        <div style={W.form}>
+          <Field label="📌 Titre" error={errors.title}>
+            <input style={inp(errors.title)} placeholder="Ex : Débat sur l'innovation..." value={form.title} onChange={e => set("title", e.target.value)} />
+          </Field>
+
+          <Field label="📝 Description" error={errors.description}>
+            <textarea style={{ ...inp(errors.description), resize: "vertical", minHeight: 100 }}
+              placeholder="Décrivez le contenu…" value={form.description} onChange={e => set("description", e.target.value)} />
+          </Field>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <Field label="📅 Date" error={errors.date}>
+              <input type="date" style={inp(errors.date)} value={form.date} onChange={e => set("date", e.target.value)} />
+            </Field>
+            <Field label="🕐 Heure" error={errors.time}>
+              <input type="time" style={inp(errors.time)} value={form.time} onChange={e => set("time", e.target.value)} />
+            </Field>
+          </div>
+
+          <Field label="🎯 Thématique" error={errors.thematique}>
+            <select style={inp(errors.thematique)} value={form.thematique} onChange={e => set("thematique", e.target.value)}>
+              <option value="">-- Sélectionnez --</option>
+              {THEMATIQUES.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </Field>
+
+          <div style={W.actions}>
+            <button type="button" onClick={() => onCancel ? onCancel() : navigate(-1)} style={W.ghost}>Annuler</button>
+            <button onClick={() => validate() && setStep("confirm")} style={W.primary}>
+              Créer le Live →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
+
+function Field({ label, error, children }) {
+  return (
+    <div>
+      <label style={{ color: "rgba(255,255,255,.8)", fontSize: 13, fontWeight: 600, display: "block", marginBottom: 8 }}>{label}</label>
+      {children}
+      {error && <p style={{ color: "#f87171", fontSize: 12, marginTop: 4 }}>⚠ {error}</p>}
+    </div>
+  );
+}
+
+const inp = (err) => ({
+  background: "rgba(255,255,255,.06)", border: `1px solid ${err ? "#ef4444" : "rgba(255,255,255,.12)"}`,
+  borderRadius: 12, color: "#fff", fontSize: 14, padding: "12px 16px",
+  outline: "none", width: "100%", fontFamily: "inherit",
+  boxShadow: err ? "0 0 0 3px rgba(239,68,68,.15)" : "none",
+});
+
+const ANIM = `
+  @keyframes bounceIn { from{transform:scale(0)} to{transform:scale(1)} }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+`;
+
+const W = {
+  page:      { minHeight: "100vh", background: "linear-gradient(135deg,#0f0c29,#1e0a4a,#0f0c29)", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", fontFamily: "'DM Sans',sans-serif" },
+  card:      { background: "rgba(255,255,255,.04)", backdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 24, width: "100%", maxWidth: 680, padding: "44px 40px", boxShadow: "0 30px 80px rgba(0,0,0,.5)", animation: "fadeUp .4s ease", textAlign: "center" },
+  badge:     { display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#7c3aed,#c026d3)", color: "#fff", padding: "7px 20px", borderRadius: 50, fontSize: 11, fontWeight: 800, letterSpacing: 2, textTransform: "uppercase", marginBottom: 18 },
+  dot:       { width: 9, height: 9, background: "#f87171", borderRadius: "50%", animation: "pulse 1.5s infinite", display: "inline-block" },
+  h1:        { fontSize: 28, fontWeight: 900, color: "#fff", margin: "0 0 10px", background: "linear-gradient(135deg,#fff,#c4b5fd)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" },
+  h2:        { fontSize: 22, fontWeight: 800, color: "#f1f5f9", margin: "0 0 10px" },
+  sub:       { color: "rgba(255,255,255,.5)", fontSize: 14, marginBottom: 28 },
+  form:      { display: "flex", flexDirection: "column", gap: 20, textAlign: "left" },
+  actions:   { display: "flex", justifyContent: "flex-end", gap: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,.07)" },
+  primary:   { background: "linear-gradient(135deg,#7c3aed,#3b82f6)", border: "none", borderRadius: 12, padding: "13px 28px", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", boxShadow: "0 4px 20px rgba(124,58,237,.4)", display: "flex", alignItems: "center", gap: 8 },
+  ghost:     { background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.15)", borderRadius: 12, padding: "13px 24px", color: "rgba(255,255,255,.75)", fontWeight: 600, fontSize: 14, cursor: "pointer" },
+  detailBox: { background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 14, padding: "16px 20px", margin: "20px 0", textAlign: "left" },
+  detailRow: { display: "flex", gap: 12, marginBottom: 10, fontSize: 13 },
+  detailKey: { color: "rgba(255,255,255,.4)", minWidth: 110 },
+  detailVal: { color: "rgba(255,255,255,.85)", fontWeight: 600, wordBreak: "break-all" },
+  linkBox:   { background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 14, padding: 16, marginBottom: 20, textAlign: "left" },
+  linkLabel: { color: "rgba(255,255,255,.5)", fontSize: 11, fontWeight: 700, display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 },
+  linkRow:   { display: "flex", gap: 8, alignItems: "center" },
+  linkCode:  { flex: 1, color: "#a78bfa", fontSize: 11, wordBreak: "break-all", background: "rgba(167,139,250,.08)", padding: "6px 10px", borderRadius: 8 },
+  copyBtn:   { background: "#7c3aed", border: "none", borderRadius: 8, padding: "6px 10px", color: "#fff", cursor: "pointer", flexShrink: 0 },
+  spinner:   { width: 20, height: 20, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin .7s linear infinite", display: "inline-block" },
+};
