@@ -22,19 +22,14 @@ const formatTime = (dateStr) => {
   return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 };
 
-// ── Prefix-first sort: résultats qui commencent par la query viennent en premier
 const sortByPrefix = (results, query) => {
   if (!query) return results;
   const q = query.trim().toLowerCase();
   return [...results].sort((a, b) => {
     const aFull = `${a.prenom_user} ${a.nom_user}`.toLowerCase();
     const bFull = `${b.prenom_user} ${b.nom_user}`.toLowerCase();
-    const aFirst = a.prenom_user?.toLowerCase() || "";
-    const bFirst = b.prenom_user?.toLowerCase() || "";
-    const aLast = a.nom_user?.toLowerCase() || "";
-    const bLast = b.nom_user?.toLowerCase() || "";
-    const aStarts = aFull.startsWith(q) || aFirst.startsWith(q) || aLast.startsWith(q);
-    const bStarts = bFull.startsWith(q) || bFirst.startsWith(q) || bLast.startsWith(q);
+    const aStarts = aFull.startsWith(q) || (a.prenom_user?.toLowerCase() || "").startsWith(q) || (a.nom_user?.toLowerCase() || "").startsWith(q);
+    const bStarts = bFull.startsWith(q) || (b.prenom_user?.toLowerCase() || "").startsWith(q) || (b.nom_user?.toLowerCase() || "").startsWith(q);
     if (aStarts && !bStarts) return -1;
     if (!aStarts && bStarts) return 1;
     return aFull.localeCompare(bFull);
@@ -56,26 +51,27 @@ function Avatar({ prenom, nom, id, size = 42 }) {
 
 function FileMessage({ msg, isMe }) {
   if (!msg.file_url) return null;
+  const url = msg.file_url.startsWith("http") ? msg.file_url : `${BACKEND}${msg.file_url}`;
   if (msg.msg_type === "image") {
     return (
-      <a href={msg.file_url} target="_blank" rel="noreferrer">
-        <img src={msg.file_url} alt="" style={{ maxWidth: 200, borderRadius: 10, display: "block", marginTop: msg.text ? 6 : 0 }} />
+      <a href={url} target="_blank" rel="noreferrer">
+        <img src={url} alt="" style={{ maxWidth: 220, borderRadius: 10, display: "block", marginTop: msg.text ? 8 : 0 }} />
       </a>
     );
   }
   if (msg.msg_type === "video") {
     return (
-      <video controls style={{ maxWidth: 200, borderRadius: 10, marginTop: msg.text ? 6 : 0 }}>
-        <source src={msg.file_url} />
+      <video controls style={{ maxWidth: 220, borderRadius: 10, marginTop: msg.text ? 8 : 0 }}>
+        <source src={url} />
       </video>
     );
   }
   return (
-    <a href={msg.file_url} target="_blank" rel="noreferrer" style={{
+    <a href={url} target="_blank" rel="noreferrer" style={{
       display: "inline-flex", alignItems: "center", gap: 6,
-      marginTop: msg.text ? 6 : 0, padding: "7px 12px", borderRadius: 8,
-      fontSize: 13, textDecoration: "none",
-      background: isMe ? "rgba(255,255,255,0.18)" : "rgba(124,92,191,0.1)",
+      marginTop: msg.text ? 6 : 0, padding: "8px 12px", borderRadius: 8,
+      fontSize: 13, textDecoration: "none", fontWeight: 500,
+      background: isMe ? "rgba(255,255,255,0.2)" : "rgba(124,92,191,0.1)",
       color: isMe ? "#fff" : "#7c5cbf",
     }}>
       📄 {msg.msg_type === "pdf" ? "PDF" : "Fichier"}
@@ -99,27 +95,28 @@ export default function AdminContact() {
   const searchTimer = useRef(null);
   const selectedRef = useRef(null);
   const fileInputRef = useRef(null);
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // ── Socket ──────────────────────────────────────────────────────────
+  // ✅ FIX: Number() — évite bug string vs int depuis localStorage
+  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const myId = Number(currentUser.id_user);
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     socketRef.current = io(BACKEND, { auth: { token }, transports: ["websocket"] });
 
     socketRef.current.on("newMessage", (msg) => {
-      if (selectedRef.current && selectedRef.current !== "group" && msg.conversation_id === selectedRef.current.id) {
+      if (selectedRef.current && selectedRef.current !== "group" &&
+        Number(msg.conversation_id) === Number(selectedRef.current.id)) {
         setMessages((prev) =>
           prev.find((m) => m.id === msg.id) ? prev : [...prev, msg]
         );
       }
       setConversations((prev) =>
-        prev
-          .map((c) =>
-            c.id === msg.conversation_id
-              ? { ...c, last_message: msg.text || `[fichier]`, last_time: msg.created_at }
-              : c
-          )
-          .sort((a, b) => new Date(b.last_time) - new Date(a.last_time))
+        prev.map((c) =>
+          Number(c.id) === Number(msg.conversation_id)
+            ? { ...c, last_message: msg.text || `[${msg.msg_type || "fichier"}]`, last_time: msg.created_at }
+            : c
+        ).sort((a, b) => new Date(b.last_time) - new Date(a.last_time))
       );
     });
 
@@ -130,32 +127,26 @@ export default function AdminContact() {
     });
 
     socketRef.current.emit("joinGroup");
-
     return () => socketRef.current?.disconnect();
   }, []);
 
   useEffect(() => { selectedRef.current = selected; }, [selected]);
 
-  // ── Fetch conversations ─────────────────────────────────────────────
   const fetchConversations = useCallback(async () => {
     try {
       const res = await API.get("/messenger/conversations");
       setConversations(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error("conversations error:", err);
-    }
+    } catch (err) { console.error("conversations error:", err); }
   }, []);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
 
-  // ── Fetch group messages ────────────────────────────────────────────
   useEffect(() => {
     API.get("/messenger/group/messages")
       .then((res) => setGroupMessages(Array.isArray(res.data) ? res.data : []))
       .catch(console.error);
   }, []);
 
-  // ── Search with prefix-first sort ──────────────────────────────────
   useEffect(() => {
     clearTimeout(searchTimer.current);
     if (!query.trim()) { setSearchResults([]); setSearching(false); return; }
@@ -163,46 +154,27 @@ export default function AdminContact() {
     searchTimer.current = setTimeout(async () => {
       try {
         const res = await API.get(`/messenger/users/search?q=${encodeURIComponent(query)}`);
-        const results = Array.isArray(res.data) ? res.data : [];
-        setSearchResults(sortByPrefix(results, query));
+        setSearchResults(sortByPrefix(Array.isArray(res.data) ? res.data : [], query));
       } catch { setSearchResults([]); }
       finally { setSearching(false); }
     }, 350);
   }, [query]);
 
-  // ── Open conversation (depuis search) ──────────────────────────────
   const openConversation = async (targetId, userInfo) => {
-    setQuery("");
-    setSearchResults([]);
+    setQuery(""); setSearchResults([]);
     try {
       const res = await API.post("/messenger/conversation", { targetId });
-      const conv = {
-        ...res.data,
-        nom_user: userInfo.nom_user,
-        prenom_user: userInfo.prenom_user,
-        id_user: userInfo.id_user || targetId,
-        role: userInfo.role,
-      };
+      const conv = { ...res.data, nom_user: userInfo.nom_user, prenom_user: userInfo.prenom_user, id_user: userInfo.id_user || targetId, role: userInfo.role };
       setSelected(conv);
       setConversations((prev) => {
         const exists = prev.find((c) => c.id === conv.id);
-        return exists
-          ? prev.map((c) => (c.id === conv.id ? { ...c, ...conv } : c))
-          : [conv, ...prev];
+        return exists ? prev.map((c) => (c.id === conv.id ? { ...c, ...conv } : c)) : [conv, ...prev];
       });
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { console.error(err); }
   };
 
-  const selectConv = (conv) => {
-    setSelected(conv);
-    setQuery("");
-    setSearchResults([]);
-    setFilePreview(null);
-  };
+  const selectConv = (conv) => { setSelected(conv); setQuery(""); setSearchResults([]); setFilePreview(null); };
 
-  // ── Load messages ──────────────────────────────────────────────────
   useEffect(() => {
     if (!selected || selected === "group") return;
     const load = async () => {
@@ -211,11 +183,8 @@ export default function AdminContact() {
         const res = await API.get(`/messenger/messages/${selected.id}`);
         setMessages(Array.isArray(res.data) ? res.data : []);
         socketRef.current?.emit("joinConversation", { conversationId: selected.id });
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingMsgs(false);
-      }
+      } catch (err) { console.error(err); }
+      finally { setLoadingMsgs(false); }
     };
     load();
   }, [selected?.id]);
@@ -224,39 +193,36 @@ export default function AdminContact() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, groupMessages, selected]);
 
-  // ── Send (texte + fichier) ─────────────────────────────────────────
   const send = async () => {
     if ((!text.trim() && !filePreview) || !selected) return;
     const msgText = text.trim();
-    setText("");
     const file = filePreview;
+    setText("");
     setFilePreview(null);
-
     try {
       if (selected === "group") {
-        // Group: texte seulement pour l'instant (file upload nécessite backend multipart)
-        if (msgText) {
+        if (file) {
+          const fd = new FormData();
+          fd.append("file", file);
+          if (msgText) fd.append("text", msgText);
+          await API.post("/messenger/group/messages/upload", fd);
+        } else if (msgText) {
           await API.post("/messenger/group/messages", { text: msgText });
         }
       } else {
         if (file) {
-          // Upload fichier via FormData
-          const formData = new FormData();
-          formData.append("file", file);
-          if (msgText) formData.append("text", msgText);
-          formData.append("conversationId", selected.id);
-          await API.post("/messenger/messages/upload", formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("conversationId", selected.id);
+          if (msgText) fd.append("text", msgText);
+          await API.post("/messenger/messages/upload", fd);
         } else {
-          await API.post("/messenger/messages", {
-            conversationId: selected.id,
-            text: msgText,
-          });
+          await API.post("/messenger/messages", { conversationId: selected.id, text: msgText });
         }
       }
     } catch (err) {
       console.error("SEND ERROR", err);
+      if (msgText) setText(msgText);
     }
   };
 
@@ -267,58 +233,30 @@ export default function AdminContact() {
 
   return (
     <div className="admin-contact">
-
-      {/* ── SIDEBAR ──────────────────────────────────────────────────── */}
       <aside className="contacts-panel">
-
-        {/* Header + Search */}
         <div style={{ padding: "20px 16px 10px", borderBottom: "1px solid #e8e8f0" }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 12 }}>
-            💬 Messages
-          </h2>
+          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 12 }}>💬 Messages</h2>
           <div style={{ position: "relative" }}>
-            <span style={{
-              position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)",
-              fontSize: 13, color: "#9e97c0",
-            }}>🔍</span>
+            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#9e97c0" }}>🔍</span>
             <input
-              type="text"
-              placeholder="Rechercher un utilisateur..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{
-                width: "100%", padding: "9px 10px 9px 32px",
-                borderRadius: 10, border: "1.5px solid #d0c9f5",
-                background: "#f3f0ff", color: "#1a1a2e",
-                fontSize: 13, outline: "none", boxSizing: "border-box",
-                caretColor: "#6b4fbb", fontFamily: "inherit",
-              }}
+              type="text" placeholder="Rechercher un utilisateur..."
+              value={query} onChange={(e) => setQuery(e.target.value)}
+              style={{ width: "100%", padding: "9px 10px 9px 32px", borderRadius: 10, border: "1.5px solid #d0c9f5", background: "#f3f0ff", color: "#1a1a2e", fontSize: 13, outline: "none", boxSizing: "border-box", caretColor: "#6b4fbb", fontFamily: "inherit" }}
             />
-            {searching && (
-              <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#9e97c0" }}>
-                ⟳
-              </span>
-            )}
+            {searching && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#9e97c0" }}>⟳</span>}
           </div>
         </div>
 
         <div className="chat-list">
-
-          {/* ── Swafy Group — toujours visible hors search ── */}
           {!isSearchMode && (
             <>
               <div className="section-label">Groupe</div>
-              <div
-                className={`group-item ${isGroup ? "active" : ""}`}
-                onClick={() => { setSelected("group"); setFilePreview(null); }}
-              >
+              <div className={`group-item ${isGroup ? "active" : ""}`} onClick={() => { setSelected("group"); setFilePreview(null); }}>
                 <div className="group-avatar">S</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e" }}>Swafy Group</div>
                   <div style={{ fontSize: 12, color: "#9e97c0" }}>
-                    {groupMessages.length > 0
-                      ? groupMessages[groupMessages.length - 1].text || "[fichier]"
-                      : "Canal général"}
+                    {groupMessages.length > 0 ? groupMessages[groupMessages.length - 1].text || "[fichier]" : "Canal général"}
                   </div>
                 </div>
                 <span style={{ fontSize: 9, fontWeight: 700, background: "#ede9ff", color: "#7c5cbf", padding: "2px 6px", borderRadius: 6 }}>GROUPE</span>
@@ -326,57 +264,27 @@ export default function AdminContact() {
             </>
           )}
 
-          {/* ── Labels ── */}
-          {isSearchMode && searchResults.length > 0 && (
-            <div className="section-label">Résultats ({searchResults.length})</div>
-          )}
-          {isSearchMode && !searching && searchResults.length === 0 && (
-            <div style={{ padding: "20px 16px", textAlign: "center", color: "#9e97c0", fontSize: 13 }}>
-              Aucun résultat
-            </div>
-          )}
-          {!isSearchMode && conversations.length > 0 && (
-            <div className="section-label">Conversations ({conversations.length})</div>
-          )}
-          {!isSearchMode && conversations.length === 0 && (
-            <div style={{ padding: "20px 16px", textAlign: "center", color: "#9e97c0", fontSize: 13 }}>
-              Aucune conversation
-            </div>
-          )}
+          {isSearchMode && searchResults.length > 0 && <div className="section-label">Résultats ({searchResults.length})</div>}
+          {isSearchMode && !searching && searchResults.length === 0 && <div style={{ padding: "20px 16px", textAlign: "center", color: "#9e97c0", fontSize: 13 }}>Aucun résultat</div>}
+          {!isSearchMode && conversations.length > 0 && <div className="section-label">Conversations ({conversations.length})</div>}
+          {!isSearchMode && conversations.length === 0 && <div style={{ padding: "20px 16px", textAlign: "center", color: "#9e97c0", fontSize: 13 }}>Aucune conversation</div>}
 
-          {/* ── Liste ── */}
           {displayList.map((item) => {
             const targetId = item.id_user;
-            const nom = item.nom_user;
-            const prenom = item.prenom_user;
             const isActive = selected !== "group" && (selected?.id === item.id || selected?.id_user === targetId);
-
             return (
-              <div
-                key={item.id || item.id_user}
-                className={`chat-item ${isActive ? "active" : ""}`}
-                onClick={() =>
-                  isSearchMode
-                    ? openConversation(targetId, item)
-                    : selectConv(item)
-                }
-              >
-                <Avatar prenom={prenom} nom={nom} id={targetId} size={42} />
+              <div key={item.id || item.id_user} className={`chat-item ${isActive ? "active" : ""}`}
+                onClick={() => isSearchMode ? openConversation(targetId, item) : selectConv(item)}>
+                <Avatar prenom={item.prenom_user} nom={item.nom_user} id={targetId} size={42} />
                 <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 120 }}>
-                      {prenom} {nom}
+                      {item.prenom_user} {item.nom_user}
                     </span>
-                    {item.last_time && (
-                      <span style={{ fontSize: 10, color: "#9e97c0", flexShrink: 0, marginLeft: 4 }}>
-                        {formatTime(item.last_time)}
-                      </span>
-                    )}
+                    {item.last_time && <span style={{ fontSize: 10, color: "#9e97c0", flexShrink: 0, marginLeft: 4 }}>{formatTime(item.last_time)}</span>}
                   </div>
                   <p style={{ fontSize: 12, color: "#6b6b8a", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {isSearchMode
-                      ? (item.role === "admin" ? "👑 Admin" : "👤 Jeune")
-                      : (item.last_message || "Nouvelle conversation")}
+                    {isSearchMode ? (item.role === "admin" ? "👑 Admin" : "👤 Jeune") : (item.last_message || "Nouvelle conversation")}
                   </p>
                 </div>
               </div>
@@ -385,16 +293,10 @@ export default function AdminContact() {
         </div>
       </aside>
 
-      {/* ── CHAT WINDOW ──────────────────────────────────────────────── */}
       <main className="chat-window">
         {selected ? (
           <>
-            {/* Header */}
-            <div style={{
-              padding: "16px 20px", display: "flex", alignItems: "center", gap: 12,
-              background: "#ffffff", borderBottom: "1px solid #e8e8f0", flexShrink: 0,
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-            }}>
+            <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: 12, background: "#ffffff", borderBottom: "1px solid #e8e8f0", flexShrink: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
               {isGroup ? (
                 <div className="group-avatar" style={{ width: 42, height: 42, fontSize: 15 }}>S</div>
               ) : (
@@ -411,30 +313,23 @@ export default function AdminContact() {
               </div>
             </div>
 
-            {/* Messages */}
-            <div style={{
-              flex: 1, overflowY: "auto", padding: "20px",
-              display: "flex", flexDirection: "column", gap: 8,
-              background: "#f7f8fc",
-              scrollbarWidth: "thin", scrollbarColor: "#d0c9f5 transparent",
-            }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 8, background: "#f7f8fc", scrollbarWidth: "thin", scrollbarColor: "#d0c9f5 transparent" }}>
               {loadingMsgs ? (
                 <div style={{ margin: "auto", color: "#9e97c0", fontSize: 13 }}>Chargement…</div>
               ) : activeMessages.length === 0 ? (
                 <div style={{ margin: "auto", color: "#9e97c0", fontSize: 13, textAlign: "center" }}>
-                  <div style={{ fontSize: 36, marginBottom: 8 }}>💬</div>
-                  Démarrez la conversation !
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>💬</div>Démarrez la conversation !
                 </div>
               ) : (
                 activeMessages.map((m) => {
-                  const isMe = m.sender_id === currentUser.id_user;
+                  // ✅ FIX: Number() pour comparaison correcte
+                  const isMe = Number(m.sender_id) === myId;
                   return (
                     <div key={m.id} style={{
                       alignSelf: isMe ? "flex-end" : "flex-start",
                       maxWidth: "70%", display: "flex", flexDirection: "column", gap: 3,
                       animation: "fadeUp 0.2s ease",
                     }}>
-                      {/* Nom expéditeur dans group */}
                       {isGroup && !isMe && (
                         <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
                           <Avatar prenom={m.prenom_user} nom={m.nom_user} id={m.sender_id} size={18} />
@@ -453,10 +348,7 @@ export default function AdminContact() {
                         {m.text && <div>{m.text}</div>}
                         <FileMessage msg={m} isMe={isMe} />
                       </div>
-                      <span style={{
-                        fontSize: 10, color: "#9e97c0",
-                        textAlign: isMe ? "right" : "left", paddingInline: 4,
-                      }}>
+                      <span style={{ fontSize: 10, color: "#9e97c0", textAlign: isMe ? "right" : "left", paddingInline: 4 }}>
                         {formatTime(m.created_at)}
                       </span>
                     </div>
@@ -466,76 +358,38 @@ export default function AdminContact() {
               <div ref={bottomRef} />
             </div>
 
-            {/* File preview bar */}
             {filePreview && (
               <div className="file-preview-bar">
                 <span>📎 {filePreview.name}</span>
-                <button
-                  onClick={() => setFilePreview(null)}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}
-                >✕</button>
+                <button onClick={() => setFilePreview(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}>✕</button>
               </div>
             )}
 
-            {/* Input bar */}
-            <div style={{
-              padding: "12px 16px", borderTop: "1px solid #e8e8f0",
-              display: "flex", alignItems: "center", gap: 8, flexShrink: 0,
-              background: "#ffffff",
-            }}>
-              {/* Attach file */}
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                title="Joindre un fichier"
-                style={{
-                  width: 38, height: 38, borderRadius: 10,
-                  border: "1.5px solid #d0c9f5", background: "#f3f0ff",
-                  cursor: "pointer", fontSize: 16,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0, transition: "background 0.15s",
-                }}
-              >📎</button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*,application/pdf,.doc,.docx"
-                style={{ display: "none" }}
-                onChange={(e) => setFilePreview(e.target.files[0] || null)}
-              />
-
+            <div style={{ padding: "12px 16px", borderTop: "1px solid #e8e8f0", display: "flex", alignItems: "center", gap: 8, flexShrink: 0, background: "#ffffff" }}>
+              <button onClick={() => fileInputRef.current?.click()} title="Joindre image / vidéo / PDF"
+                style={{ width: 38, height: 38, borderRadius: 10, border: "1.5px solid #d0c9f5", background: "#f3f0ff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                📎
+              </button>
+              <input ref={fileInputRef} type="file" accept="image/*,video/*,application/pdf" style={{ display: "none" }}
+                onChange={(e) => { setFilePreview(e.target.files[0] || null); e.target.value = ""; }} />
               <textarea
                 placeholder="Écrire un message..."
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
-                }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
                 rows={1}
-                style={{
-                  flex: 1, padding: "10px 14px",
-                  borderRadius: 12, border: "1.5px solid #d0c9f5",
-                  background: "#f3f0ff", color: "#1a1a2e",
-                  fontSize: 13.5, outline: "none", resize: "none",
-                  fontFamily: "inherit", caretColor: "#6b4fbb",
-                  minHeight: 40, maxHeight: 120,
-                }}
+                style={{ flex: 1, padding: "10px 14px", borderRadius: 12, border: "1.5px solid #d0c9f5", background: "#f3f0ff", color: "#1a1a2e", fontSize: 13.5, outline: "none", resize: "none", fontFamily: "inherit", caretColor: "#6b4fbb", minHeight: 40, maxHeight: 120 }}
               />
-              <button
-                onClick={send}
-                disabled={!text.trim() && !filePreview}
+              <button onClick={send} disabled={!text.trim() && !filePreview}
                 style={{
                   width: 42, height: 42, borderRadius: 12, border: "none",
-                  background: (text.trim() || filePreview)
-                    ? "linear-gradient(135deg,#7c5cbf,#5a3fa0)"
-                    : "#e8e3ff",
+                  background: (text.trim() || filePreview) ? "linear-gradient(135deg,#7c5cbf,#5a3fa0)" : "#e8e3ff",
                   color: (text.trim() || filePreview) ? "#fff" : "#b0a9d4",
                   cursor: (text.trim() || filePreview) ? "pointer" : "default",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                   boxShadow: (text.trim() || filePreview) ? "0 4px 12px rgba(90,63,160,0.3)" : "none",
                   transition: "all 0.2s",
-                }}
-              >
+                }}>
                 <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
                   <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -543,11 +397,7 @@ export default function AdminContact() {
             </div>
           </>
         ) : (
-          <div style={{
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
-            height: "100%", gap: 12, background: "#f7f8fc",
-          }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", gap: 12, background: "#f7f8fc" }}>
             <div style={{ fontSize: 52, filter: "drop-shadow(0 4px 12px rgba(124,92,191,0.2))" }}>💬</div>
             <p style={{ fontSize: 15, fontWeight: 700, color: "#1a1a2e" }}>Swafy Messages</p>
             <p style={{ fontSize: 12, color: "#9e97c0" }}>Sélectionnez une conversation ou le groupe</p>
