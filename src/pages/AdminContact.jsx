@@ -139,20 +139,29 @@ export default function AdminContact() {
   }, [messages]);
 
   const send = async () => {
-    if (!text.trim() || !selected) return;
-    const msgText = text.trim();
-    setText("");
-    try {
-      await API.post("/messenger/messages", {
-        conversationId: selected.id,
-        text: msgText,
-      });
-    } catch (err) {
-  console.log("ERROR", err);
-  console.log("ERROR RESPONSE", err.response);
-  alert("Erreur d'envoi");
-}
-  };
+
+  if (!text.trim() || !selected) return;
+
+  const msgText = text.trim();
+
+  setText("");
+
+  try {
+
+    const res = await API.post("/messenger/messages", {
+      conversationId: selected.id,
+      text: msgText,
+    });
+
+    console.log("ADMIN MESSAGE SENT", res.data);
+
+  } catch (err) {
+
+    console.log("ADMIN SEND ERROR", err);
+    console.log("ADMIN SEND RESPONSE", err.response);
+
+  }
+};
 
   const displayList = query.trim() ? searchResults : conversations;
   const isSearchMode = !!query.trim();
