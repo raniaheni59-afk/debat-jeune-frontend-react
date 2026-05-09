@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { io } from "socket.io-client";
 
-const SOCKET_URL = "https://swafy-backend.onrender.com";
+const SOCKET_URL = "https://debat-jeune-production.up.railway.app";
 
 /* ── Subtitles via Web Speech API ── */
 function useSubtitles(enabled, lang) {
