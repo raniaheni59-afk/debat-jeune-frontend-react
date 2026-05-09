@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { io } from "socket.io-client";
 
 // ── Pages debat-jeune (existantes) ──────────────────
@@ -93,7 +93,7 @@ export default function App() {
   }, []);
 
   return (
-    <BrowserRouter>
+    
       <Routes>
 
         {/* ══ PUBLIQUES ══════════════════════════════ */}
@@ -142,6 +142,6 @@ export default function App() {
         <Route path="*" element={<h2 style={{ textAlign: "center", marginTop: 80 }}>404 — Page non trouvée</h2>} />
 
       </Routes>
-    </BrowserRouter>
+    
   );
 }
