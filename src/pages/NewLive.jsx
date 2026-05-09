@@ -1,8 +1,4 @@
-/**
- * NewLive.jsx
- * Admin يبدأ live → يحصل على hostLink + viewerLink
- * يُحوَّل مباشرة لـ MeetRoom كـ host
- */
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
