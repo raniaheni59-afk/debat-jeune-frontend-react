@@ -6,6 +6,7 @@ import PublicationCard from "../components/PublicationCard";
 import Chatbot from "../components/Chatbot";
 import JeuneContact from "./JeuneContact";
 import "./JeuneLayout.css";
+import LiveBanner from "../components/LiveBanner";
 
 
 const BACKEND =
@@ -461,6 +462,7 @@ const JeuneLayout = () => {
         return (
           <div className="jl-page">
             <h2 className="jl-section-title"><Icon name="radio" size={18}/> Sessions Live</h2>
+      <LiveBanner />
             <div className="jl-live-banner">
               <div className="jl-live-top">
                 <span className="jl-live-badge">● LIVE</span>

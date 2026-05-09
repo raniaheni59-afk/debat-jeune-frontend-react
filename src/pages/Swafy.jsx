@@ -5,6 +5,7 @@ import {
   FiAward, FiZap, FiX, FiChevronLeft, FiChevronRight,
   FiArrowRight,
 } from "react-icons/fi";
+import LiveBanner from "../components/LiveBanner";
 
 /* ═══════════════════════════════════════════════
    GLOBAL CSS — injected once
@@ -656,6 +657,7 @@ function VideoModal({ open, onClose, videoUrl }) {
 function HeroCard() {
   return (
     <div className="sw-hero-visual" style={{ position: "relative" }}>
+      <LiveBanner compact />
       {/* badge top-left */}
       <div className="sw-float-badge sw-badge-1 sw-glass-str" style={{ borderRadius: 16 }}>
         <div className="sw-badge-icon" style={{ background: "rgba(127,255,238,0.15)" }}>🤖</div>

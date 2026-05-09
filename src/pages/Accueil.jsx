@@ -15,6 +15,7 @@ import {
   FiAward,
   FiTrendingUp,
 } from "react-icons/fi";
+import LiveBanner from "../components/LiveBanner";
 
 /* ─── STYLES ─────────────────────────────────────────────── */
 const css = `
@@ -668,6 +669,7 @@ function Brand() {
 function HeroCard() {
   return (
     <div className="hero-visual">
+      <LiveBanner compact />
       <div className="float-badge float-badge-1">
         <div className="float-icon float-icon-ai">🤖</div>
         <div>
