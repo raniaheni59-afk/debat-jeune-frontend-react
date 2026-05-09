@@ -7,9 +7,7 @@ import Chatbot from "../components/Chatbot";
 import JeuneContact from "./JeuneContact";
 import "./JeuneLayout.css";
 
-/* ═══════════════════════════════════════════════════════════
-   HELPERS
-═══════════════════════════════════════════════════════════ */
+
 const BACKEND =
   API.defaults.baseURL?.split("/api")[0] ||
   "https://debat-jeune-production.up.railway.app";
