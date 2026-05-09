@@ -3,327 +3,380 @@ import { io } from "socket.io-client";
 import API from "../services/api";
 import "./AdminContact.css";
 
+// ─────────────────────────────────────────────────────────────
+// CONSTANTS
+// ─────────────────────────────────────────────────────────────
 const BACKEND = "https://debat-jeune-production.up.railway.app";
-const AVATAR_COLORS = ["#6d56c1", "#2563eb", "#059669", "#d97706", "#dc2626", "#7c3aed", "#0891b2"];
+const COLORS = [
+  "#6d56c1","#2563eb","#059669","#d97706",
+  "#dc2626","#7c3aed","#0891b2","#be185d",
+];
 
-const getInitials = (prenom, nom) =>
-  ((prenom?.[0] || "") + (nom?.[0] || "")).toUpperCase() || "?";
-const getColor = (id) => AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length];
-const formatTime = (d) => {
-  if (!d) return "";
-  const dt = new Date(d), now = new Date(), diff = now - dt;
-  if (diff < 60000) return "À l'instant";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)}min`;
-  if (diff < 86400000) return dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  return dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+// ─────────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────────
+const initials = (p = "", n = "") =>
+  ((p[0] || "") + (n[0] || "")).toUpperCase() || "?";
+
+const avatarColor = (id) => COLORS[(Number(id) || 0) % COLORS.length];
+
+const fmtTime = (s) => {
+  if (!s) return "";
+  const d = new Date(s), diff = Date.now() - d;
+  if (diff < 60e3)   return "À l'instant";
+  if (diff < 3.6e6)  return `${Math.floor(diff / 60e3)}min`;
+  if (diff < 864e5)  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
 };
 
-// ── Prefix-first sort: résultats qui commencent par la query viennent en premier
-const sortByPrefix = (results, query) => {
-  if (!query) return results;
-  const q = query.trim().toLowerCase();
-  return [...results].sort((a, b) => {
-    const aFull = `${a.prenom_user} ${a.nom_user}`.toLowerCase();
-    const bFull = `${b.prenom_user} ${b.nom_user}`.toLowerCase();
-    const aFirst = a.prenom_user?.toLowerCase() || "";
-    const bFirst = b.prenom_user?.toLowerCase() || "";
-    const aLast = a.nom_user?.toLowerCase() || "";
-    const bLast = b.nom_user?.toLowerCase() || "";
-    const aStarts = aFull.startsWith(q) || aFirst.startsWith(q) || aLast.startsWith(q);
-    const bStarts = bFull.startsWith(q) || bFirst.startsWith(q) || bLast.startsWith(q);
-    if (aStarts && !bStarts) return -1;
-    if (!aStarts && bStarts) return 1;
-    return aFull.localeCompare(bFull);
+// Trie: noms qui commencent par la query en premier
+const sortPrefix = (list, q) => {
+  if (!q) return list;
+  const lq = q.toLowerCase();
+  return [...list].sort((a, b) => {
+    const af = `${a.prenom_user || ""} ${a.nom_user || ""}`.toLowerCase();
+    const bf = `${b.prenom_user || ""} ${b.nom_user || ""}`.toLowerCase();
+    const aOk = af.startsWith(lq) || (a.prenom_user||"").toLowerCase().startsWith(lq) || (a.nom_user||"").toLowerCase().startsWith(lq);
+    const bOk = bf.startsWith(lq) || (b.prenom_user||"").toLowerCase().startsWith(lq) || (b.nom_user||"").toLowerCase().startsWith(lq);
+    if (aOk && !bOk) return -1;
+    if (!aOk && bOk)  return  1;
+    return af.localeCompare(bf);
   });
 };
 
-function Avatar({ user, size = 42 }) {
-  if (user?.photo_user) {
-    return (
-      <img
-        src={user.photo_user}
-        alt=""
-        style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}
-      />
-    );
-  }
+const resolveUrl = (u) => (!u ? null : u.startsWith("http") ? u : `${BACKEND}${u}`);
+
+// ─────────────────────────────────────────────────────────────
+// SMALL COMPONENTS
+// ─────────────────────────────────────────────────────────────
+function Av({ user, size = 42 }) {
+  if (user?.photo_user)
+    return <img src={user.photo_user} alt="" style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }}/>;
   return (
     <div style={{
       width: size, height: size, borderRadius: "50%", flexShrink: 0,
-      background: getColor(user?.id_user),
+      background: avatarColor(user?.id_user),
       display: "flex", alignItems: "center", justifyContent: "center",
       color: "#fff", fontWeight: 700, fontSize: Math.round(size * 0.35),
+      userSelect: "none",
     }}>
-      {getInitials(user?.prenom_user, user?.nom_user)}
+      {initials(user?.prenom_user, user?.nom_user)}
     </div>
   );
 }
 
-function FileMessage({ msg, isMe }) {
+// Avatar spécial pour l'admin (logo S)
+function AdminAv({ size = 42 }) {
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0,
+      background: "linear-gradient(135deg,#6d56c1,#4f3fa0)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      color: "#fff", fontWeight: 800, fontSize: Math.round(size * 0.42),
+      userSelect: "none",
+    }}>S</div>
+  );
+}
+
+function FileBubble({ msg, isMe }) {
   if (!msg.file_url) return null;
-  if (msg.msg_type === "image") {
+  const url = resolveUrl(msg.file_url);
+  if (msg.msg_type === "image")
     return (
-      <a href={msg.file_url} target="_blank" rel="noreferrer">
-        <img src={msg.file_url} alt="" style={{ maxWidth: 200, borderRadius: 10, display: "block", marginTop: msg.text ? 6 : 0 }} />
+      <a href={url} target="_blank" rel="noreferrer">
+        <img src={url} alt="" style={{ maxWidth: 230, maxHeight: 200, borderRadius: 12, display: "block", marginTop: msg.text ? 8 : 0, objectFit: "cover" }}/>
       </a>
     );
-  }
-  if (msg.msg_type === "video") {
+  if (msg.msg_type === "video")
     return (
-      <video controls style={{ maxWidth: 200, borderRadius: 10, marginTop: msg.text ? 6 : 0 }}>
-        <source src={msg.file_url} />
+      <video controls style={{ maxWidth: 230, borderRadius: 12, marginTop: msg.text ? 8 : 0, display: "block" }}>
+        <source src={url}/>
       </video>
     );
-  }
   return (
-    <a href={msg.file_url} target="_blank" rel="noreferrer" style={{
-      display: "inline-flex", alignItems: "center", gap: 6, marginTop: msg.text ? 6 : 0,
-      padding: "7px 12px", borderRadius: 8, fontSize: 13, textDecoration: "none",
-      background: isMe ? "rgba(255,255,255,0.18)" : "rgba(109,86,193,0.1)",
+    <a href={url} target="_blank" rel="noreferrer" style={{
+      display: "inline-flex", alignItems: "center", gap: 8,
+      marginTop: msg.text ? 6 : 0, padding: "9px 14px", borderRadius: 10,
+      fontSize: 13, fontWeight: 600, textDecoration: "none",
+      background: isMe ? "rgba(255,255,255,0.18)" : "#f0ecff",
       color: isMe ? "#fff" : "#6d56c1",
+      border: isMe ? "1px solid rgba(255,255,255,0.25)" : "1px solid #ddd6fe",
     }}>
-      📄 {msg.msg_type === "pdf" ? "PDF" : "Fichier"}
+      <span style={{ fontSize: 18 }}>{msg.msg_type === "pdf" ? "📄" : "📎"}</span>
+      {msg.msg_type === "pdf" ? "Ouvrir PDF" : "Télécharger"}
     </a>
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// MAIN
+// ─────────────────────────────────────────────────────────────
 export default function JeuneContact() {
-  const [conversations, setConversations] = useState([]);
-  const [admins, setAdmins] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [groupMessages, setGroupMessages] = useState([]);
-  const [query, setQuery] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [searching, setSearching] = useState(false);
-  const [text, setText] = useState("");
-  const [filePreview, setFilePreview] = useState(null);
-  const [loadingMsgs, setLoadingMsgs] = useState(false);
-  const bottomRef = useRef(null);
-  const socketRef = useRef(null);
-  const searchTimer = useRef(null);
-  const selectedRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const [convs, setConvs]               = useState([]);
+  const [admins, setAdmins]             = useState([]);
+  const [sel, setSel]                   = useState(null);
+  const [msgs, setMsgs]                 = useState([]);
+  const [grpMsgs, setGrpMsgs]           = useState([]);
+  const [query, setQuery]               = useState("");
+  const [results, setResults]           = useState([]);
+  const [searching, setSearching]       = useState(false);
+  const [text, setText]                 = useState("");
+  const [filePrev, setFilePrev]         = useState(null);
+  const [loadingMsgs, setLoadingMsgs]   = useState(false);
+  const [sending, setSending]           = useState(false);
 
-  // ── Socket ──────────────────────────────────────────────────────────
+  const bottomRef = useRef(null);
+  const sockRef   = useRef(null);
+  const timerRef  = useRef(null);
+  const selRef    = useRef(null);
+  const fileRef   = useRef(null);
+
+  // ✅ myId calculé UNE seule fois — Number() garanti
+  const rawUser = JSON.parse(localStorage.getItem("user") || "{}");
+  const myId    = Number(rawUser.id_user);
+
+  // ── Socket ──────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem("token");
-    socketRef.current = io(BACKEND, { auth: { token }, transports: ["websocket"] });
+    const sock  = io(BACKEND, { auth: { token }, transports: ["websocket"] });
+    sockRef.current = sock;
 
-    socketRef.current.on("newMessage", (msg) => {
-      if (selectedRef.current !== "group" && selectedRef.current?.id === msg.conversation_id) {
-        
-      }setMessages(prev =>
-  prev.find(m => Number(m.id) === Number(msg.id))
-    ? prev
-    : [...prev, msg]
-);
-      setConversations(prev =>
-        prev.map(c => c.id === msg.conversation_id
-          ? { ...c, last_message: msg.text || `[${msg.msg_type || "fichier"}]`, last_time: msg.created_at }
+    sock.on("newMessage", (m) => {
+      const selNow = selRef.current;
+      // ✅ Accolades correctes — setMsgs seulement si on est dans la bonne conversation
+      if (selNow && selNow !== "group" && Number(m.conversation_id) === Number(selNow.id)) {
+        setMsgs((p) => p.find((x) => Number(x.id) === Number(m.id)) ? p : [...p, m]);
+      }
+      setConvs((p) =>
+        p.map((c) => Number(c.id) === Number(m.conversation_id)
+          ? { ...c, last_message: m.text || `[${m.msg_type || "fichier"}]`, last_time: m.created_at }
           : c
-        ).sort((a, b) => new Date(b.last_time) - new Date(a.last_time))
+        ).sort((a, b) => new Date(b.last_time || 0) - new Date(a.last_time || 0))
       );
     });
 
-    socketRef.current.on("newGroupMessage", (msg) => {
-      setGroupMessages(prev =>
-  prev.find(m => Number(m.id) === Number(msg.id))
-    ? prev
-    : [...prev, msg]
-);
+    sock.on("newGroupMessage", (m) => {
+      setGrpMsgs((p) => p.find((x) => Number(x.id) === Number(m.id)) ? p : [...p, m]);
     });
 
-    socketRef.current.emit("joinGroup");
-    return () => socketRef.current?.disconnect();
+    sock.emit("joinGroup");
+    return () => sock.disconnect();
   }, []);
 
-  useEffect(() => { selectedRef.current = selected; }, [selected]);
+  useEffect(() => { selRef.current = sel; }, [sel]);
 
-  // ── Fetch data ──────────────────────────────────────────────────────
-  const fetchConversations = useCallback(async () => {
+  // ── Fetch conversations ──────────────────────────────────────
+  const fetchConvs = useCallback(async () => {
     try {
-      const res = await API.get("/messenger/conversations");
-      setConversations(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error("conversations error:", err);
-    }
+      const r = await API.get("/messenger/conversations");
+      setConvs(Array.isArray(r.data) ? r.data : []);
+    } catch (e) { console.error("convs:", e); }
   }, []);
 
-  useEffect(() => { fetchConversations(); }, [fetchConversations]);
+  useEffect(() => { fetchConvs(); }, [fetchConvs]);
 
+  // ── Fetch admins + group ─────────────────────────────────────
   useEffect(() => {
     API.get("/messenger/admins")
-      .then(res => setAdmins(Array.isArray(res.data) ? res.data : []))
-      .catch(() => { });
+      .then((r) => setAdmins(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
     API.get("/messenger/group/messages")
-      .then(res => setGroupMessages(Array.isArray(res.data) ? res.data : []))
-      .catch(() => { });
+      .then((r) => setGrpMsgs(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
   }, []);
 
-  // ── Search (admins seulement pour jeunes) + prefix-first sort ──────
+  // ── Search (admins seulement pour les jeunes) ────────────────
   useEffect(() => {
-    clearTimeout(searchTimer.current);
-    if (!query.trim()) { setSearchResults([]); setSearching(false); return; }
+    clearTimeout(timerRef.current);
+    const q = query.trim();
+    if (!q) { setResults([]); setSearching(false); return; }
     setSearching(true);
-    searchTimer.current = setTimeout(async () => {
+    timerRef.current = setTimeout(async () => {
       try {
-        const res = await API.get(`/messenger/admins`);
-        const all = Array.isArray(res.data) ? res.data : [];
-        const q = query.trim().toLowerCase();
-        // Filtrer côté client sur les admins seulement
-        const filtered = all.filter(u => {
-          const full = `${u.prenom_user} ${u.nom_user}`.toLowerCase();
-          return full.includes(q);
-        });
-        setSearchResults(sortByPrefix(filtered, query));
-      } catch { setSearchResults([]); }
+        // Filtre local sur les admins déjà chargés — plus rapide et sécurisé
+        const lq = q.toLowerCase();
+        const filtered = admins.filter((u) =>
+          `${u.prenom_user || ""} ${u.nom_user || ""}`.toLowerCase().includes(lq)
+        );
+        setResults(sortPrefix(filtered, q));
+      } catch { setResults([]); }
       finally { setSearching(false); }
-    }, 350);
-  }, [query]);
+    }, 300);
+    return () => clearTimeout(timerRef.current);
+  }, [query, admins]);
 
-  // ── Open conversation ───────────────────────────────────────────────
-  const openConversation = async (targetId, userInfo) => {
-    setQuery(""); setSearchResults([]);
+  // ── Open conversation ────────────────────────────────────────
+  // ✅ FIX: on garde conv.id = ID de la conversation
+  const openConv = async (targetUser) => {
+    setQuery(""); setResults([]);
     try {
-      const res = await API.post("/messenger/conversation", { targetId });
-      const conv = { ...res.data, ...userInfo, id_user: userInfo.id_user || targetId };
-      setSelected(conv);
-      setConversations(prev => {
-        const exists = prev.find(c => c.id === conv.id);
-        return exists ? prev.map(c => c.id === conv.id ? { ...c, ...conv } : c) : [conv, ...prev];
+      const r = await API.post("/messenger/conversation", { targetId: targetUser.id_user });
+      const conv = {
+        id:          r.data.id,              // ✅ ID conversation
+        user_a_id:   r.data.user_a_id,
+        user_b_id:   r.data.user_b_id,
+        id_user:     targetUser.id_user,     // ID de l'autre user
+        nom_user:    targetUser.nom_user,
+        prenom_user: targetUser.prenom_user,
+        role:        targetUser.role,
+      };
+      setSel(conv);
+      setConvs((p) => {
+        const ex = p.find((c) => c.id === conv.id);
+        return ex ? p.map((c) => c.id === conv.id ? { ...c, ...conv } : c) : [conv, ...p];
       });
-    } catch (err) { console.error(err); }
+    } catch (e) { console.error("openConv:", e); }
   };
 
-  // ── Load messages ───────────────────────────────────────────────────
+  // ── Load messages ────────────────────────────────────────────
   useEffect(() => {
-    if (!selected || selected === "group") return;
+    if (!sel || sel === "group") return;
+    if (!sel.id) { console.error("sel.id manquant:", sel); return; }
+    setMsgs([]);
     const load = async () => {
       setLoadingMsgs(true);
       try {
-        const res = await API.get(`/messenger/messages/${selected.id}`);
-        setMessages(Array.isArray(res.data) ? res.data : []);
-        socketRef.current?.emit("joinConversation", { conversationId: selected.id });
-      } catch { }
+        const r = await API.get(`/messenger/messages/${sel.id}`);
+        setMsgs(Array.isArray(r.data) ? r.data : []);
+        sockRef.current?.emit("joinConversation", { conversationId: sel.id });
+      } catch (e) { console.error("loadMsgs:", e); }
       finally { setLoadingMsgs(false); }
     };
     load();
-  }, [selected?.id]);
+  }, [sel?.id]);
 
+  // ── Auto-scroll ──────────────────────────────────────────────
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, groupMessages, selected]);
+    requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }));
+  }, [msgs, grpMsgs, sel]);
 
-  // ── Send (texte + fichier) ──────────────────────────────────────────
+  // ── Send ─────────────────────────────────────────────────────
   const send = async () => {
-    if ((!text.trim() && !filePreview) || !selected) return;
+    if ((!text.trim() && !filePrev) || !sel || sending) return;
     const msgText = text.trim();
-    setText("");
-    const file = filePreview;
-    setFilePreview(null);
-
+    const file    = filePrev;
+    setText(""); setFilePrev(null);
+    setSending(true);
     try {
-      if (selected === "group") {
-  if (msgText) {
-    await API.post("/messenger/group/messages", { text: msgText });
-  }
-} else {
-  if (file) {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    if (msgText) formData.append("text", msgText);
-
-    formData.append("conversationId", selected.id);
-
-    await API.post("/messenger/messages/upload", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
-
-  } else {
-    await API.post("/messenger/messages", {
-      conversationId: selected.id,
-      text: msgText,
-    });
-  }
-}
-    } catch (err) {
-      console.error(err);
-      alert("Erreur d'envoi");
+      if (sel === "group") {
+        if (file) {
+          const fd = new FormData();
+          fd.append("file", file);
+          if (msgText) fd.append("text", msgText);
+          await API.post("/messenger/group/messages/upload", fd);
+        } else {
+          await API.post("/messenger/group/messages", { text: msgText });
+        }
+      } else {
+        if (file) {
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("conversationId", String(sel.id));
+          if (msgText) fd.append("text", msgText);
+          await API.post("/messenger/messages/upload", fd);
+        } else {
+          await API.post("/messenger/messages", { conversationId: sel.id, text: msgText });
+        }
+      }
+    } catch (e) {
+      console.error("send:", e);
+      if (msgText) setText(msgText);
+    } finally {
+      setSending(false);
     }
   };
 
-  // ── Helpers ─────────────────────────────────────────────────────────
-  const isSearchMode = !!query.trim();
-  const displayList = isSearchMode ? searchResults : conversations;
-  const adminNotInConv = admins.filter(a => !conversations.find(c => c.id_user === a.id_user));
-  const activeMessages = selected === "group" ? groupMessages : messages;
-  const isGroup = selected === "group";
+  // ── Derived ──────────────────────────────────────────────────
+  const isGroup        = sel === "group";
+  const isSearch       = !!query.trim();
+  const listItems      = isSearch ? results : convs;
+  const adminNotInConv = admins.filter((a) => !convs.find((c) => Number(c.id_user) === Number(a.id_user)));
+  const activeMsgs     = isGroup ? grpMsgs : msgs;
+  const canSend        = !!(text.trim() || filePrev) && !sending;
 
+  // ─────────────────────────────────────────────────────────────
+  // RENDER
+  // ─────────────────────────────────────────────────────────────
   return (
     <div className="admin-contact">
 
-      {/* ── SIDEBAR ──────────────────────────────────────────────────── */}
+      {/* ══ SIDEBAR ══════════════════════════════════════════════ */}
       <aside className="contacts-panel">
 
-        {/* Header + Search */}
-        <div style={{ padding: "20px 16px 12px", borderBottom: "1px solid #ede9ff" }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", marginBottom: 12 }}>💬 Messages</h2>
+        {/* Header */}
+        <div style={{ padding: "18px 16px 12px", borderBottom: "1px solid #ede9ff", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+              background: "linear-gradient(135deg,#6d56c1,#4f3fa0)",
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17,
+            }}>💬</div>
+            <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e" }}>Messages</span>
+          </div>
+
+          {/* Search — admins seulement */}
           <div style={{ position: "relative" }}>
-            <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: "#b0a9d4" }}>🔍</span>
+            <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
+              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9e97c0" strokeWidth="2.5">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
             <input
-              type="text"
-              placeholder="Rechercher un admin..."
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Rechercher un admin…"
               style={{
-                width: "100%", padding: "9px 10px 9px 32px",
-                borderRadius: 10, border: "1.5px solid #ede9ff",
-                background: "#f7f5ff", color: "#1a1a2e",
-                fontSize: 13, outline: "none", boxSizing: "border-box",
-                caretColor: "#6d56c1", fontFamily: "inherit",
+                width: "100%", padding: "9px 32px", boxSizing: "border-box",
+                borderRadius: 10, border: "1.5px solid #e0daff",
+                background: "#f5f2ff", color: "#1a1a2e", fontSize: 13,
+                outline: "none", fontFamily: "inherit", transition: "border-color .2s",
               }}
+              onFocus={(e) => (e.target.style.borderColor = "#a78bfa")}
+              onBlur={(e)  => (e.target.style.borderColor = "#e0daff")}
             />
-            {searching && <span style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: "#b0a9d4" }}>⟳</span>}
+            {searching && (
+              <div style={{
+                position: "absolute", right: 11, top: "50%", transform: "translateY(-50%)",
+                width: 13, height: 13, borderRadius: "50%",
+                border: "2px solid #e0daff", borderTopColor: "#6d56c1",
+                animation: "spin .7s linear infinite",
+              }}/>
+            )}
+            {query && !searching && (
+              <button onClick={() => { setQuery(""); setResults([]); }}
+                style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9e97c0", fontSize: 15, padding: 0, lineHeight: 1 }}>
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
         <div className="chat-list">
 
-          {/* Group Swafy — toujours visible hors search */}
-          {!isSearchMode && (
+          {/* Groupe Swafy — toujours visible hors search */}
+          {!isSearch && (
             <>
               <div className="section-label">Groupe</div>
-              <div
-                className={`group-item ${isGroup ? "active" : ""}`}
-                onClick={() => { setSelected("group"); setFilePreview(null); }}
-              >
+              <div className={`group-item ${isGroup ? "active" : ""}`}
+                onClick={() => { setSel("group"); setFilePrev(null); }}>
                 <div className="group-avatar">S</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e" }}>Swafy</div>
-                  <div style={{ fontSize: 12, color: "#9e97c0" }}>
-                    {groupMessages.length > 0 ? groupMessages[groupMessages.length - 1].text || "[fichier]" : "Canal général"}
+                  <div style={{ fontSize: 12, color: "#9e97c0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {grpMsgs.length > 0 ? (grpMsgs.at(-1).text || "[fichier]") : "Canal général"}
                   </div>
                 </div>
-                <span style={{ fontSize: 9, fontWeight: 700, background: "#ede9ff", color: "#6d56c1", padding: "2px 6px", borderRadius: 6 }}>GROUPE</span>
+                <span style={{ fontSize: 9, fontWeight: 700, background: "#ede9ff", color: "#6d56c1", padding: "2px 7px", borderRadius: 6, flexShrink: 0 }}>GROUPE</span>
               </div>
             </>
           )}
 
-          {/* Admins Swafy (pas encore en conversation) */}
-          {!isSearchMode && adminNotInConv.length > 0 && (
+          {/* Admins sans conversation — bouton direct */}
+          {!isSearch && adminNotInConv.length > 0 && (
             <>
-              <div className="section-label">Swafy Admin</div>
-              {adminNotInConv.map(admin => (
-                <div key={admin.id_user} className="chat-item" onClick={() => openConversation(admin.id_user, admin)}>
-                  <div style={{
-                    width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                    background: "linear-gradient(135deg,#6d56c1,#4f3fa0)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#fff", fontWeight: 800, fontSize: 18,
-                  }}>S</div>
+              <div className="section-label">Contacter</div>
+              {adminNotInConv.map((a) => (
+                <div key={a.id_user} className="chat-item" onClick={() => openConv(a)}>
+                  <AdminAv size={42} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e" }}>Swafy</div>
                     <div style={{ fontSize: 12, color: "#9e97c0" }}>👑 Équipe Swafy</div>
@@ -333,53 +386,42 @@ export default function JeuneContact() {
             </>
           )}
 
-          {/* Labels */}
-          {!isSearchMode && conversations.length > 0 && (
-            <div className="section-label">Conversations ({conversations.length})</div>
+          {/* Conversations existantes */}
+          {!isSearch && convs.length > 0 && (
+            <div className="section-label">Conversations ({convs.length})</div>
           )}
-          {isSearchMode && (
+
+          {/* Section label search */}
+          {isSearch && (
             <div className="section-label">
-              {searching ? "Recherche…" : searchResults.length > 0 ? `${searchResults.length} résultat(s)` : "Aucun résultat"}
+              {searching ? "Recherche…" : results.length ? `${results.length} résultat(s)` : "Aucun résultat"}
             </div>
           )}
 
-          {/* Liste conversations ou résultats search */}
-          {displayList.map(item => {
-            const id = item.id_user;
-            const isActive = selected !== "group" && (selected?.id === item.id || selected?.id_user === id);
-            const isAdmin = item.role === "admin";
+          {/* Liste */}
+          {listItems.map((item) => {
+            const isAdmin  = item.role === "admin";
+            const isActive = !isGroup && sel && sel !== "group" && Number(sel.id) === Number(item.id);
             return (
               <div
                 key={item.id || item.id_user}
                 className={`chat-item ${isActive ? "active" : ""}`}
-                onClick={() => {
-                  if (isSearchMode) {
-                    openConversation(item.id_user, item);
-                  } else {
-                    setSelected(item);
-                    setFilePreview(null);
-                  }
-                }}
+                onClick={() => isSearch ? openConv(item) : setSel(item)}
               >
-                {isAdmin ? (
-                  <div style={{
-                    width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                    background: "linear-gradient(135deg,#6d56c1,#4f3fa0)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    color: "#fff", fontWeight: 800, fontSize: 18,
-                  }}>S</div>
-                ) : (
-                  <Avatar user={item} size={42} />
-                )}
-                <div style={{ flex: 1, minWidth: 0, marginLeft: 10 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 130 }}>
+                {isAdmin ? <AdminAv size={42} /> : <Av user={item} size={42} />}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                    <span style={{ fontWeight: 600, fontSize: 13.5, color: "#1a1a2e", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
                       {isAdmin ? "Swafy" : `${item.prenom_user} ${item.nom_user}`}
                     </span>
-                    {item.last_time && <span style={{ fontSize: 10, color: "#b0a9d4", flexShrink: 0, marginLeft: 4 }}>{formatTime(item.last_time)}</span>}
+                    {item.last_time && (
+                      <span style={{ fontSize: 10, color: "#b0a9d4", flexShrink: 0, marginLeft: 6 }}>
+                        {fmtTime(item.last_time)}
+                      </span>
+                    )}
                   </div>
-                  <p style={{ fontSize: 12, color: "#9e97c0", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {isSearchMode ? (isAdmin ? "👑 Admin" : "👤 Membre") : (item.last_message || "Nouvelle conversation")}
+                  <p style={{ fontSize: 12, color: "#9e97c0", margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {isSearch ? "👑 Admin" : (item.last_message || "Nouvelle conversation")}
                   </p>
                 </div>
               </div>
@@ -388,79 +430,87 @@ export default function JeuneContact() {
         </div>
       </aside>
 
-      {/* ── CHAT WINDOW ──────────────────────────────────────────────── */}
+      {/* ══ CHAT WINDOW ══════════════════════════════════════════ */}
       <main className="chat-window">
-        {selected ? (
+        {!sel ? (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 14, background: "#f4f2fb" }}>
+            <div style={{ width: 80, height: 80, borderRadius: 24, background: "linear-gradient(135deg,#ede9ff,#d0c9f5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 36 }}>💬</div>
+            <div style={{ textAlign: "center" }}>
+              <p style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e", margin: "0 0 6px" }}>Swafy Messages</p>
+              <p style={{ fontSize: 13, color: "#9e97c0", margin: 0 }}>Choisissez une conversation ou rejoignez le groupe</p>
+            </div>
+          </div>
+        ) : (
           <>
             {/* Header */}
-            <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, background: "#fff", borderBottom: "1px solid #ede9ff", flexShrink: 0, boxShadow: "0 1px 4px rgba(0,0,0,0.04)" }}>
-              {isGroup ? (
-                <div className="group-avatar" style={{ width: 42, height: 42, fontSize: 15 }}>S</div>
-              ) : (
-                selected.role === "admin" ? (
-                  <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#6d56c1,#4f3fa0)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 18, flexShrink: 0 }}>S</div>
-                ) : (
-                  <Avatar user={selected} size={42} />
-                )
-              )}
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a2e" }}>
-                  {isGroup ? "Swafy" : (selected.role === "admin" ? "Swafy" : `${selected.prenom_user} ${selected.nom_user}`)}
+            <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", gap: 12, background: "#fff", borderBottom: "1px solid #ede9ff", flexShrink: 0, boxShadow: "0 1px 6px rgba(0,0,0,0.05)" }}>
+              {isGroup
+                ? <div className="group-avatar" style={{ width: 42, height: 42, fontSize: 16 }}>S</div>
+                : sel.role === "admin"
+                ? <AdminAv size={42} />
+                : <Av user={sel} size={42} />
+              }
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 14.5, color: "#1a1a2e" }}>
+                  {isGroup ? "Swafy" : sel.role === "admin" ? "Swafy" : `${sel.prenom_user || ""} ${sel.nom_user || ""}`}
                 </div>
-                <div style={{ fontSize: 11, color: "#059669", display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#059669", display: "inline-block" }} />
+                <div style={{ fontSize: 11, color: "#059669", display: "flex", alignItems: "center", gap: 5, marginTop: 2 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#059669", display: "inline-block" }}/>
                   {isGroup ? "Canal général" : "En ligne"}
                 </div>
               </div>
             </div>
 
             {/* Messages */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", display: "flex", flexDirection: "column", gap: 10, background: "#f4f2fb" }}>
+            <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: 6, background: "#f4f2fb" }}>
               {loadingMsgs ? (
-                <div style={{ margin: "auto", color: "#b0a9d4", fontSize: 13 }}>Chargement…</div>
-              ) : activeMessages.length === 0 ? (
-                <div style={{ margin: "auto", textAlign: "center", color: "#b0a9d4", animation: "fadeUp 0.4s ease" }}>
-                  <div style={{ fontSize: 44, marginBottom: 10 }}>💬</div>
-                  <div style={{ fontWeight: 600, color: "#6b6b8a" }}>Démarrez la conversation</div>
+                <div style={{ margin: "auto", color: "#b0a9d4", fontSize: 13, textAlign: "center" }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", border: "3px solid #e0daff", borderTopColor: "#6d56c1", animation: "spin .7s linear infinite", margin: "0 auto 10px" }}/>
+                  Chargement…
+                </div>
+              ) : activeMsgs.length === 0 ? (
+                <div style={{ margin: "auto", textAlign: "center" }}>
+                  <div style={{ fontSize: 40, marginBottom: 10 }}>🌟</div>
+                  <div style={{ fontWeight: 600, color: "#6b6b8a", marginBottom: 4, fontSize: 14 }}>Démarrez la conversation</div>
+                  <div style={{ fontSize: 12, color: "#b0a9d4" }}>Soyez le premier à écrire !</div>
                 </div>
               ) : (
-                activeMessages.map(m => {
-                  const myId = Number(currentUser.id_user);
-                  const isGroup = selected === "group";
+                activeMsgs.map((m) => {
+                  // ✅ THE FIX: Number() des deux côtés — myId défini hors du map
                   const isMe = Number(m.sender_id) === myId;
-
-                    return (
-                    <div
-  key={m.id}
-  style={{
-    marginLeft: isMe ? "auto" : 0,
-    marginRight: isMe ? 0 : "auto",
-    maxWidth: "72%",
-    display: "flex",
-    flexDirection: "column",
-    gap: 3,
-  }}
->
+                  return (
+                    <div key={m.id} style={{
+                      // ✅ moi → flex-end (droite) / autre → flex-start (gauche)
+                      alignSelf: isMe ? "flex-end" : "flex-start",
+                      maxWidth: "72%", display: "flex", flexDirection: "column", gap: 3,
+                      animation: "fadeUp .18s ease",
+                    }}>
+                      {/* Nom dans le groupe — seulement pour les autres */}
                       {isGroup && !isMe && (
-                        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4 }}>
-                          <Avatar user={{ id_user: m.sender_id, prenom_user: m.prenom_user, nom_user: m.nom_user, photo_user: m.photo_user }} size={20} />
-                          <span style={{ fontSize: 11, color: "#6d56c1", fontWeight: 600 }}>{m.prenom_user} {m.nom_user}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 4, marginBottom: 2 }}>
+                          <Av user={{ id_user: m.sender_id, prenom_user: m.prenom_user, nom_user: m.nom_user, photo_user: m.photo_user }} size={20} />
+                          <span style={{ fontSize: 11, color: "#6d56c1", fontWeight: 700 }}>
+                            {m.prenom_user} {m.nom_user}
+                          </span>
                         </div>
                       )}
+                      {/* Bulle */}
                       <div style={{
-                        background: isMe ? "linear-gradient(135deg,#6d56c1,#4f3fa0)" : "#ffffff",
-                        color: isMe ? "#ffffff" : "#1a1a2e",
+                        background: isMe ? "linear-gradient(135deg,#6d56c1,#4f3fa0)" : "#fff",
+                        color: isMe ? "#fff" : "#1a1a2e",
                         padding: "10px 14px",
                         borderRadius: isMe ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
                         fontSize: 13.5, lineHeight: 1.55,
-                        boxShadow: isMe ? "0 4px 14px rgba(109,86,193,0.3)" : "0 1px 6px rgba(0,0,0,0.07)",
+                        boxShadow: isMe ? "0 4px 14px rgba(79,63,160,0.3)" : "0 1px 4px rgba(0,0,0,0.07)",
                         border: isMe ? "none" : "1px solid #ede9ff",
+                        wordBreak: "break-word",
                       }}>
                         {m.text && <div>{m.text}</div>}
-                        <FileMessage msg={m} isMe={isMe} />
+                        <FileBubble msg={m} isMe={isMe} />
                       </div>
+                      {/* Heure */}
                       <span style={{ fontSize: 10, color: "#b0a9d4", textAlign: isMe ? "right" : "left", paddingInline: 4 }}>
-                        {formatTime(m.created_at)}
+                        {fmtTime(m.created_at)}
                       </span>
                     </div>
                   );
@@ -470,70 +520,74 @@ export default function JeuneContact() {
             </div>
 
             {/* File preview */}
-            {filePreview && (
+            {filePrev && (
               <div className="file-preview-bar">
-                <span>📎 {filePreview.name}</span>
-                <button onClick={() => setFilePreview(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}>✕</button>
+                <span style={{ fontSize: 16 }}>
+                  {filePrev.type.startsWith("image/") ? "🖼️" : filePrev.type.startsWith("video/") ? "🎬" : "📄"}
+                </span>
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {filePrev.name}
+                </span>
+                <span style={{ fontSize: 11, color: "#9e97c0" }}>{(filePrev.size / 1024).toFixed(0)} Ko</span>
+                <button onClick={() => setFilePrev(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#ef4444", fontSize: 18, padding: "0 4px", lineHeight: 1 }}>✕</button>
               </div>
             )}
 
-            {/* Input bar */}
-            <div style={{ padding: "12px 16px", borderTop: "1px solid #ede9ff", display: "flex", alignItems: "center", gap: 8, background: "#fff", flexShrink: 0 }}>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                style={{ width: 38, height: 38, borderRadius: 10, border: "1.5px solid #ede9ff", background: "#f7f5ff", cursor: "pointer", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background 0.15s" }}
-                title="Joindre un fichier"
-              >📎</button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/*,application/pdf,.doc,.docx"
-                style={{ display: "none" }}
-                onChange={e => setFilePreview(e.target.files[0] || null)}
-              />
+            {/* Input */}
+            <div style={{ padding: "10px 14px", borderTop: "1px solid #ede9ff", display: "flex", alignItems: "flex-end", gap: 8, background: "#fff", flexShrink: 0 }}>
+              <button onClick={() => fileRef.current?.click()}
+                style={{ width: 40, height: 40, borderRadius: 11, border: "1.5px solid #e0daff", background: "#f5f2ff", cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background .15s" }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#ede9ff")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#f5f2ff")}
+                title="Joindre image / vidéo / PDF">📎</button>
+              <input ref={fileRef} type="file" accept="image/*,video/*,application/pdf" style={{ display: "none" }}
+                onChange={(e) => { setFilePrev(e.target.files[0] || null); e.target.value = ""; }} />
+
               <textarea
-                placeholder="Écrire un message... (Entrée pour envoyer)"
                 value={text}
-                onChange={e => setText(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-                rows={1}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  e.target.style.height = "40px";
+                  e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder="Écrire un message…"
                 style={{
-                  flex: 1, padding: "10px 14px",
-                  borderRadius: 14, border: "1.5px solid #ede9ff",
-                  background: "#f7f5ff", color: "#1a1a2e",
-                  fontSize: 13.5, outline: "none", resize: "none",
+                  flex: 1, padding: "10px 14px", borderRadius: 12,
+                  border: "1.5px solid #e0daff", background: "#f5f2ff",
+                  color: "#1a1a2e", fontSize: 13.5, outline: "none", resize: "none",
                   fontFamily: "inherit", caretColor: "#6d56c1",
-                  minHeight: 40, maxHeight: 120,
+                  height: 40, maxHeight: 120, overflowY: "auto",
+                  lineHeight: 1.5, transition: "border-color .2s",
                 }}
+                onFocus={(e) => (e.target.style.borderColor = "#a78bfa")}
+                onBlur={(e)  => (e.target.style.borderColor = "#e0daff")}
               />
-              <button
-                onClick={send}
-                disabled={!text.trim() && !filePreview}
+
+              <button onClick={send} disabled={!canSend}
                 style={{
-                  width: 42, height: 42, borderRadius: 12, border: "none",
-                  background: (text.trim() || filePreview) ? "linear-gradient(135deg,#6d56c1,#4f3fa0)" : "#e8e3ff",
-                  color: (text.trim() || filePreview) ? "#fff" : "#b0a9d4",
-                  cursor: (text.trim() || filePreview) ? "pointer" : "default",
+                  width: 42, height: 42, borderRadius: 12, border: "none", flexShrink: 0,
+                  background: canSend ? "linear-gradient(135deg,#6d56c1,#4f3fa0)" : "#e8e3ff",
+                  color: canSend ? "#fff" : "#c4bde8",
+                  cursor: canSend ? "pointer" : "default",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  flexShrink: 0,
-                  boxShadow: (text.trim() || filePreview) ? "0 4px 14px rgba(109,86,193,0.35)" : "none",
-                  transition: "all 0.2s",
-                }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-                  <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                  boxShadow: canSend ? "0 4px 14px rgba(79,63,160,0.38)" : "none",
+                  transition: "all .2s",
+                }}>
+                {sending
+                  ? <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.4)", borderTopColor: "#fff", animation: "spin .7s linear infinite" }}/>
+                  : <svg viewBox="0 0 24 24" fill="none" width="18" height="18"><path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                }
               </button>
             </div>
           </>
-        ) : (
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, background: "#f4f2fb" }}>
-            <div style={{ fontSize: 52, filter: "drop-shadow(0 4px 12px rgba(109,86,193,0.2))" }}>💬</div>
-            <p style={{ fontSize: 16, fontWeight: 700, color: "#1a1a2e" }}>Swafy Messages</p>
-            <p style={{ fontSize: 13, color: "#b0a9d4" }}>Sélectionnez une conversation ou rejoignez le groupe</p>
-          </div>
         )}
       </main>
+
+      <style>{`
+        @keyframes spin   { to { transform: rotate(360deg); } }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+      `}</style>
     </div>
   );
 }
