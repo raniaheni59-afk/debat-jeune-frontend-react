@@ -34,7 +34,8 @@ export default function NewLive({ onCancel }) {
   const handleCreate = async () => {
     setLoading(true);
     try {
-      const res = await API.post("/api/lives/session/create", {
+      // جديد ✅
+const res = await API.post("/lives/session/create", {
         title: form.title, description: form.description,
         date: form.date, time: form.time,
         thematique: form.thematique, status: "En cours", category: "other",
