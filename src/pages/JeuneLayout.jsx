@@ -1,809 +1,1166 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { io } from "socket.io-client";
-import API from "../services/api";
-import PublicationCard from "../components/PublicationCard";
-import Chatbot from "../components/Chatbot";
-import JeuneContact from "./JeuneContact";
-import "./JeuneLayout.css";
-import LiveBanner from "../components/LiveBanner";
+const {
+  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+  Header, Footer, AlignmentType, HeadingLevel, BorderStyle, WidthType,
+  ShadingType, VerticalAlign, PageNumber, PageBreak, LevelFormat,
+  TableOfContents, NumberFormat
+} = require('docx');
+const fs = require('fs');
 
+const BLUE = "1F4E79";
+const LIGHT_BLUE = "BDD7EE";
+const DARK_BLUE = "2E75B6";
+const GREY_BG = "F2F2F2";
 
-const BACKEND =
-  API.defaults.baseURL?.split("/api")[0] ||
-  "https://debat-jeune-production.up.railway.app";
+const border = { style: BorderStyle.SINGLE, size: 1, color: "AAAAAA" };
+const borders = { top: border, bottom: border, left: border, right: border };
+const noBorder = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
+const noBorders = { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder };
 
-const getAvatar = (photo, sexe) => {
-  if (photo) return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;
-  return sexe === "femme"
-    ? "https://randomuser.me/api/portraits/women/44.jpg"
-    : "https://randomuser.me/api/portraits/men/44.jpg";
-};
-
-const PAGES = {
-  HOME     : "home",
-  MESSAGES : "messages",
-  NOTIFS   : "notifications",
-  SETTINGS : "settings",
-  PUBLIER  : "publier",
-  CALENDAR : "calendar",
-  LIVE     : "live",
-};
-
-/* ═══════════════════════════════════════════════════════════
-   SVG ICONS — professionnels (Heroicons style)
-═══════════════════════════════════════════════════════════ */
-const Icon = ({ name, size = 20 }) => {
-  const paths = {
-    home     : "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
-    message  : "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
-    pencil   : "M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z",
-    calendar : "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-    radio    : "M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0",
-    bell     : "M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9",
-    settings : "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z",
-    logout   : "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1",
-    menu     : "M4 6h16M4 12h16M4 18h16",
-    send     : "M12 19l9 2-9-18-9 18 9-2zm0 0v-8",
-    heart    : "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z",
-    "heart-filled": "M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z",
-    comment  : "M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z",
-    share    : "M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z",
-    clock    : "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-    play     : "M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-    mic      : "M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 016 0v6a3 3 0 01-3 3z",
-    check    : "M5 13l4 4L19 7",
-    close    : "M6 18L18 6M6 6l12 12",
-    chevron  : "M9 5l7 7-7 7",
-    user     : "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
-    photo    : "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z",
-    video    : "M15 10l4.553-2.069A1 1 0 0121 8.868v6.264a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
-    link     : "M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1",
-    shield   : "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-    lock     : "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z",
-    palette  : "M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01",
-    robot    : "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h3.5a2 2 0 012 2V7h3V5a2 2 0 012-2H19a2 2 0 012 2v10a2 2 0 01-2 2h-2M9 9h6m-6 4h6m-3-8v3",
-    star     : "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z",
-    sparkles : "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
-    dots     : "M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z",
-  };
-  const d = paths[name] || paths.dots;
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      aria-hidden="true">
-      {name === "heart-filled"
-        ? <path d={d} fill="currentColor" stroke="none" />
-        : <path d={d} />}
-    </svg>
-  );
-};
-
-/* ═══════════════════════════════════════════════════════════
-   MODAL COMPONENT
-═══════════════════════════════════════════════════════════ */
-const Toggle = ({ on, onToggle }) => (
-  <div
-    className={`jl-sw ${on ? "on" : "off"}`}
-    onClick={onToggle}
-    role="switch"
-    aria-checked={on}
-    tabIndex={0}
-    onKeyDown={(e) => e.key === " " && onToggle()}
-  >
-    <div className="jl-sw-thumb" />
-  </div>
-);
-
-const ModalProfile = () => (
-  <>
-    <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
-      <img src="https://randomuser.me/api/portraits/men/44.jpg"
-        style={{ width:58, height:58, borderRadius:"50%", border:"3px solid rgba(90,63,160,0.22)" }} alt="avatar"/>
-      <button style={{ padding:"8px 16px", borderRadius:10, background:"#f4f0ff", color:"#5a3fa0", border:"1.5px solid rgba(90,63,160,0.2)", fontSize:12, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
-        <Icon name="photo" size={14}/> Changer la photo
-      </button>
-    </div>
-    <div className="jl-m-row">
-      <div className="jl-m-fg">
-        <label className="jl-m-fl">Prénom</label>
-        <input className="jl-m-fi" defaultValue="Ahmed"/>
-      </div>
-      <div className="jl-m-fg">
-        <label className="jl-m-fl">Nom</label>
-        <input className="jl-m-fi" defaultValue="Ben Ali"/>
-      </div>
-    </div>
-    <div className="jl-m-fg">
-      <label className="jl-m-fl">Email</label>
-      <input className="jl-m-fi" defaultValue="ahmed.benali@swafy.tn"/>
-    </div>
-    <div className="jl-m-fg">
-      <label className="jl-m-fl">Bio</label>
-      <textarea className="jl-m-fi" placeholder="Parlez de vous…"
-        style={{ resize:"vertical", minHeight:72, lineHeight:1.55 }}/>
-    </div>
-  </>
-);
-
-const ModalToggles = ({ items, initState }) => {
-  const [states, setStates] = useState(initState || items.map(() => true));
-  return (
-    <>
-      {items.map((item, i) => (
-        <div key={i} className="jl-m-toggle-row">
-          <div style={{ flex:1 }}>
-            <p style={{ fontSize:13, fontWeight:600, color:"#261a52", marginBottom:2 }}>{item.label}</p>
-            {item.sub && <p style={{ fontSize:11.5, color:"#9080b8" }}>{item.sub}</p>}
-          </div>
-          <Toggle on={states[i]} onToggle={() => setStates(s => { const n=[...s]; n[i]=!n[i]; return n; })} />
-        </div>
-      ))}
-    </>
-  );
-};
-
-const ModalAppearance = () => {
-  const [theme, setTheme] = useState(0);
-  return (
-    <>
-      <p className="jl-m-fl" style={{ marginBottom:10 }}>Thème</p>
-      <div style={{ display:"flex", gap:10, marginBottom:20 }}>
-        {[["☀️","Clair"],["🌙","Sombre"],["✨","Auto"]].map(([ic,l],i) => (
-          <div key={i} onClick={() => setTheme(i)}
-            style={{ flex:1, padding:"14px 8px", borderRadius:13, border:`2px solid ${theme===i?"#5a3fa0":"#e0d8f0"}`, background:theme===i?"#f0ebff":"#faf8ff", textAlign:"center", cursor:"pointer", transition:"all .22s" }}>
-            <div style={{ fontSize:24, marginBottom:6 }}>{ic}</div>
-            <p style={{ fontSize:12, fontWeight:600, color:"#261a52" }}>{l}</p>
-          </div>
-        ))}
-      </div>
-      <p className="jl-m-fl" style={{ marginBottom:8 }}>Langue</p>
-      <select className="jl-m-fi">
-        <option>Français</option><option>العربية</option><option>English</option>
-      </select>
-    </>
-  );
-};
-
-const ModalSecurity = () => (
-  <>
-    <div className="jl-m-fg"><label className="jl-m-fl">Mot de passe actuel</label><input className="jl-m-fi" type="password" placeholder="••••••••"/></div>
-    <div className="jl-m-fg"><label className="jl-m-fl">Nouveau mot de passe</label><input className="jl-m-fi" type="password" placeholder="••••••••"/></div>
-    <div style={{ background:"linear-gradient(135deg,rgba(90,63,160,0.07),rgba(124,92,191,0.05))", borderRadius:14, padding:16, border:"1px solid rgba(90,63,160,0.16)", display:"flex", alignItems:"center", gap:12 }}>
-      <div style={{ width:44, height:44, borderRadius:13, background:"linear-gradient(135deg,#5a3fa0,#7c5cbf)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-        <Icon name="shield" size={20}/><span style={{ color:"#fff", marginLeft:-20 }}/>
-      </div>
-      <div style={{ flex:1 }}>
-        <p style={{ fontSize:13, fontWeight:700, color:"#261a52", marginBottom:2 }}>Authentification 2 facteurs</p>
-        <p style={{ fontSize:11.5, color:"#9080b8" }}>Renforcez la sécurité de votre compte</p>
-      </div>
-      <button style={{ padding:"8px 16px", borderRadius:10, background:"linear-gradient(135deg,#5a3fa0,#7c5cbf)", color:"#fff", fontSize:12, fontWeight:700, border:"none", cursor:"pointer", boxShadow:"0 4px 14px rgba(90,63,160,0.3)" }}>Activer</button>
-    </div>
-  </>
-);
-
-const MODAL_MAP = {
-  profile : { title:"Mon profil",      Body: ModalProfile,    hasFoot: true },
-  notif   : { title:"Notifications",   Body: () => <ModalToggles items={[{label:"Nouvelles publications",sub:"Quand un membre publie"},{label:"Commentaires",sub:"Sur vos publications"},{label:"Messages",sub:"Nouveaux messages"},{label:"Live",sub:"Alertes avant les sessions"}]} initState={[true,true,false,true]}/>, hasFoot:true },
-  priv    : { title:"Confidentialité", Body: () => <ModalToggles items={[{label:"Profil public"},{label:"Afficher mes publications"},{label:"Autoriser les messages"},{label:"Indexation dans la recherche"}]} initState={[true,true,true,false]}/>, hasFoot:true },
-  app     : { title:"Apparence",       Body: ModalAppearance, hasFoot: true },
-  sec     : { title:"Sécurité",        Body: ModalSecurity,   hasFoot: true },
-};
-
-/* ═══════════════════════════════════════════════════════════
-   MAIN COMPONENT
-═══════════════════════════════════════════════════════════ */
-const JeuneLayout = () => {
-  const [user] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("user")) || null; }
-    catch { return null; }
+function heading1(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_1,
+    spacing: { before: 360, after: 180 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: DARK_BLUE, space: 4 } },
+    children: [new TextRun({ text, bold: true, size: 32, color: BLUE, font: "Arial" })]
   });
-  const navigate = useNavigate();
+}
 
-  /* UI */
-  const [activePage,    setActivePage]    = useState(PAGES.HOME);
-  const [sidebarOpen,   setSidebarOpen]   = useState(true);
-  const [mobileOpen,    setMobileOpen]    = useState(false);
-  const [modalKey,      setModalKey]      = useState(null);
+function heading2(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 240, after: 120 },
+    children: [new TextRun({ text, bold: true, size: 26, color: DARK_BLUE, font: "Arial" })]
+  });
+}
 
-  /* data */
-  const [publications,  setPublications]  = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [highlightedPub,setHighlightedPub]= useState(null);
-  const [unreadMessages,setUnreadMessages]= useState(0);
-  const [unreadNotifs,  setUnreadNotifs]  = useState(0);
-  const [notifications, setNotifications] = useState([]);
+function heading3(text) {
+  return new Paragraph({
+    heading: HeadingLevel.HEADING_3,
+    spacing: { before: 180, after: 80 },
+    children: [new TextRun({ text, bold: true, size: 24, color: "1F4E79", font: "Arial" })]
+  });
+}
 
-  /* publish form */
-  const [pubTitle, setPubTitle] = useState("");
-  const [pubBody,  setPubBody]  = useState("");
-  const [pubCat,   setPubCat]   = useState("");
-  const [pubVis,   setPubVis]   = useState("public");
-  const [pubBusy,  setPubBusy]  = useState(false);
+function para(text, opts = {}) {
+  return new Paragraph({
+    alignment: AlignmentType.JUSTIFIED,
+    spacing: { before: 80, after: 80, line: 360 },
+    children: [new TextRun({ text, size: 24, font: "Times New Roman", ...opts })]
+  });
+}
 
-  /* chatbot */
-  const [cbInput, setCbInput] = useState("");
-  const [cbMsgs,  setCbMsgs]  = useState([
-    { from:"bot", text:"Bonjour ! Comment puis-je vous aider ?" },
-    { from:"user",text:"Les lives cette semaine ?" },
-    { from:"bot", text:"3 débats live sont programmés cette semaine !" },
-  ]);
-  const cbEndRef = useRef(null);
+function bold(text) {
+  return new TextRun({ text, bold: true, size: 24, font: "Times New Roman" });
+}
 
-  /* ── SOCKET ── */
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    const socket = io(BACKEND, { auth:{ token }, transports:["websocket"] });
-    socket.on("connect_error", (e) => console.error("Socket:", e.message));
-    socket.on("new_message", () => setUnreadMessages((n) => n + 1));
-    return () => socket.disconnect();
-  }, []);
+function italic(text) {
+  return new TextRun({ text, italics: true, size: 24, font: "Times New Roman" });
+}
 
-  /* ── FETCH ── */
-  const fetchPublications = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await API.get("/publications");
-      setPublications(Array.isArray(res.data) ? res.data : []);
-    } catch { setPublications([]); }
-    finally   { setLoading(false); }
-  }, []);
+function bullet(text) {
+  return new Paragraph({
+    numbering: { reference: "bullets", level: 0 },
+    spacing: { before: 60, after: 60 },
+    children: [new TextRun({ text, size: 24, font: "Times New Roman" })]
+  });
+}
 
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const res  = await API.get("/notifications");
-      const list = Array.isArray(res.data) ? res.data : [];
-      setNotifications(list);
-      setUnreadNotifs(list.filter((n) => !n.is_read).length);
-    } catch {}
-  }, []);
+function numbered(text) {
+  return new Paragraph({
+    numbering: { reference: "numbers", level: 0 },
+    spacing: { before: 60, after: 60 },
+    children: [new TextRun({ text, size: 24, font: "Times New Roman" })]
+  });
+}
 
-  useEffect(() => {
-    fetchPublications();
-    fetchNotifications();
-    const params = new URLSearchParams(window.location.search);
-    const pubId  = params.get("publication");
-    if (pubId) {
-      setHighlightedPub(parseInt(pubId));
-      setTimeout(() => {
-        document.getElementById(`pub-${pubId}`)
-          ?.scrollIntoView({ behavior:"smooth", block:"center" });
-      }, 900);
-    }
-  }, []);
+function space(n = 1) {
+  return new Paragraph({ children: [new TextRun({ text: " ".repeat(n), size: 24 })], spacing: { before: 60, after: 60 } });
+}
 
-  useEffect(() => { cbEndRef.current?.scrollIntoView({ behavior:"smooth" }); }, [cbMsgs]);
+function pageBreak() {
+  return new Paragraph({ children: [new PageBreak()], spacing: { before: 0, after: 0 } });
+}
 
-  /* ── ACTIONS ── */
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.location.href = "/login";
-  };
+function tableTitle(text) {
+  return new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 120, after: 120 },
+    children: [new TextRun({ text, bold: true, italics: true, size: 22, font: "Times New Roman", color: BLUE })]
+  });
+}
 
-  const goTo = (page) => {
-    setActivePage(page);
-    setMobileOpen(false);
-  };
+function makeTable(headers, rows, colWidths) {
+  const totalW = colWidths.reduce((a, b) => a + b, 0);
+  const headerRow = new TableRow({
+    tableHeader: true,
+    children: headers.map((h, i) => new TableCell({
+      borders,
+      width: { size: colWidths[i], type: WidthType.DXA },
+      shading: { fill: LIGHT_BLUE, type: ShadingType.CLEAR },
+      margins: { top: 80, bottom: 80, left: 120, right: 120 },
+      children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: h, bold: true, size: 22, font: "Arial" })] })]
+    }))
+  });
+  const dataRows = rows.map(row => new TableRow({
+    children: row.map((cell, i) => new TableCell({
+      borders,
+      width: { size: colWidths[i], type: WidthType.DXA },
+      margins: { top: 80, bottom: 80, left: 120, right: 120 },
+      children: [new Paragraph({ alignment: AlignmentType.JUSTIFIED, children: [new TextRun({ text: String(cell), size: 22, font: "Times New Roman" })] })]
+    }))
+  }));
+  return new Table({ width: { size: totalW, type: WidthType.DXA }, columnWidths: colWidths, rows: [headerRow, ...dataRows] });
+}
 
-  const markNotifRead = async (id) => {
-    try { await API.put(`/notifications/${id}/read`); fetchNotifications(); } catch {}
-  };
-
-  const handlePublier = async (e) => {
-    e.preventDefault();
-    if (!pubTitle.trim() || !pubBody.trim()) return;
-    try {
-      setPubBusy(true);
-      await API.post("/publications", {
-        titre_publication   : pubTitle,
-        contenu_publication : pubBody,
-        categorie           : pubCat,
-        visibilite          : pubVis,
-      });
-      setPubTitle(""); setPubBody(""); setPubCat(""); setPubVis("public");
-      await fetchPublications();
-      goTo(PAGES.HOME);
-    } catch (err) { console.error(err); }
-    finally { setPubBusy(false); }
-  };
-
-  const sendCb = () => {
-    if (!cbInput.trim()) return;
-    const userMsg = { from:"user", text:cbInput.trim() };
-    setCbMsgs((m) => [...m, userMsg]);
-    setCbInput("");
-    setTimeout(() => {
-      setCbMsgs((m) => [...m, { from:"bot", text:"Je traite votre demande, un instant…" }]);
-    }, 700);
-  };
-
-  /* ── NAV ── */
-  const NAV = [
-    { icon:"home",     label:"Accueil",        page:PAGES.HOME },
-    { icon:"message",  label:"Messages",        page:PAGES.MESSAGES,  badge:unreadMessages||null },
-    { icon:"pencil",   label:"Publier",         page:PAGES.PUBLIER },
-    { icon:"calendar", label:"Calendrier",      page:PAGES.CALENDAR },
-    { icon:"radio",    label:"Live",            page:PAGES.LIVE,      live:true },
-    { icon:"bell",     label:"Notifications",   page:PAGES.NOTIFS,    badge:unreadNotifs||null },
-    { icon:"settings", label:"Paramètres",      page:PAGES.SETTINGS },
+function ucTable(titre, objectif, acteur, preCondition, postCondition, scenarioNominal, exception, alternative = null) {
+  const rows = [
+    ["Titre", titre],
+    ["Objectif", objectif],
+    ["Acteur(s)", acteur],
+    ["Pré-condition", preCondition],
+    ["Post-condition", postCondition],
+    ["Scénario nominal", scenarioNominal],
   ];
+  if (alternative) rows.push(["Scénario alternatif", alternative]);
+  rows.push(["Exceptions", exception]);
 
-  /* ── MODAL ── */
-  const openModal = (key) => setModalKey(key);
-  const closeModal = () => setModalKey(null);
-  const modalDef  = modalKey ? MODAL_MAP[modalKey] : null;
+  return new Table({
+    width: { size: 9360, type: WidthType.DXA },
+    columnWidths: [2000, 7360],
+    rows: rows.map(([label, value]) => new TableRow({
+      children: [
+        new TableCell({
+          borders,
+          width: { size: 2000, type: WidthType.DXA },
+          shading: { fill: GREY_BG, type: ShadingType.CLEAR },
+          margins: { top: 80, bottom: 80, left: 120, right: 120 },
+          children: [new Paragraph({ children: [new TextRun({ text: label, bold: true, size: 22, font: "Arial" })] })]
+        }),
+        new TableCell({
+          borders,
+          width: { size: 7360, type: WidthType.DXA },
+          margins: { top: 80, bottom: 80, left: 120, right: 120 },
+          children: [new Paragraph({ alignment: AlignmentType.JUSTIFIED, children: [new TextRun({ text: value, size: 22, font: "Times New Roman" })] })]
+        })
+      ]
+    }))
+  });
+}
 
-  /* ═══════════════════════════════════════════════════════
-     PAGE CONTENT
-  ═══════════════════════════════════════════════════════ */
-  const renderContent = () => {
-    switch (activePage) {
+// ============================================================
+// BUILD DOCUMENT
+// ============================================================
+const doc = new Document({
+  styles: {
+    default: {
+      document: { run: { font: "Times New Roman", size: 24 } }
+    },
+    paragraphStyles: [
+      {
+        id: "Heading1", name: "Heading 1", basedOn: "Normal", next: "Normal", quickFormat: true,
+        run: { size: 32, bold: true, font: "Arial", color: BLUE },
+        paragraph: { spacing: { before: 360, after: 180 }, outlineLevel: 0 }
+      },
+      {
+        id: "Heading2", name: "Heading 2", basedOn: "Normal", next: "Normal", quickFormat: true,
+        run: { size: 26, bold: true, font: "Arial", color: DARK_BLUE },
+        paragraph: { spacing: { before: 240, after: 120 }, outlineLevel: 1 }
+      },
+      {
+        id: "Heading3", name: "Heading 3", basedOn: "Normal", next: "Normal", quickFormat: true,
+        run: { size: 24, bold: true, font: "Arial", color: "1F4E79" },
+        paragraph: { spacing: { before: 180, after: 80 }, outlineLevel: 2 }
+      },
+    ]
+  },
+  numbering: {
+    config: [
+      {
+        reference: "bullets",
+        levels: [{ level: 0, format: LevelFormat.BULLET, text: "\u2022", alignment: AlignmentType.LEFT,
+          style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
+      },
+      {
+        reference: "numbers",
+        levels: [{ level: 0, format: LevelFormat.DECIMAL, text: "%1.", alignment: AlignmentType.LEFT,
+          style: { paragraph: { indent: { left: 720, hanging: 360 } } } }]
+      }
+    ]
+  },
+  sections: [
+    // ====== PAGE DE GARDE ======
+    {
+      properties: {
+        page: {
+          size: { width: 11906, height: 16838 },
+          margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 }
+        }
+      },
+      children: [
+        new Table({
+          width: { size: 9000, type: WidthType.DXA },
+          columnWidths: [4000, 1000, 4000],
+          rows: [new TableRow({ children: [
+            new TableCell({
+              borders: noBorders,
+              width: { size: 4000, type: WidthType.DXA },
+              margins: { top: 80, bottom: 80, left: 120, right: 120 },
+              children: [
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "République Tunisienne", bold: true, size: 22, font: "Arial" })] }),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Ministère de l'Enseignement Supérieur", bold: true, size: 22, font: "Arial" })] }),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "et de la Recherche Scientifique", bold: true, size: 22, font: "Arial" })] }),
+              ]
+            }),
+            new TableCell({ borders: noBorders, width: { size: 1000, type: WidthType.DXA }, children: [new Paragraph({ children: [new TextRun("  ")] })] }),
+            new TableCell({
+              borders: noBorders,
+              width: { size: 4000, type: WidthType.DXA },
+              margins: { top: 80, bottom: 80, left: 120, right: 120 },
+              children: [
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Université de Sfax", bold: true, size: 22, font: "Arial" })] }),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Institut Supérieur d'Administration", bold: true, size: 22, font: "Arial" })] }),
+                new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "des Affaires", bold: true, size: 22, font: "Arial" })] }),
+              ]
+            }),
+          ]})]
+        }),
+        space(2),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 600 }, children: [new TextRun({ text: "Projet de fin d'études", bold: true, size: 36, font: "Arial", color: BLUE })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120 }, children: [new TextRun({ text: "En vue de l'obtention du diplôme de", size: 24, font: "Times New Roman" })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: "Licence en Informatique de Gestion", bold: true, size: 28, font: "Arial" })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80 }, children: [new TextRun({ text: "Parcours : Business Intelligence", bold: true, size: 24, font: "Arial" })] }),
+        space(2),
+        new Table({
+          width: { size: 8000, type: WidthType.DXA },
+          columnWidths: [8000],
+          rows: [new TableRow({ children: [new TableCell({
+            width: { size: 8000, type: WidthType.DXA },
+            shading: { fill: LIGHT_BLUE, type: ShadingType.CLEAR },
+            borders: { top: { style: BorderStyle.SINGLE, size: 4, color: BLUE }, bottom: { style: BorderStyle.SINGLE, size: 4, color: BLUE }, left: { style: BorderStyle.SINGLE, size: 4, color: BLUE }, right: { style: BorderStyle.SINGLE, size: 4, color: BLUE } },
+            margins: { top: 200, bottom: 200, left: 300, right: 300 },
+            children: [
+              new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Conception et Développement d'une Plateforme", bold: true, size: 36, font: "Arial", color: BLUE })] }),
+              new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Web Interactive pour les Débats Jeunesse –", bold: true, size: 36, font: "Arial", color: BLUE })] }),
+              new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Projet SWAFY", bold: true, size: 36, font: "Arial", color: DARK_BLUE })] }),
+            ]
+          })]})],
+        }),
+        space(2),
+        new Table({
+          width: { size: 8000, type: WidthType.DXA },
+          columnWidths: [8000],
+          rows: [new TableRow({ children: [new TableCell({
+            borders: { top: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" }, bottom: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" }, left: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" }, right: { style: BorderStyle.SINGLE, size: 2, color: "CCCCCC" } },
+            margins: { top: 120, bottom: 120, left: 200, right: 200 },
+            children: [
+              new Paragraph({ children: [new TextRun({ text: "Encadrant académique : ", bold: true, size: 24, font: "Arial" }), new TextRun({ text: "Mr/Mme ………………………………", size: 24, font: "Times New Roman" })] }),
+              new Paragraph({ children: [new TextRun({ text: "Encadrant professionnel : ", bold: true, size: 24, font: "Arial" }), new TextRun({ text: "Mr/Mme ………………………………", size: 24, font: "Times New Roman" })] }),
+            ]
+          })]})],
+        }),
+        space(2),
+        new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: "Présenté par :", bold: true, size: 26, font: "Arial" })] }),
+        new Paragraph({ children: [new TextRun({ text: "    Rania Heni", size: 26, font: "Times New Roman" })] }),
+        new Paragraph({ children: [new TextRun({ text: "    Hajer Labedi", size: 26, font: "Times New Roman" })] }),
+        space(3),
+        new Table({
+          width: { size: 4000, type: WidthType.DXA },
+          columnWidths: [4000],
+          rows: [new TableRow({ children: [new TableCell({
+            borders,
+            shading: { fill: BLUE, type: ShadingType.CLEAR },
+            margins: { top: 100, bottom: 100, left: 200, right: 200 },
+            children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Année universitaire 2024 – 2025", bold: true, size: 24, font: "Arial", color: "FFFFFF" })] })]
+          })]})],
+        }),
+      ]
+    },
 
-      /* ── MESSAGES ── */
-      case PAGES.MESSAGES:
-        return (
-          <div className="jl-page">
-            <JeuneContact />
-          </div>
-        );
+    // ====== DÉDICACES ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Plateforme SWAFY – Rapport de PFE", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 2000, after: 400 }, children: [new TextRun({ text: "Dédicaces", bold: true, size: 36, font: "Arial", color: BLUE })] }),
+        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: LIGHT_BLUE } }, children: [new TextRun("")] }),
+        space(),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 200, after: 200, line: 400 }, children: [italic("Je dédie ce travail à mes chers parents, pour leur amour inconditionnel, leur soutien indéfectible et leurs sacrifices tout au long de mon parcours. Votre confiance en moi a été ma plus grande force.")] }),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 200, after: 200, line: 400 }, children: [italic("À ma binôme Hajer, pour sa patience, son sérieux et la belle collaboration que nous avons partagée durant ce projet.")] }),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 200, after: 200, line: 400 }, children: [italic("À tous mes enseignants de l'ISAAS qui ont contribué à ma formation et à l'enrichissement de mes connaissances.")] }),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 200, after: 200, line: 400 }, children: [italic("À l'équipe du projet SWAFY / ANPR pour leur accueil, leur guidance et la confiance qu'ils nous ont accordée.")] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 600 }, children: [new TextRun({ text: "Rania Heni", italics: true, size: 24, font: "Times New Roman" })] }),
+        space(3),
+        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: LIGHT_BLUE } }, children: [new TextRun("")] }),
+        space(),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 200, after: 200, line: 400 }, children: [italic("Je dédie ce modeste travail à ma famille, source inépuisable d'amour et de motivation. À mes parents qui m'ont toujours encouragée à persévérer.")] }),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 200, after: 200, line: 400 }, children: [italic("À ma binôme Rania, avec qui j'ai eu le plaisir de travailler tout au long de ce projet enrichissant.")] }),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 200, after: 200, line: 400 }, children: [italic("À tous ceux qui m'ont soutenue, de près ou de loin, dans l'accomplissement de ce projet de fin d'études.")] }),
+        new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 600 }, children: [new TextRun({ text: "Hajer Labedi", italics: true, size: 24, font: "Times New Roman" })] }),
+      ]
+    },
 
-      /* ── NOTIFICATIONS ── */
-      case PAGES.NOTIFS:
-        return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="bell" size={18}/> Notifications</h2>
-            {notifications.length === 0 ? (
-              <div className="jl-empty">
-                <span className="jl-empty-icon">🔔</span>
-                <p>Aucune notification pour le moment</p>
-              </div>
-            ) : notifications.map((n, i) => (
-              <div key={n.id_notification}
-                className={`jl-notif-item${n.is_read ? "" : " unread"}`}
-                style={{ animationDelay:`${i * 0.06}s` }}
-                onClick={() => markNotifRead(n.id_notification)}>
-                <div className="jl-notif-icon">
-                  {n.type_notification==="new_post" ? "📝"
-                  :n.type_notification==="publication_comment" ? "💬" : "🔔"}
-                </div>
-                <div style={{ flex:1 }}>
-                  <p className="jl-notif-msg">{n.message}</p>
-                  <p className="jl-notif-time">{new Date(n.created_at).toLocaleString("fr-FR")}</p>
-                </div>
-                {!n.is_read && <span className="jl-notif-dot"/>}
-              </div>
-            ))}
-          </div>
-        );
+    // ====== REMERCIEMENTS ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Plateforme SWAFY – Rapport de PFE", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 400, after: 400 }, children: [new TextRun({ text: "Remerciements", bold: true, size: 36, font: "Arial", color: BLUE })] }),
+        new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: LIGHT_BLUE } }, children: [new TextRun("")] }),
+        space(),
+        para("Nous tenons à exprimer notre profonde gratitude à toutes les personnes qui ont contribué, de près ou de loin, à la réalisation de ce projet de fin d'études."),
+        space(),
+        para("Nous remercions, en premier lieu, nos encadrants académiques de l'Institut Supérieur d'Administration des Affaires de Sfax pour leurs précieux conseils, leur disponibilité et leur accompagnement tout au long de ce travail."),
+        space(),
+        para("Nos sincères remerciements vont également à l'équipe du projet SWAFY (Science With And For Youth), rattaché à l'Agence Nationale de la Promotion de la Recherche Scientifique (ANPR), pour leur accueil chaleureux, leur confiance et le cadre de stage enrichissant qu'ils nous ont offert. Ce projet, inscrit dans le programme européen EU4Youth Tunisie, représente une initiative remarquable au service de la jeunesse tunisienne."),
+        space(),
+        para("Nous exprimons aussi notre gratitude à nos enseignants de l'ISAAS pour la qualité de la formation reçue durant notre cursus universitaire, qui nous a permis de mener à bien ce projet."),
+        space(),
+        para("Enfin, nous remercions nos familles pour leur soutien moral constant, leur patience et leurs encouragements qui ont été une source de force et de motivation tout au long de notre parcours."),
+        space(2),
+        new Paragraph({ alignment: AlignmentType.RIGHT, spacing: { before: 600 }, children: [new TextRun({ text: "Rania Heni & Hajer Labedi", italics: true, bold: true, size: 24, font: "Times New Roman" })] }),
+      ]
+    },
 
-      /* ── PUBLIER ── */
-      case PAGES.PUBLIER:
-        return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="pencil" size={18}/> Nouvelle publication</h2>
-            <div className="jl-form-card">
-              <form onSubmit={handlePublier}>
-                <div className="jl-fg">
-                  <label className="jl-fl">Titre</label>
-                  <input className="jl-fi" placeholder="Un titre accrocheur…"
-                    value={pubTitle} onChange={(e) => setPubTitle(e.target.value)} required/>
-                </div>
-                <div className="jl-fg">
-                  <label className="jl-fl">Contenu</label>
-                  <textarea className="jl-fi jl-fi-ta" placeholder="Partagez vos idées, opinions ou expériences…"
-                    value={pubBody} onChange={(e) => setPubBody(e.target.value)} required/>
-                </div>
-                <div className="jl-form-row">
-                  <div className="jl-fg">
-                    <label className="jl-fl">Catégorie</label>
-                    <select className="jl-fi" value={pubCat} onChange={(e) => setPubCat(e.target.value)}>
-                      <option value="">Sélectionner…</option>
-                      <option value="education">Éducation</option>
-                      <option value="environnement">Environnement</option>
-                      <option value="culture">Culture</option>
-                      <option value="politique">Politique</option>
-                      <option value="sante">Santé</option>
-                      <option value="technologie">Technologie</option>
-                    </select>
-                  </div>
-                  <div className="jl-fg">
-                    <label className="jl-fl">Visibilité</label>
-                    <select className="jl-fi" value={pubVis} onChange={(e) => setPubVis(e.target.value)}>
-                      <option value="public">Public</option>
-                      <option value="membres">Membres seulement</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="jl-media-row">
-                  <button type="button" className="jl-media-btn"><Icon name="photo" size={14}/>Photo</button>
-                  <button type="button" className="jl-media-btn"><Icon name="video" size={14}/>Vidéo</button>
-                  <button type="button" className="jl-media-btn"><Icon name="link"  size={14}/>Lien</button>
-                </div>
-                <button type="submit" className="jl-submit-btn" disabled={pubBusy}>
-                  <Icon name="send" size={16}/>
-                  {pubBusy ? "Publication en cours…" : "Publier maintenant"}
-                </button>
-              </form>
-            </div>
-            <h2 className="jl-section-title" style={{ marginTop:6 }}>Publications récentes</h2>
-            {publications.slice(0,2).map((pub) => (
-              <PublicationCard key={pub.id_publication} publication={pub} onUpdate={fetchPublications}/>
-            ))}
-          </div>
-        );
+    // ====== RÉSUMÉ & ABSTRACT ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Plateforme SWAFY – Rapport de PFE", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 300, after: 300 }, children: [new TextRun({ text: "Résumé", bold: true, size: 32, font: "Arial", color: BLUE })] }),
+        new Table({
+          width: { size: 9360, type: WidthType.DXA },
+          columnWidths: [9360],
+          rows: [new TableRow({ children: [new TableCell({
+            borders,
+            shading: { fill: GREY_BG, type: ShadingType.CLEAR },
+            margins: { top: 200, bottom: 200, left: 240, right: 240 },
+            children: [
+              new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80, line: 360 }, children: [new TextRun({ text: "Ce projet de fin d'études porte sur la conception et le développement d'une plateforme web interactive dédiée aux débats de la jeunesse tunisienne, dans le cadre du projet SWAFY (Science With And For Youth) soutenu par l'Agence Nationale de la Promotion de la Recherche Scientifique (ANPR) et le programme européen EU4Youth Tunisie.", size: 24, font: "Times New Roman" })] }),
+              new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80, line: 360 }, children: [new TextRun({ text: "La plateforme développée permet aux jeunes de s'inscrire, de participer aux sessions de diffusion en direct (Lives), de prendre part à des enquêtes interactives, de publier et commenter des débats, et de gérer leur profil. Du côté administrateur, le système offre un tableau de bord complet pour gérer les utilisateurs, les contenus, les statistiques de participation et la modération.", size: 24, font: "Times New Roman" })] }),
+              new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80, line: 360 }, children: [new TextRun({ text: "Développée avec Node.js et React.js, la solution repose sur une base de données MySQL et est déployée sur des plateformes cloud (Railway, Vercel, Render). Ce rapport présente l'ensemble du cycle de développement : analyse des besoins, modélisation UML, conception de la base de données et réalisation des interfaces.", size: 24, font: "Times New Roman" })] }),
+              space(),
+              new Paragraph({ children: [new TextRun({ text: "Mots-clés : ", bold: true, size: 24, font: "Arial" }), new TextRun({ text: "Plateforme web, Débat jeunesse, SWAFY, ANPR, Node.js, React.js, MySQL, UML, Lives, Enquêtes.", size: 24, font: "Times New Roman" })] }),
+            ]
+          })]})],
+        }),
+        space(2),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 300, after: 300 }, children: [new TextRun({ text: "Abstract", bold: true, size: 32, font: "Arial", color: BLUE })] }),
+        new Table({
+          width: { size: 9360, type: WidthType.DXA },
+          columnWidths: [9360],
+          rows: [new TableRow({ children: [new TableCell({
+            borders,
+            shading: { fill: GREY_BG, type: ShadingType.CLEAR },
+            margins: { top: 200, bottom: 200, left: 240, right: 240 },
+            children: [
+              new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80, line: 360 }, children: [new TextRun({ text: "This end-of-studies project focuses on the design and development of an interactive web platform dedicated to debates among Tunisian youth, as part of the SWAFY (Science With And For Youth) project supported by the National Agency for the Promotion of Scientific Research (ANPR) and the EU4Youth Tunisia European program.", size: 24, font: "Times New Roman" })] }),
+              new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80, line: 360 }, children: [new TextRun({ text: "The platform enables youth to register, participate in live streaming sessions, take part in interactive surveys, publish and comment on debates, and manage their profiles. On the administrator side, the system provides a comprehensive dashboard for managing users, content, participation statistics, and moderation.", size: 24, font: "Times New Roman" })] }),
+              new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80, line: 360 }, children: [new TextRun({ text: "Built with Node.js and React.js, the solution uses a MySQL database and is deployed on cloud platforms (Railway, Vercel, Render). This report presents the complete development lifecycle: requirements analysis, UML modeling, database design, and interface implementation.", size: 24, font: "Times New Roman" })] }),
+              space(),
+              new Paragraph({ children: [new TextRun({ text: "Keywords: ", bold: true, size: 24, font: "Arial" }), new TextRun({ text: "Web platform, Youth debate, SWAFY, ANPR, Node.js, React.js, MySQL, UML, Live streaming, Surveys.", size: 24, font: "Times New Roman" })] }),
+            ]
+          })]})],
+        }),
+      ]
+    },
 
-      /* ── CALENDAR ── */
-      case PAGES.CALENDAR:
-        return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="calendar" size={18}/> Calendrier</h2>
-            {[
-              { ico:"📚", title:"Débat : Réforme éducative",      date:"Lun 12 Mai · 18h00" },
-              { ico:"🌱", title:"Live : Environnement & Jeunesse", date:"Mer 14 Mai · 20h00" },
-              { ico:"📊", title:"Enquête nationale : Emploi",      date:"Ven 16 Mai · Toute la journée" },
-              { ico:"🎤", title:"Atelier : Prise de parole",       date:"Sam 17 Mai · 10h00" },
-            ].map((ev, i) => (
-              <div key={i} className="jl-event-item" style={{ animationDelay:`${i*0.08}s` }}>
-                <div className="jl-event-dot">{ev.ico}</div>
-                <div>
-                  <p className="jl-event-title">{ev.title}</p>
-                  <p className="jl-event-meta"><Icon name="clock" size={12}/>{ev.date}</p>
-                </div>
-                <button className="jl-event-btn">S'inscrire</button>
-              </div>
-            ))}
-          </div>
-        );
+    // ====== TABLE DES MATIÈRES ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Plateforme SWAFY – Rapport de PFE", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 400 }, children: [new TextRun({ text: "Table des Matières", bold: true, size: 32, font: "Arial", color: BLUE })] }),
+        new TableOfContents("Table des Matières", { hyperlink: true, headingStyleRange: "1-3" }),
+      ]
+    },
 
-      /* ── LIVE ── */
-      case PAGES.LIVE:
-        return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="radio" size={18}/> Sessions Live</h2>
-      <LiveBanner />
-            <div className="jl-live-banner">
-              <div className="jl-live-top">
-                <span className="jl-live-badge">● LIVE</span>
-                <span className="jl-live-desc">Débat : L'avenir de la jeunesse tunisienne</span>
-              </div>
-              <div className="jl-live-screen">
-                <div style={{ textAlign:"center" }}>
-                  <div style={{ fontSize:44, marginBottom:8 }}>🎙️</div>
-                  <p style={{ fontSize:12, color:"rgba(255,255,255,0.72)" }}>342 spectateurs en direct</p>
-                </div>
-              </div>
-              <button className="jl-submit-btn"><Icon name="play" size={16}/>Rejoindre le Live</button>
-            </div>
-            <h2 className="jl-section-title" style={{ marginTop:8 }}>Prochains lives</h2>
-            {[
-              { title:"Santé mentale des jeunes",    date:"Demain · 19h00" },
-              { title:"Entrepreneuriat & Innovation", date:"Jeudi · 20h00" },
-            ].map((l, i) => (
-              <div key={i} className="jl-event-item" style={{ animationDelay:`${i*0.08}s` }}>
-                <div className="jl-event-dot"><Icon name="mic" size={22}/></div>
-                <div>
-                  <p className="jl-event-title">{l.title}</p>
-                  <p className="jl-event-meta"><Icon name="clock" size={12}/>{l.date}</p>
-                </div>
-                <button className="jl-event-btn">Rappel</button>
-              </div>
-            ))}
-          </div>
-        );
+    // ====== LISTE DES FIGURES ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Plateforme SWAFY – Rapport de PFE", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 200, after: 300 }, children: [new TextRun({ text: "Liste des Figures", bold: true, size: 28, font: "Arial", color: BLUE })] }),
+        makeTable(["Référence", "Description"], [
+          ["Figure 1", "Logo du projet SWAFY / ANPR"],
+          ["Figure 2", "Diagramme de contexte – situation actuelle"],
+          ["Figure 3", "Diagramme de cas d'utilisation métier"],
+          ["Figure 4", "Diagramme de cas d'utilisation global du système"],
+          ["Figure 5", "Diagramme de classes principal"],
+          ["Figure 6", "Diagramme de séquence – Authentification"],
+          ["Figure 7", "Diagramme de séquence – Inscription avec vérification email"],
+          ["Figure 8", "Diagramme de séquence – Participer à un Live"],
+          ["Figure 9", "Diagramme de séquence – Participer à une Enquête"],
+          ["Figure 10", "Diagramme de séquence – Gérer les Débats"],
+          ["Figure 11", "Diagramme de séquence – Gérer les Publications"],
+          ["Figure 12", "Diagramme de séquence – Messagerie instantanée"],
+          ["Figure 13", "Diagramme d'états – Utilisateur"],
+          ["Figure 14", "Schéma logique des données"],
+          ["Figure 15", "Schéma physique de la base de données"],
+          ["Figure 16", "Interface – Page d'accueil (Swafy.jsx)"],
+          ["Figure 17", "Interface – Inscription & Vérification email"],
+          ["Figure 18", "Interface – Tableau de bord Jeune"],
+          ["Figure 19", "Interface – Section Lives"],
+          ["Figure 20", "Interface – Publication et Débat"],
+          ["Figure 21", "Interface – Messagerie (Messenger)"],
+          ["Figure 22", "Interface – Tableau de bord Administrateur"],
+          ["Figure 23", "Interface – Gestion des Utilisateurs"],
+          ["Figure 24", "Interface – Statistiques de participation"],
+          ["Figure 25", "Interface – Paramètres"],
+        ], [3000, 6360]),
+        space(2),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 300, after: 300 }, children: [new TextRun({ text: "Liste des Tableaux", bold: true, size: 28, font: "Arial", color: BLUE })] }),
+        makeTable(["Référence", "Description"], [
+          ["Tableau 1", "Tableau comparatif : Plateforme SWAFY vs YLP Tunisie"],
+          ["Tableau 2", "Description textuelle UC – Authentification"],
+          ["Tableau 3", "Description textuelle UC – Inscription"],
+          ["Tableau 4", "Description textuelle UC – Participer au Live"],
+          ["Tableau 5", "Description textuelle UC – Créer un Live (Admin)"],
+          ["Tableau 6", "Description textuelle UC – Participer à l'enquête"],
+          ["Tableau 7", "Description textuelle UC – Gérer le profil"],
+          ["Tableau 8", "Description textuelle UC – Participer au débat"],
+          ["Tableau 9", "Description textuelle UC – Publier un contenu"],
+          ["Tableau 10", "Description textuelle UC – Messagerie instantanée"],
+          ["Tableau 11", "Description textuelle UC – Gérer les utilisateurs (Admin)"],
+          ["Tableau 12", "Description textuelle UC – Gérer les statistiques (Admin)"],
+          ["Tableau 13", "Dictionnaire de données – Tables principales"],
+          ["Tableau 14", "Environnement de développement et outils utilisés"],
+        ], [3000, 6360]),
+      ]
+    },
 
-      /* ── SETTINGS ── */
-      case PAGES.SETTINGS:
-        return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="settings" size={18}/> Paramètres</h2>
-            {[
-              { ico:"👤", label:"Informations personnelles", sub:"Nom, photo, bio",       bg:"rgba(90,63,160,0.1)", key:"profile" },
-              { ico:"🔔", label:"Notifications",            sub:"Email, push, SMS",       bg:"rgba(59,130,246,0.1)", key:"notif" },
-              { ico:"🔒", label:"Confidentialité",          sub:"Visibilité du profil",   bg:"rgba(16,185,129,0.1)", key:"priv" },
-              { ico:"🎨", label:"Apparence",                sub:"Thème, langue",          bg:"rgba(236,72,153,0.1)", key:"app" },
-              { ico:"🛡️", label:"Sécurité",                 sub:"Mot de passe, 2FA",      bg:"rgba(245,158,11,0.1)", key:"sec" },
-            ].map((s, i) => (
-              <div key={i} className="jl-settings-item"
-                style={{ animationDelay:`${i*0.07}s` }}
-                onClick={() => openModal(s.key)}>
-                <div className="jl-settings-ico" style={{ background:s.bg, border:"1px solid rgba(0,0,0,0.06)" }}>
-                  {s.ico}
-                </div>
-                <div>
-                  <p className="jl-settings-label">{s.label}</p>
-                  <p className="jl-settings-sub">{s.sub}</p>
-                </div>
-                <span className="jl-settings-arr"><Icon name="chevron" size={18}/></span>
-              </div>
-            ))}
-          </div>
-        );
+    // ====== INTRODUCTION GÉNÉRALE ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Plateforme SWAFY – Rapport de PFE", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        heading1("Introduction Générale"),
+        space(),
+        para("À l'ère du numérique, la participation citoyenne des jeunes passe de plus en plus par des espaces d'échanges en ligne. La jeunesse tunisienne, reconnue pour son dynamisme intellectuel et son désir d'engagement, manquait jusqu'ici d'une plateforme dédiée, sécurisée et structurée pour exprimer ses opinions scientifiques, participer à des débats constructifs et interagir avec des experts."),
+        space(),
+        para("C'est dans ce contexte que s'inscrit le projet SWAFY (Science With And For Youth), une initiative portée par l'Agence Nationale de la Promotion de la Recherche Scientifique (ANPR) dans le cadre du programme européen EU4Youth Tunisie. Ce projet vise à créer un lien durable entre la science et la jeunesse tunisienne, à travers des débats nationaux, des congrès, des clubs scientifiques et des activités d'innovation."),
+        space(),
+        para("Notre mission, dans le cadre de ce projet de fin d'études réalisé à l'ISAAS de Sfax, a consisté à concevoir et développer la plateforme web officielle du projet SWAFY. Cette plateforme numérique interactive centralise les activités du projet en offrant aux jeunes un espace d'inscription, de participation aux Lives, de vote dans les enquêtes, de publication et de débat, tout en fournissant à l'équipe SWAFY un tableau de bord analytique complet."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80, line: 360 }, children: [new TextRun({ text: "Ce rapport est organisé en quatre chapitres principaux :", size: 24, font: "Times New Roman" })] }),
+        bullet("Chapitre 1 – Modélisation du métier : présentation du domaine, étude de l'existant, critique et objectifs à atteindre."),
+        bullet("Chapitre 2 – Capture des besoins : identification des acteurs, élaboration des cas d'utilisation et descriptions textuelles."),
+        bullet("Chapitre 3 – Analyse et conception : diagramme de classes, diagrammes de séquence, diagrammes d'états."),
+        bullet("Chapitre 4 – Réalisation : environnement technique, conception de la base de données et présentation des interfaces."),
+        space(),
+        para("Ce travail a été réalisé sur une période allant de début février à fin avril 2025, au sein de l'organisme ANPR – projet SWAFY à Tunis."),
+      ]
+    },
 
-      /* ── HOME ── */
-      default:
-        return (
-          <div className="jl-page">
-            {/* Welcome */}
-            <section className="jl-welcome">
-              <div>
-                <p className="jl-welcome-tag">Tableau de bord</p>
-                <h1 className="jl-welcome-h1">
-                  Bonjour, <span className="jl-welcome-name">{user?.prenom_user || "Jeune"}</span> 👋
-                </h1>
-                <p className="jl-welcome-sub">Explorez, publiez, débattez avec la communauté.</p>
-              </div>
-              <div className="jl-welcome-art">
-                <div className="jl-ring"/><div className="jl-ring"/><div className="jl-ring"/>
-                <div className="jl-ring-center">
-                  <Icon name="sparkles" size={28}/>
-                </div>
-              </div>
-            </section>
+    // ====== CHAPITRE 1 ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Chapitre 1 : Modélisation du Métier", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400, after: 200 },
+          shading: { fill: BLUE, type: ShadingType.CLEAR },
+          children: [new TextRun({ text: "Chapitre 1 : Modélisation du Métier", bold: true, size: 40, font: "Arial", color: "FFFFFF" })]
+        }),
+        space(2),
 
-            {/* Stats */}
-            <div className="jl-stats">
-              {[
-                { label:"Mon profil",    sub:"Compte actif",                               icon:"user",    color:"#5a3fa0", action:() => openModal("profile") },
-                { label:"Publications",  sub:`${publications?.length||0} posts`,           icon:"pencil",  color:"#3b82f6", action:() => goTo(PAGES.PUBLIER) },
-                { label:"Live",          sub:"Débats en direct",                           icon:"radio",   color:"#ec4899", action:() => goTo(PAGES.LIVE) },
-                { label:"Messages",      sub:unreadMessages ? `${unreadMessages} non lus` : "Aucun message",
-                                                                                           icon:"message", color:"#10b981", action:() => goTo(PAGES.MESSAGES) },
-              ].map((c, i) => (
-                <div key={i} className="jl-stat" style={{ "--ac":c.color, animationDelay:`${i*0.08}s` }} onClick={c.action}>
-                  <div className="jl-stat-icon"><Icon name={c.icon} size={22}/></div>
-                  <p className="jl-stat-label">{c.label}</p>
-                  <p className="jl-stat-sub">{c.sub}</p>
-                </div>
-              ))}
-            </div>
+        heading1("Introduction"),
+        para("Le projet SWAFY vise à structurer un débat national autour de la thématique « Jeunesse et Science » en identifiant les enjeux prioritaires et les obstacles structurels. Il s'adresse aux acteurs éducatifs et scientifiques, au secteur public et privé, à la société civile, aux citoyens, aux partenaires internationaux, aux médias et à la jeunesse tunisienne elle-même, actrice centrale et bénéficiaire ultime de toute transformation."),
+        space(),
 
-            {/* Banners */}
-            <div className="jl-banners">
-              <div className="jl-banner jl-ban-live">
-                <div className="jl-banner-body">
-                  <span className="jl-banner-tag">En Direct</span>
-                  <h2>Sessions Live<br/>Interactives</h2>
-                  <button className="jl-banner-btn" onClick={() => goTo(PAGES.LIVE)}>
-                    <Icon name="play" size={12}/>Rejoindre
-                  </button>
-                </div>
-                <img src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=300&q=80"
-                  alt="live" className="jl-banner-img"
-                  onError={(e) => { e.target.style.display="none"; }}/>
-              </div>
-              <div className="jl-banner jl-ban-enquete">
-                <div className="jl-banner-body">
-                  <span className="jl-banner-tag">Nouveau</span>
-                  <h2>Participez aux<br/>Enquêtes</h2>
-                  <button className="jl-banner-btn">
-                    <Icon name="chevron" size={12}/>Participer
-                  </button>
-                </div>
-                <img src="https://images.unsplash.com/photo-1606326608606-aa0b62935f2b?w=300&q=80"
-                  alt="enquete" className="jl-banner-img"
-                  onError={(e) => { e.target.style.display="none"; }}/>
-              </div>
-            </div>
+        heading1("1.1. Étude de l'existant"),
 
-            {/* Feed */}
-            <h2 className="jl-section-title"><Icon name="dots" size={18}/> Fil d'actualité</h2>
-            {loading ? (
-              <div className="jl-spinner-wrap"><div className="jl-spinner"/></div>
-            ) : publications.length === 0 ? (
-              <div className="jl-empty">
-                <span className="jl-empty-icon">✦</span>
-                <p>Aucune publication pour le moment</p>
-              </div>
-            ) : publications.map((pub) => (
-              <div key={pub.id_publication}
-                id={`pub-${pub.id_publication}`}
-                className={highlightedPub===pub.id_publication ? "jl-highlighted" : ""}>
-                <PublicationCard publication={pub} onUpdate={fetchPublications}/>
-              </div>
-            ))}
-          </div>
-        );
-    }
-  };
+        heading2("1.1.1. Repérage du domaine"),
 
-  /* ═══════════════════════════════════════════════════════
-     RENDER
-  ═══════════════════════════════════════════════════════ */
-  return (
-    <div className="jl-root">
-      {/* orbs */}
-      <div className="jl-orb jl-orb1" aria-hidden="true"/>
-      <div className="jl-orb jl-orb2" aria-hidden="true"/>
-      <div className="jl-orb jl-orb3" aria-hidden="true"/>
+        heading3("A. Présentation du cadre du stage"),
+        para("Le stage a été effectué au sein de l'Agence Nationale de la Promotion de la Recherche Scientifique (ANPR), dans le cadre du projet SWAFY, situé à Tunis. L'ANPR est un établissement public tunisien sous tutelle du Ministère de l'Enseignement Supérieur et de la Recherche Scientifique, chargé de la promotion et du financement de la recherche scientifique nationale."),
+        space(),
+        para("Le projet SWAFY (Science With And For Youth) s'inscrit dans le programme européen EU4Youth Tunisie. Il joue un rôle essentiel dans le développement des compétences des jeunes scientifiques, en créant et en soutenant les clubs scientifiques dans tous les gouvernorats tunisiens. Son objectif est d'accroître la valeur ajoutée de la recherche et de l'innovation en collaborant avec les jeunes, les clubs scientifiques, les associations, les encadrants et chercheurs."),
+        space(),
 
-      {/* mobile overlay */}
-      {mobileOpen && <div className="jl-overlay" onClick={() => setMobileOpen(false)}/>}
+        heading3("B. Diagramme de contexte"),
+        para("Étant donné que le projet SWAFY ne dispose pas encore d'une plateforme numérique centralisée, la gestion des interactions se fait de manière manuelle ou via des outils tiers dispersés (réseaux sociaux, Google Forms, événements physiques). Le diagramme de contexte illustre cette organisation fragmentée."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 2 : Diagramme de contexte – situation actuelle]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        para("Ce diagramme met en évidence la complexité et la dispersion des flux d'informations actuels. L'équipe SWAFY utilise des canaux non officiels ou externes (Facebook, formulaires en ligne, ou papier lors des événements) pour annoncer les débats et récolter les avis. Les jeunes participent de manière non structurée : ils commentent sur les réseaux sociaux au milieu d'autres publications, sans que leurs interventions ne soient archivées ni valorisées."),
+        space(),
 
-      {/* ══ SIDEBAR ══ */}
-      <aside className={[
-        "jl-sidebar",
-        sidebarOpen ? "" : "collapsed",
-        mobileOpen  ? "mobile-open" : "",
-      ].join(" ")}>
+        heading2("1.1.2. Diagramme de cas d'utilisation métier"),
+        para("Le diagramme de cas d'utilisation métier représente les différents processus actuels du projet SWAFY avant l'implémentation du système informatisé. Il identifie les principaux travailleurs du métier et leurs interactions avec les processus existants."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 3 : Diagramme de cas d'utilisation métier]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        para("Les principaux processus métier identifiés sont : l'organisation des débats jeunesse, la diffusion d'événements scientifiques, la gestion des clubs scientifiques par gouvernorat, la collecte d'avis et de retours des jeunes, et la communication des résultats des débats."),
+        space(),
 
-        {/* Logo */}
-        <div className="jl-logo" onClick={() => {
-          if (window.innerWidth < 860) setMobileOpen((o) => !o);
-          else setSidebarOpen((o) => !o);
-        }}>
-          <div className="jl-logo-icon">S</div>
-          <span className="jl-logo-text">Swafy</span>
-        </div>
+        heading2("1.1.3. Comparaison avec des initiatives similaires – YLP Tunisie"),
+        para("Youth Leadership Programme (YLP Tunisie) est une initiative dédiée au renforcement des capacités des jeunes en Tunisie. Ce programme vise à offrir aux jeunes des espaces de dialogue, de réflexion et d'échange autour des enjeux qui concernent leur avenir."),
+        space(),
+        tableTitle("Tableau 1 : Comparatif entre la plateforme SWAFY et YLP Tunisie"),
+        makeTable(
+          ["Critère", "YLP Tunisie", "Notre plateforme SWAFY"],
+          [
+            ["Accessibilité", "Accès sélectif", "Accès libre pour tous les jeunes"],
+            ["Participation", "Nombre limité de participants", "Large participation nationale"],
+            ["Liberté d'expression", "Expression encadrée", "Expression totalement libre"],
+            ["Continuité", "Activités ponctuelles", "Plateforme disponible en permanence"],
+            ["Innovation", "Méthodes classiques", "Outils numériques interactifs"],
+            ["Statistiques", "Non disponibles", "Tableau de bord analytique complet"],
+            ["Modération", "Manuelle", "Système de signalement automatisé"],
+          ],
+          [2500, 3000, 3860]
+        ),
+        space(2),
 
-        {/* Menu btn */}
-        <button className="jl-menu-btn" onClick={() => {
-          if (window.innerWidth < 860) setMobileOpen((o) => !o);
-          else setSidebarOpen((o) => !o);
-        }}>
-          <Icon name="menu" size={18}/>
-          <span className="jl-menu-label">Menu</span>
-        </button>
+        heading1("1.2. Critique de l'existant"),
+        para("L'analyse de la situation actuelle révèle plusieurs limites majeures qui justifient pleinement la création d'une solution numérique dédiée :"),
+        space(),
+        bullet("Absence d'un site web dédié : La communication est dispersée et non centralisée, ce qui rend l'accès à l'information difficile pour les jeunes comme pour l'administration."),
+        bullet("Dépendance aux réseaux sociaux : Les échanges se font sur des plateformes où les discussions sont non organisées, difficiles à modérer et rapidement noyées par d'autres contenus."),
+        bullet("Aucun système de gestion des profils : Il est impossible d'identifier clairement les participants, de vérifier leur identité ou de protéger leurs données personnelles."),
+        bullet("Absence de centralisation des Lives : Aucune fonctionnalité ne permet de regrouper les diffusions vidéo en direct et d'y associer un espace de questions/réponses dédié."),
+        bullet("Système de vote non sécurisé : Les outils actuels ne permettent pas de récolter les avis des jeunes avec garantie d'unicité du vote."),
+        bullet("Manque de traçabilité des idées : Il est très difficile d'exploiter les propositions des jeunes et d'en extraire des statistiques claires pour les décideurs."),
+        bullet("Absence de messagerie institutionnelle : Les échanges entre jeunes et avec l'administration se font via des canaux non sécurisés et non archivés."),
+        space(),
 
-        {/* Nav */}
-        <nav className="jl-nav">
-          {NAV.map((item, idx) => (
-            <button key={idx}
-              className={`jl-nav-item${activePage===item.page ? " active" : ""}`}
-              onClick={() => goTo(item.page)}>
-              <span className="jl-nav-icon"><Icon name={item.icon} size={20}/></span>
-              <span className="jl-nav-label">{item.label}</span>
-              {item.badge && <span className="jl-badge">{item.badge}</span>}
-              {item.live  && <span className="jl-badge-live">LIVE</span>}
-            </button>
-          ))}
-        </nav>
+        heading1("1.3. Objectifs à atteindre"),
+        para("Pour pallier les limites de l'existant, notre plateforme numérique SWAFY vise à atteindre les objectifs suivants :"),
+        space(),
+        numbered("Créer un espace sécurisé : Mettre en place un système d'authentification avec vérification par email pour gérer les profils des jeunes et garantir la fiabilité des participants."),
+        numbered("Centraliser les sessions de débats (Lives) : Offrir un accès direct aux diffusions vidéo où les jeunes peuvent poser des questions en temps réel aux experts invités."),
+        numbered("Mettre en place un système de publications et débats : Permettre aux jeunes de publier des contenus (texte, image, vidéo, PDF), de commenter et de débattre en prenant des positions argumentées (Pour/Contre)."),
+        numbered("Développer une messagerie instantanée : Intégrer un système de messagerie privée et de groupe pour faciliter la communication entre les jeunes."),
+        numbered("Mettre en place un système d'enquêtes : Permettre aux jeunes de voter et de donner leurs avis sur des sujets clés, tout en garantissant l'unicité de chaque vote."),
+        numbered("Fournir un tableau de bord analytique : Permettre à l'administrateur de consulter des statistiques précises (par âge, par région, par thématique) basées sur la participation des jeunes."),
+        numbered("Assurer une modération efficace : Intégrer des fonctionnalités de signalement et de filtrage des commentaires pour garantir un environnement respectueux."),
+        numbered("Archiver et valoriser les propositions : Transformer les avis des jeunes en une base de données utile pour les décideurs du projet SWAFY."),
+        space(),
 
-        {/* Exit */}
-        <button className="jl-exit-btn" onClick={handleLogout}>
-          <span className="jl-nav-icon"><Icon name="logout" size={20}/></span>
-          <span className="jl-exit-label">Déconnexion</span>
-        </button>
-      </aside>
+        heading1("Conclusion"),
+        para("La définition de ce cadre général et l'identification des failles du processus actuel nous ont permis de tracer les grandes lignes de notre solution numérique. La modélisation du métier a mis en lumière l'absence criante d'une infrastructure digitale adaptée aux besoins du projet SWAFY. Il est désormais impératif de modéliser les fonctionnalités de la future plateforme. Cela fera l'objet du chapitre suivant, dédié à la capture des besoins et à la conception du système."),
+      ]
+    },
 
-      {/* ══ MAIN ══ */}
-      <main className={`jl-main ${sidebarOpen ? "ml-open" : "ml-col"}`}>
+    // ====== CHAPITRE 2 ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Chapitre 2 : Capture des Besoins", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400, after: 200 },
+          shading: { fill: BLUE, type: ShadingType.CLEAR },
+          children: [new TextRun({ text: "Chapitre 2 : Capture des Besoins", bold: true, size: 40, font: "Arial", color: "FFFFFF" })]
+        }),
+        space(2),
 
-        {/* Topbar */}
-        <div className="jl-topbar">
-          <button className="jl-burger" aria-label="Menu" onClick={() => {
-            if (window.innerWidth < 860) setMobileOpen((o) => !o);
-            else setSidebarOpen((o) => !o);
-          }}>
-            <Icon name="menu" size={20}/>
-          </button>
-          <span className="jl-topbar-title">Swafy</span>
-          <div className="jl-topbar-avatar" onClick={() => openModal("profile")}>
-            <img src={getAvatar(user?.photo_user, user?.sexe)} alt="avatar"
-              onError={(e) => { e.target.src="https://randomuser.me/api/portraits/men/44.jpg"; }}/>
-          </div>
-        </div>
+        heading1("Introduction"),
+        para("Ce chapitre est consacré à l'analyse fonctionnelle et à la modélisation des besoins de la plateforme web dédiée aux débats des jeunes dans le cadre du projet SWAFY. Nous identifions les acteurs du système, précisons les besoins fonctionnels et non fonctionnels, et élaborons le modèle de cas d'utilisation avec leurs descriptions textuelles détaillées."),
+        space(),
 
-        {/* Content */}
-        {activePage === PAGES.MESSAGES ? (
-          <div className="jl-messages-full"><JeuneContact/></div>
-        ) : (
-          <div className="jl-scroll">{renderContent()}</div>
-        )}
-      </main>
+        heading1("2.1. Acteurs du système informatisé"),
+        para("Dans le cadre de la création de la plateforme SWAFY, différents acteurs interagissent avec le système. Chaque acteur assume une fonction précise qui détermine son accès et les actions qu'il peut réaliser."),
+        space(),
+        makeTable(
+          ["Acteur", "Description", "Accès principal"],
+          [
+            ["Visiteur", "Utilisateur non authentifié. Il parcourt le site pour consulter les informations publiques, voir les Lives disponibles et s'inscrire.", "Page d'accueil, inscription"],
+            ["Jeune intéressé", "Utilisateur authentifié. Il participe aux Lives, répond aux enquêtes, publie des contenus, commente, débat et utilise la messagerie.", "Tableau de bord complet, publications, Lives, messagerie"],
+            ["Administrateur\n(équipe SWAFY)", "Gestionnaire global de la plateforme. Il gère les utilisateurs, crée les Lives et enquêtes, modère les contenus et consulte les statistiques.", "Tableau de bord admin, gestion complète"],
+          ],
+          [2500, 4360, 2500]
+        ),
+        space(2),
 
-      {/* ══ RIGHT SIDEBAR — sticky ══ */}
-      {activePage !== PAGES.MESSAGES && (
-        <aside className="jl-right">
-          <div className="jl-right-scroll">
+        heading1("2.2. Besoins fonctionnels et non fonctionnels"),
 
-            {/* Profile card */}
-            <div className="jl-profile-card" onClick={() => openModal("profile")}>
-              <div className="jl-p-row">
-                <img className="jl-p-ava"
-                  src={getAvatar(user?.photo_user, user?.sexe)} alt="avatar"
-                  onError={(e) => { e.target.src="https://randomuser.me/api/portraits/men/44.jpg"; }}/>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <p className="jl-p-name">{user?.prenom_user} {user?.nom_user}</p>
-                  <p className="jl-p-email">{user?.email_user}</p>
-                </div>
-                <span className="jl-p-arr"><Icon name="chevron" size={16}/></span>
-              </div>
-              <span className="jl-p-role">
-                <Icon name="star" size={11}/> Jeune membre · Swafy
-              </span>
-            </div>
+        heading2("2.2.1. Besoins fonctionnels"),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 }, children: [new TextRun({ text: "Gestion des utilisateurs et sécurité :", bold: true, size: 24, font: "Arial" })] }),
+        bullet("Le système permet l'inscription des jeunes avec vérification par email."),
+        bullet("L'accès aux fonctionnalités est contrôlé selon le rôle (ADMIN / JEUNE)."),
+        bullet("Un utilisateur bloqué ne peut plus accéder à son espace."),
+        bullet("Le système empêche le vote multiple dans une même enquête."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 }, children: [new TextRun({ text: "Gestion des débats, publications et interactivité :", bold: true, size: 24, font: "Arial" })] }),
+        bullet("Publication de contenus multimédias (texte, image, vidéo, PDF)."),
+        bullet("Système de réactions (like, love, haha, wow, sad, angry) sur les publications."),
+        bullet("Commentaires imbriqués avec positions Pour/Contre dans les débats."),
+        bullet("Signalement des contenus abusifs par les jeunes."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 }, children: [new TextRun({ text: "Gestion des Lives :", bold: true, size: 24, font: "Arial" })] }),
+        bullet("Création de sessions de diffusion en direct par l'administrateur."),
+        bullet("Participation des jeunes via un code de salle ou un lien de stream."),
+        bullet("Système de questions/réponses en temps réel pendant les Lives."),
+        bullet("Création d'enquêtes liées aux Lives par l'administrateur."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 }, children: [new TextRun({ text: "Messagerie instantanée :", bold: true, size: 24, font: "Arial" })] }),
+        bullet("Conversations privées entre utilisateurs (1-à-1)."),
+        bullet("Groupes de discussion avec partage de fichiers et votes de groupe."),
+        bullet("Réactions emoji sur les messages."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80 }, children: [new TextRun({ text: "Gestion administrative et statistiques :", bold: true, size: 24, font: "Arial" })] }),
+        bullet("Tableau de bord avec statistiques de participation par gouvernorat, âge, statut."),
+        bullet("Gestion complète des utilisateurs (ajout, modification, blocage, suppression)."),
+        bullet("Gestion des événements par gouvernorat."),
+        bullet("Système de notifications en temps réel (Socket.IO)."),
+        space(),
 
-            {/* Quick stats */}
-            <div className="jl-q-stats">
-              <div className="jl-q-sc"><p className="jl-q-num">24</p><p className="jl-q-lbl">Posts</p></div>
-              <div className="jl-q-sc"><p className="jl-q-num">142</p><p className="jl-q-lbl">Amis</p></div>
-              <div className="jl-q-sc"><p className="jl-q-num">8</p><p className="jl-q-lbl">Événements</p></div>
-            </div>
+        heading2("2.2.2. Besoins non fonctionnels"),
+        bullet("Ergonomie et Utilisabilité : Interface intuitive, responsive design, adaptée aux smartphones et tablettes."),
+        bullet("Sécurité : Protection des données personnelles, hachage des mots de passe (bcryptjs), authentification JWT, vérification email."),
+        bullet("Performance : Plateforme capable de supporter un grand nombre de connexions simultanées, notamment lors des Lives."),
+        bullet("Disponibilité : Accessible 24h/24 et 7j/7 grâce au déploiement cloud (Railway, Vercel, Render)."),
+        bullet("Internationalisation : Interface en français avec support de l'arabe (i18n avec LanguageContext)."),
+        bullet("Scalabilité : Architecture modulaire permettant l'ajout de nouvelles fonctionnalités."),
+        space(),
 
-            {/* Upcoming event */}
-            <div className="jl-ev-widget">
-              <p className="jl-ev-tag">Prochain événement</p>
-              <p className="jl-ev-name">Débat : Réforme éducative</p>
-              <p className="jl-ev-time"><Icon name="clock" size={12}/>Lundi 12 Mai · 18h00</p>
-              <button className="jl-ev-join" onClick={() => goTo(PAGES.LIVE)}>
-                <Icon name="play" size={13}/>Rejoindre le live
-              </button>
-            </div>
+        heading1("2.3. Diagramme de cas d'utilisation global"),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 4 : Diagramme de cas d'utilisation global du système SWAFY]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
 
-            {/* Trending */}
-            <p className="jl-sec-label">Tendances</p>
-            {[
-              { num:1, txt:"Éducation",    cnt:"342 posts" },
-              { num:2, txt:"Environnement",cnt:"218 posts" },
-              { num:3, txt:"Santé mentale",cnt:"195 posts" },
-            ].map((t, i) => (
-              <div key={i} className="jl-tr-item">
-                <span className="jl-tr-num">{t.num}</span>
-                <span className="jl-tr-txt">{t.txt}</span>
-                <span className="jl-tr-cnt">{t.cnt}</span>
-              </div>
-            ))}
+        heading1("2.4. Descriptions textuelles des cas d'utilisation"),
 
-            {/* Chatbot */}
-            <div className="jl-cb">
-              <div className="jl-cb-head">
-                <div className="jl-cb-icon"><Icon name="robot" size={14}/></div>
-                <div>
-                  <p className="jl-cb-title">Assistant Swafy</p>
-                  <p className="jl-cb-sub">Toujours disponible</p>
-                </div>
-                <span className="jl-cb-online">● En ligne</span>
-              </div>
-              <div className="jl-cb-msgs">
-                {cbMsgs.map((m, i) => (
-                  <div key={i} className={`jl-cb-msg ${m.from==="bot" ? "jl-cb-bot" : "jl-cb-user"}`}>
-                    {m.text}
-                  </div>
-                ))}
-                <div ref={cbEndRef}/>
-              </div>
-              <div className="jl-cb-bar">
-                <input className="jl-cb-input" placeholder="Écrire…"
-                  value={cbInput} onChange={(e) => setCbInput(e.target.value)}
-                  onKeyDown={(e) => e.key==="Enter" && sendCb()}/>
-                <button className="jl-cb-send" onClick={sendCb} aria-label="Envoyer">
-                  <Icon name="send" size={13}/>
-                </button>
-              </div>
-            </div>
+        heading2("2.4.1. Cas d'utilisation : Authentification"),
+        tableTitle("Tableau 2 : Description textuelle du cas d'utilisation « Authentification »"),
+        ucTable(
+          "Authentification",
+          "Permettre à l'utilisateur (Jeune ou Administrateur) d'accéder à son espace selon ses droits.",
+          "Jeune intéressé, Administrateur",
+          "Le compte existe dans la base de données.",
+          "Le système affiche l'interface correspondant au rôle de l'utilisateur (tableau de bord jeune ou admin).",
+          "1. Le système affiche le formulaire de connexion (email et mot de passe).\n2. L'utilisateur saisit ses identifiants.\n3. L'utilisateur clique sur « Se connecter ».\n4. Le système vérifie les informations saisies et le rôle.\n5. Le système génère un token JWT et le stocke.\n6. Le système redirige l'utilisateur vers son interface correspondante.",
+          "E1) Champs vides : « Veuillez remplir tous les champs obligatoires. »\nE2) Email ou mot de passe incorrect : « Veuillez vérifier vos coordonnées. »\nE3) Compte bloqué : « Votre compte a été suspendu. »\nE4) Erreur système : « Impossible de se connecter. Veuillez réessayer. »"
+        ),
+        space(2),
 
-          </div>
-        </aside>
-      )}
+        heading2("2.4.2. Cas d'utilisation : Inscription avec vérification email"),
+        tableTitle("Tableau 3 : Description textuelle du cas d'utilisation « Inscription »"),
+        ucTable(
+          "Inscription avec vérification email",
+          "Permettre à un visiteur de créer un compte sur la plateforme SWAFY avec validation par code email.",
+          "Visiteur",
+          "Le visiteur accède à la page d'inscription.",
+          "Un nouveau compte utilisateur est créé, vérifié et enregistré dans le système. L'utilisateur peut se connecter.",
+          "1. Le visiteur clique sur « S'inscrire ».\n2. Le système affiche le formulaire d'inscription (nom, prénom, email, téléphone, date de naissance, sexe, mot de passe).\n3. Le visiteur saisit ses informations et clique sur « Valider ».\n4. Le système vérifie l'unicité de l'email.\n5. Le système envoie un code de vérification à 6 chiffres par email (via Brevo).\n6. Le visiteur saisit le code reçu sur la page de vérification.\n7. Le système valide le code et active le compte.\n8. Le système affiche : « Inscription réussie. Bienvenue sur SWAFY ! »",
+          "E1) Champ vide ou invalide : « Veuillez vérifier les informations saisies. »\nE2) Email déjà utilisé : « Cette adresse email est déjà enregistrée. »\nE3) Code expiré : « Le code de vérification a expiré. »\nE4) Code incorrect : « Code invalide. »\nE5) Erreur système : « L'inscription n'a pas pu être effectuée. »"
+        ),
+        space(2),
 
-      {/* ══ MODAL ══ */}
-      {modalDef && (
-        <div className="jl-modal-bg" onClick={(e) => e.target===e.currentTarget && closeModal()}>
-          <div className="jl-modal">
-            <div className="jl-modal-head">
-              <span className="jl-modal-title">{modalDef.title}</span>
-              <button className="jl-modal-close" onClick={closeModal} aria-label="Fermer">
-                <Icon name="close" size={15}/>
-              </button>
-            </div>
-            <div className="jl-modal-body">
-              <modalDef.Body/>
-            </div>
-            {modalDef.hasFoot && (
-              <div className="jl-modal-foot">
-                <button className="jl-m-cancel" onClick={closeModal}>Annuler</button>
-                <button className="jl-m-save" onClick={closeModal}>
-                  <Icon name="check" size={14}/>Enregistrer
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+        heading2("2.4.3. Cas d'utilisation : Participer à un Live"),
+        tableTitle("Tableau 4 : Description textuelle du cas d'utilisation « Participer à un Live »"),
+        ucTable(
+          "Participer à un Live",
+          "Permettre au jeune de rejoindre et de participer à une session de diffusion en direct.",
+          "Jeune intéressé",
+          "Le jeune est authentifié. Un Live est disponible (statut : planifié ou en_direct).",
+          "Le jeune est enregistré comme participant au Live. Il peut poser des questions et participer à l'enquête associée.",
+          "1. Le jeune accède à la section « Lives ».\n2. Le système affiche la liste des Lives (planifiés, en direct, terminés).\n3. Le jeune sélectionne un Live.\n4. Le système affiche les détails (titre, date, description, thématique).\n5. Si le Live est en direct, le jeune clique sur « Rejoindre ».\n6. Le système enregistre la participation (table live_participants).\n7. Le jeune accède au flux vidéo (via stream_link ou room_code).\n8. Le jeune peut poser des questions dans le chat du débat en temps réel.",
+          "E1) Aucun Live disponible : « Aucun live n'est disponible pour le moment. »\nE2) Live terminé : « Cette session est terminée. »\nE3) Erreur de connexion : « Connexion au live échouée. Vérifiez votre connexion. »",
+          "Participer à l'enquête du Live : Le jeune peut répondre aux questions de l'enquête associée au Live (via questions_enquete et reponses)."
+        ),
+        space(2),
 
-export default JeuneLayout;
+        heading2("2.4.4. Cas d'utilisation : Créer un Live (Administrateur)"),
+        tableTitle("Tableau 5 : Description textuelle du cas d'utilisation « Créer un Live »"),
+        ucTable(
+          "Créer un Live",
+          "Permettre à l'administrateur de créer une nouvelle session de diffusion en direct avec toutes ses caractéristiques.",
+          "Administrateur",
+          "L'administrateur est authentifié et dispose des droits d'administration.",
+          "Un nouveau Live est enregistré dans la base de données (table lives). Il apparaît dans la liste des Lives pour les jeunes.",
+          "1. L'administrateur accède au tableau de bord admin.\n2. Il clique sur « Créer un nouveau Live ».\n3. Le système affiche le formulaire (titre, description, lien de stream, date, thématique, catégorie).\n4. L'administrateur remplit les informations et valide.\n5. Le système génère un code de salle unique (room_code).\n6. Le système enregistre le Live avec statut « planifié ».\n7. Un message de confirmation s'affiche.\n8. L'administrateur peut créer une enquête associée au Live.",
+          "E1) Champ obligatoire vide : « Veuillez remplir tous les champs requis. »\nE2) Date invalide : « La date doit être supérieure à la date actuelle. »\nE3) Erreur d'enregistrement : « Impossible de créer le Live. »"
+        ),
+        space(2),
+
+        heading2("2.4.5. Cas d'utilisation : Publier un contenu / Participer au débat"),
+        tableTitle("Tableau 6 : Description textuelle du cas d'utilisation « Publier un contenu »"),
+        ucTable(
+          "Publier un contenu / Participer au débat",
+          "Permettre au jeune de publier différents types de contenus (texte, image, vidéo, PDF, débat Pour/Contre) sur la plateforme.",
+          "Jeune intéressé",
+          "L'utilisateur est authentifié. Le module Publications est accessible.",
+          "Le contenu est enregistré dans la base de données (table publications) et visible sur le fil d'actualité.",
+          "1. Le jeune accède à la section « Publications ».\n2. Il choisit le type de publication : texte, image, vidéo, PDF, ou débat.\n3. Pour un débat : il saisit une question de débat (question_debat).\n4. Pour un fichier : il importe le fichier (stockage Cloudinary).\n5. Il saisit le contenu textuel associé.\n6. Il clique sur « Publier ».\n7. Le système valide et enregistre la publication.\n8. Le système affiche la publication dans le fil d'actualité.\n9. Les autres jeunes peuvent réagir (like/love/…), commenter et partager.",
+          "E1) Champ vide : « Le contenu ne peut pas être vide. »\nE2) Format de fichier invalide : « Format non pris en charge. Formats acceptés : jpg, png, mp4, pdf. »\nE3) Fichier trop volumineux : « La taille du fichier dépasse la limite autorisée. »",
+          "Commenter un débat : Le jeune peut commenter une publication et prendre une position (Pour/Contre) avec un argument (table debat_positions, publication_commentaires, debat_comments)."
+        ),
+        space(2),
+
+        heading2("2.4.6. Cas d'utilisation : Messagerie instantanée"),
+        tableTitle("Tableau 7 : Description textuelle du cas d'utilisation « Messagerie »"),
+        ucTable(
+          "Messagerie instantanée",
+          "Permettre aux utilisateurs d'échanger des messages privés (1-à-1) et en groupe avec partage de fichiers et votes.",
+          "Jeune intéressé, Administrateur",
+          "L'utilisateur est authentifié.",
+          "Les messages sont enregistrés et les conversations accessibles à tout moment.",
+          "1. L'utilisateur accède à la section « Messagerie ».\n2. Il choisit entre une conversation privée ou un groupe.\n3. Pour une conversation privée : il recherche un utilisateur et initie la conversation (table messenger_conversations, messenger_messages).\n4. Pour un groupe : il accède à la salle de groupe (messenger_group_messages).\n5. Il saisit son message texte ou importe un fichier (image/vidéo).\n6. Il clique sur « Envoyer ».\n7. Le système envoie le message en temps réel via Socket.IO.\n8. Les autres participants reçoivent le message instantanément.",
+          "E1) Message vide : « Impossible d'envoyer un message vide. »\nE2) Fichier invalide : « Format de fichier non supporté. »\nE3) Utilisateur non trouvé : « Cet utilisateur n'existe pas. »",
+          "Créer un vote de groupe : Dans un groupe, un utilisateur peut créer un vote avec des options (tables messenger_group_votes, messenger_group_vote_options, messenger_group_vote_answers). Les membres peuvent voter et voir les résultats."
+        ),
+        space(2),
+
+        heading2("2.4.7. Cas d'utilisation : Gérer les utilisateurs (Admin)"),
+        tableTitle("Tableau 8 : Description textuelle du cas d'utilisation « Gérer les utilisateurs »"),
+        ucTable(
+          "Gérer les utilisateurs",
+          "Permettre à l'administrateur de consulter, modifier le statut et gérer les profils des utilisateurs.",
+          "Administrateur",
+          "L'administrateur est authentifié. Le module « Gestion des utilisateurs » est disponible.",
+          "Le profil d'un utilisateur est modifié ou son statut mis à jour dans le système.",
+          "1. L'administrateur accède au tableau de bord.\n2. Il navigue vers « Gestion des utilisateurs ».\n3. Le système affiche la liste paginée des utilisateurs avec leurs informations (nom, email, statut, rôle, date d'inscription).\n4. L'administrateur peut filtrer par statut ou rechercher un utilisateur.\n5. Pour chaque utilisateur, il peut : voir le profil, bloquer/débloquer le compte, supprimer le compte.\n6. Le système met à jour la base de données et affiche une confirmation.",
+          "E1) Informations manquantes : « Veuillez vérifier les champs saisis. »\nE2) Échec de mise à jour : « L'opération n'a pas pu être effectuée. »\nE3) Tentative de suppression de compte admin : « Action non autorisée. »"
+        ),
+        space(2),
+
+        heading2("2.4.8. Cas d'utilisation : Gérer les statistiques (Admin)"),
+        tableTitle("Tableau 9 : Description textuelle du cas d'utilisation « Gérer les statistiques »"),
+        ucTable(
+          "Gérer les statistiques",
+          "Permettre à l'administrateur de consulter et filtrer les statistiques de participation sur la plateforme.",
+          "Administrateur",
+          "L'administrateur est authentifié. Des données de participation existent dans le système.",
+          "Les statistiques sont affichées selon les critères choisis par l'administrateur.",
+          "1. L'administrateur accède au tableau de bord des statistiques.\n2. Le système affiche les indicateurs clés : nombre d'utilisateurs inscrits, participation par gouvernorat, répartition par âge, statut (collège/lycée/étudiant/diplômé), nombre de publications, de Lives, d'enquêtes.\n3. L'administrateur peut filtrer par période, par gouvernorat ou par thématique.\n4. Le système met à jour les graphiques et tableaux en temps réel.\n5. L'administrateur peut exporter les données.",
+          "E1) Aucune donnée : « Aucune statistique disponible pour le moment. »\nE2) Erreur de chargement : « Erreur lors du chargement des statistiques. »\nE3) Filtre invalide : « Critère de filtre incorrect. »",
+          "Exporter les statistiques : L'administrateur clique sur « Exporter », le système génère un fichier téléchargeable avec les données de participation."
+        ),
+        space(2),
+
+        heading1("Conclusion"),
+        para("L'identification des acteurs et la modélisation des cas d'utilisation ont permis de préciser de manière exhaustive les attentes des utilisateurs ainsi que les fonctionnalités indispensables du système SWAFY. Les descriptions textuelles détaillées fournissent une base solide pour la phase de conception et de développement. Le chapitre suivant s'attachera à l'analyse statique et dynamique du système à travers les diagrammes UML."),
+      ]
+    },
+
+    // ====== CHAPITRE 3 ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Chapitre 3 : Analyse et Conception", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400, after: 200 },
+          shading: { fill: BLUE, type: ShadingType.CLEAR },
+          children: [new TextRun({ text: "Chapitre 3 : Analyse et Conception", bold: true, size: 40, font: "Arial", color: "FFFFFF" })]
+        }),
+        space(2),
+
+        heading1("Introduction"),
+        para("Ce chapitre présente la modélisation détaillée du système SWAFY à travers les modèles statiques et dynamiques UML. Il comprend le dictionnaire de données, le diagramme de classes, les diagrammes de séquence pour les principaux cas d'utilisation, ainsi que les diagrammes d'états pour les entités à comportement complexe."),
+        space(),
+
+        heading1("3.1. Développement du modèle statique"),
+
+        heading2("3.1.1. Dictionnaire de données"),
+        para("Le dictionnaire de données ci-dessous présente les principales entités de la base de données MySQL du système SWAFY avec leurs attributs clés :"),
+        space(),
+        tableTitle("Tableau 10 : Dictionnaire de données – Tables principales"),
+        makeTable(
+          ["Table", "Attributs principaux", "Description"],
+          [
+            ["utilisateurs", "id_user, nom_user, prenom_user, email_user, mot_de_passe_user, role, status_user, email_verified, date_naissance, sexe, telephone_user", "Stocke tous les utilisateurs (jeunes et admins). Le rôle détermine les droits d'accès."],
+            ["jeune_profiles", "id_profile, user_id, gouvernorat_jeune, delegation_jeune, ville_jeune, age, statut, etablissement", "Profil détaillé du jeune : informations géographiques et statut académique."],
+            ["lives", "id_live, admin_id, title_live, description, stream_link, status_live, date_live, room_code, thematique, category", "Sessions de diffusion en direct créées par l'administrateur."],
+            ["live_participants", "id_participation, live_id, user_id, date_participation, role_live", "Enregistre les jeunes ayant participé à chaque Live."],
+            ["enquetes", "id_enquete, live_id, titre, description, date_creation", "Enquêtes liées aux sessions Lives."],
+            ["questions_enquete", "id_question, user_id, contenu_enquete, status_question, date_creation", "Questions posées dans les enquêtes et les chats de débat."],
+            ["reponses", "id_reponse, question_id, user_id, contenu_reponse, heure_reponse", "Réponses des jeunes aux questions des enquêtes."],
+            ["publications", "id_publication, user_id, titre_publication, contenu_publication, type_publication, question_debat, status_publication, date_publication", "Publications des jeunes : texte, image, vidéo, PDF, débat."],
+            ["publication_medias", "id_media, id_publication, type_media, url_media, nom_original, taille_fichier", "Fichiers multimédias associés aux publications (stockés sur Cloudinary)."],
+            ["publication_reactions", "id_reaction, id_publication, id_user, type_reaction", "Réactions des jeunes sur les publications (like, love, haha, wow, sad, angry)."],
+            ["publication_commentaires", "id_commentaire, id_publication, id_user, contenu, debat_side, parent_id", "Commentaires sur les publications avec support Pour/Contre pour les débats."],
+            ["debat_positions", "id_position, id_publication, id_user, position, argument", "Position argumentée des jeunes dans les débats (Pour ou Contre)."],
+            ["debat_comments", "id_comment, id_debat, id_user, side, contenu, parent_id", "Commentaires imbriqués dans les débats avec prise de position."],
+            ["publications_signalements", "id_signalement, id_publication, id_user, raison, statut, traite_par", "Signalements de contenus abusifs pour modération."],
+            ["messenger_conversations", "id, user_a_id, user_b_id, created_at, updated_at", "Conversations privées entre deux utilisateurs."],
+            ["messenger_messages", "id, conversation_id, sender_id, type, text, attachment_url", "Messages des conversations privées (texte, image, vidéo)."],
+            ["messenger_group_messages", "id, sender_id, text, file_url, msg_type", "Messages dans les groupes de discussion."],
+            ["messenger_group_votes", "id, sender_id, question", "Votes créés dans les groupes de messagerie."],
+            ["notifications", "id_notification, id_user_to, id_user_from, type_notification, entity_type, entity_id, message, is_read", "Notifications en temps réel envoyées aux utilisateurs."],
+            ["gouvernorat", "id_gouvernorat, nom, nombre_evenement", "Référentiel des 24 gouvernorats de Tunisie."],
+            ["delegation", "id_delegation, nom_delegation, id_gouvernorat", "Délégations rattachées à chaque gouvernorat."],
+            ["evenement", "id_evenement, titre_evenement, date_evenement, id_gouvernorat", "Événements organisés par gouvernorat."],
+            ["contacts", "id_contact, user_id, sujet, contenu_message, statut, reponse", "Messages de contact envoyés à l'administration."],
+            ["email_verifications", "id, email, code, code_expires, verified, temp_password, nom, prenom, attempts", "Gestion de la vérification email lors de l'inscription."],
+          ],
+          [2800, 4200, 2360]
+        ),
+        space(2),
+
+        heading2("3.1.2. Diagramme de classes"),
+        para("Le diagramme de classes ci-dessous représente la structure statique du système SWAFY avec les principales entités, leurs attributs, les relations entre elles et leurs multiplicités."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 5 : Diagramme de classes principal du système SWAFY]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        para("Les relations principales du diagramme de classes sont les suivantes :"),
+        bullet("Utilisateur (1) ←→ (0..*) Publication : Un utilisateur peut créer plusieurs publications."),
+        bullet("Publication (1) ←→ (0..*) PublicationMedia : Une publication peut avoir plusieurs fichiers médias."),
+        bullet("Publication (1) ←→ (0..*) PublicationReaction : Une publication peut recevoir plusieurs réactions."),
+        bullet("Publication (1) ←→ (0..*) PublicationCommentaire : Une publication peut avoir plusieurs commentaires."),
+        bullet("Utilisateur (1) ←→ (1) JeuneProfile : Chaque jeune a un profil détaillé."),
+        bullet("Live (1) ←→ (0..*) Enquete : Un Live peut avoir plusieurs enquêtes associées."),
+        bullet("Live (1) ←→ (0..*) LiveParticipant : Un Live peut avoir plusieurs participants."),
+        bullet("Utilisateur (1) ←→ (0..*) MessengerConversation : Un utilisateur peut avoir plusieurs conversations privées."),
+        bullet("MessengerConversation (1) ←→ (0..*) MessengerMessage : Une conversation contient plusieurs messages."),
+        bullet("Gouvernorat (1) ←→ (0..*) Delegation : Un gouvernorat contient plusieurs délégations."),
+        space(2),
+
+        heading1("3.2. Développement des modèles dynamiques"),
+
+        heading2("3.2.1. Diagrammes de séquence"),
+
+        heading3("Diagramme de séquence : Authentification"),
+        para("Ce diagramme représente les échanges entre l'utilisateur, le navigateur, le serveur Node.js et la base de données MySQL lors du processus de connexion."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 6 : Diagramme de séquence – Authentification]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { before: 80, after: 80, line: 360 }, children: [new TextRun({ text: "Description des échanges :", bold: true, size: 24, font: "Arial" })] }),
+        numbered("L'utilisateur saisit ses identifiants (email + mot de passe) dans le formulaire React."),
+        numbered("Le composant React envoie une requête POST /auth/login au serveur Node.js."),
+        numbered("Le serveur interroge la table utilisateurs via authController.js."),
+        numbered("La base de données retourne les informations de l'utilisateur."),
+        numbered("Le serveur vérifie le mot de passe avec bcryptjs.compare()."),
+        numbered("En cas de succès, le serveur génère un token JWT (jsonwebtoken) et le retourne."),
+        numbered("Le composant React stocke le token et redirige vers le tableau de bord approprié."),
+        space(),
+
+        heading3("Diagramme de séquence : Inscription avec vérification email"),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 7 : Diagramme de séquence – Inscription avec vérification email]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        numbered("Le visiteur remplit le formulaire d'inscription dans Register.jsx."),
+        numbered("POST /auth/register → authController.js vérifie l'unicité de l'email."),
+        numbered("Le serveur envoie un code à 6 chiffres via Brevo (service mailer.js)."),
+        numbered("Les données temporaires sont stockées dans email_verifications."),
+        numbered("Le visiteur saisit le code dans VerifyCode.jsx."),
+        numbered("POST /auth/verify-code → Le serveur valide le code et crée le compte dans utilisateurs."),
+        numbered("Le compte est activé (email_verified = 1) et l'utilisateur est redirigé."),
+        space(),
+
+        heading3("Diagramme de séquence : Participer à un Live"),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 8 : Diagramme de séquence – Participer à un Live]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        numbered("Le jeune accède à la page Lives.jsx et sélectionne un Live."),
+        numbered("GET /lives/:id → Le serveur retourne les détails du Live depuis la table lives."),
+        numbered("Le jeune clique sur « Rejoindre »."),
+        numbered("POST /lives/:id/join → Le serveur enregistre la participation dans live_participants."),
+        numbered("Le serveur retourne le room_code ou stream_link."),
+        numbered("Le jeune accède au flux vidéo (MeetRoom.jsx ou LiveViewer.jsx)."),
+        numbered("Le jeune peut envoyer des questions en temps réel via Socket.IO (authSocket.js)."),
+        space(),
+
+        heading3("Diagramme de séquence : Publication et débat"),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 10 : Diagramme de séquence – Gérer les publications]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        numbered("Le jeune accède à PublierPage.jsx et choisit le type de publication."),
+        numbered("Pour un fichier, il est uploadé via uploadMiddleware.js vers Cloudinary."),
+        numbered("POST /publications → publicationController.js enregistre dans publications et publication_medias."),
+        numbered("Le serveur envoie des notifications aux abonnés via notificationController.js."),
+        numbered("Les autres jeunes voient la publication dans PublicationFeed.jsx."),
+        numbered("Ils peuvent réagir (POST /publications/:id/react → publication_reactions)."),
+        numbered("Ils peuvent commenter (POST /publications/:id/comments → publication_commentaires)."),
+        numbered("Pour un débat, ils peuvent prendre une position Pour/Contre (POST /publications/:id/position → debat_positions)."),
+        space(),
+
+        heading3("Diagramme de séquence : Messagerie instantanée"),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 12 : Diagramme de séquence – Messagerie instantanée]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        numbered("L'utilisateur ouvre Swafy_Meet.jsx (messagerie)."),
+        numbered("GET /messenger/conversations → Le serveur retourne les conversations de l'utilisateur."),
+        numbered("L'utilisateur sélectionne une conversation ou en crée une nouvelle."),
+        numbered("POST /messenger/conversations → Création dans messenger_conversations."),
+        numbered("L'utilisateur envoie un message (texte ou fichier)."),
+        numbered("POST /messenger/messages → Stockage dans messenger_messages."),
+        numbered("Socket.IO diffuse le message en temps réel au destinataire."),
+        numbered("Le destinataire reçoit une notification via le système de notifications."),
+        space(),
+
+        heading2("3.2.2. Diagrammes d'états"),
+
+        heading3("Diagramme d'états : Utilisateur"),
+        para("Ce diagramme représente le cycle de vie d'un compte utilisateur sur la plateforme SWAFY."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 13 : Diagramme d'états – Utilisateur]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        para("Les états possibles d'un utilisateur sont :"),
+        bullet("pending_owner : État initial lors de la phase de vérification email (avant validation du code)."),
+        bullet("actif : État normal après vérification de l'email. L'utilisateur peut accéder à toutes les fonctionnalités."),
+        bullet("inactif : Le compte est désactivé temporairement par l'administrateur."),
+        bullet("bloque : L'utilisateur a été bloqué suite à des comportements abusifs. Il ne peut plus se connecter."),
+        bullet("banni : Bannissement permanent du compte par l'administrateur."),
+        space(),
+
+        heading3("Diagramme d'états : Live"),
+        para("Les états d'un Live sur la plateforme sont :"),
+        bullet("planifie : Le Live a été créé et planifié mais n'a pas encore démarré."),
+        bullet("en_direct : Le Live est actuellement diffusé. Les jeunes peuvent le rejoindre."),
+        bullet("termine : La session s'est terminée. Le replay peut être consulté."),
+        bullet("annule : Le Live a été annulé par l'administrateur."),
+        space(),
+
+        heading2("3.2.3. Confrontation modèle statique / modèles dynamiques"),
+        para("La confrontation entre le diagramme de classes et les diagrammes de séquence permet de valider la cohérence du modèle. Chaque message échangé dans les diagrammes de séquence correspond à une opération sur une classe du diagramme de classes, et chaque table accédée dans les séquences correspond à une entité du dictionnaire de données."),
+        space(),
+        para("Cette vérification croisée confirme que :"),
+        bullet("Toutes les classes nécessaires sont bien définies dans le diagramme de classes."),
+        bullet("Les associations entre classes correspondent aux jointures SQL dans les contrôleurs."),
+        bullet("Les attributs utilisés dans les séquences existent bien dans les tables correspondantes."),
+        bullet("Les contraintes d'unicité (ex : un seul vote par enquête, une seule réaction par publication par user) sont bien reflétées dans les contraintes UNIQUE KEY de la base de données."),
+        space(),
+
+        heading1("Conclusion"),
+        para("La phase d'analyse et de conception a permis de formaliser l'architecture complète du système SWAFY. Les modèles statiques et dynamiques UML fournissent une vision claire et cohérente de la structure et du comportement du système. Ces modèles constituent le fondement technique sur lequel repose la phase de réalisation, présentée dans le chapitre suivant."),
+      ]
+    },
+
+    // ====== CHAPITRE 4 ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Chapitre 4 : Réalisation", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 400, after: 200 },
+          shading: { fill: BLUE, type: ShadingType.CLEAR },
+          children: [new TextRun({ text: "Chapitre 4 : Réalisation", bold: true, size: 40, font: "Arial", color: "FFFFFF" })]
+        }),
+        space(2),
+
+        heading1("Introduction"),
+        para("Ce chapitre est consacré à la phase de réalisation de la plateforme SWAFY. Nous y présentons l'environnement de développement utilisé, la conception des schémas logiques et physiques de la base de données, ainsi qu'une présentation des principales interfaces développées."),
+        space(),
+
+        heading1("4.1. Environnement de réalisation"),
+        tableTitle("Tableau 11 : Environnement de développement et outils utilisés"),
+        makeTable(
+          ["Catégorie", "Outil / Technologie", "Version / Détail"],
+          [
+            ["Langage Backend", "Node.js", "JavaScript côté serveur"],
+            ["Framework Backend", "Express.js", "Framework web minimaliste"],
+            ["Langage Frontend", "React.js (JSX)", "Bibliothèque UI avec hooks"],
+            ["Base de données", "MySQL", "Via Railway cloud (v9.4.0)"],
+            ["ORM / Driver", "mysql2", "Driver MySQL natif pour Node.js"],
+            ["Authentification", "jsonwebtoken (JWT) + bcryptjs", "Tokens sécurisés + hachage"],
+            ["Temps réel", "Socket.IO", "WebSockets pour messagerie et notifications"],
+            ["Upload fichiers", "Multer + Cloudinary", "Stockage cloud des médias"],
+            ["Envoi d'emails", "Brevo (ex Sendinblue)", "Vérification email et notifications"],
+            ["Déploiement Backend", "Railway / Render", "Hébergement cloud du serveur Node.js"],
+            ["Déploiement Frontend", "Vercel", "Hébergement statique React"],
+            ["Déploiement BDD", "Railway MySQL", "Base de données cloud"],
+            ["Gestion de style", "CSS Modules + CSS classique", "Styles componentisés"],
+            ["Outils de modélisation", "Draw.io / StarUML", "Diagrammes UML"],
+            ["Environnement de dev", "Visual Studio Code", "Éditeur de code principal"],
+            ["Versionning", "Git / GitHub", "Contrôle de version"],
+          ],
+          [2800, 3200, 3360]
+        ),
+        space(2),
+
+        heading1("4.2. Architecture du projet"),
+
+        heading2("4.2.1. Architecture générale"),
+        para("La plateforme SWAFY suit une architecture client-serveur en trois couches :"),
+        bullet("Couche présentation (Frontend) : Application React.js déployée sur Vercel. Elle communique avec le backend via des appels HTTP REST et des connexions WebSocket."),
+        bullet("Couche logique métier (Backend) : Serveur Node.js/Express.js hébergé sur Railway/Render. Il gère l'authentification, les règles métier, la communication temps réel (Socket.IO) et les uploads vers Cloudinary."),
+        bullet("Couche données (Base de données) : Base de données MySQL hébergée sur Railway. Elle stocke toutes les données persistantes de la plateforme."),
+        space(),
+
+        heading2("4.2.2. Structure du backend"),
+        para("Le serveur backend est organisé selon une architecture MVC (Model-View-Controller) avec les répertoires suivants :"),
+        bullet("controllers/ : Logique métier des contrôleurs (authController.js, publicationController.js, debatController.js, notificationController.js, etc.)"),
+        bullet("routes/ : Définition des routes REST API (authRoutes.js, publicationRoutes.js, LiveRoutes.js, messengerRoutes.js, etc.)"),
+        bullet("middlewares/ : Middlewares d'authentification JWT (authMiddleware.js), WebSocket auth (authSocket.js), upload de fichiers (uploadMiddleware.js, avatarUpload.js)"),
+        bullet("utils/ : Utilitaires partagés (mailer.js pour Brevo, cache.js, passwordGenerator.js)"),
+        bullet("config/ : Configuration de la base de données (db.js)"),
+        space(),
+
+        heading1("4.3. Conception des schémas de données"),
+
+        heading2("4.3.1. Schéma logique des données"),
+        para("Le schéma logique des données traduit le diagramme de classes en un ensemble de tables relationnelles normalisées. Les principales règles de normalisation respectées sont : l'élimination des dépendances fonctionnelles partielles (2NF) et transitives (3NF)."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 14 : Schéma logique des données du système SWAFY]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        para("Les tables principales sont :"),
+        bullet("utilisateurs (id_user, nom_user, prenom_user, email_user, mot_de_passe_user, role, status_user, email_verified, ...)"),
+        bullet("jeune_profiles (id_profile, #user_id, gouvernorat_jeune, delegation_jeune, ville_jeune, age, statut, etablissement)"),
+        bullet("publications (id_publication, #user_id, titre_publication, contenu_publication, type_publication, question_debat, status_publication, ...)"),
+        bullet("lives (id_live, #admin_id, title_live, description, stream_link, status_live, date_live, room_code, thematique, ...)"),
+        bullet("enquetes (id_enquete, #live_id, titre, description, date_creation)"),
+        bullet("messenger_conversations (id, #user_a_id, #user_b_id, created_at, updated_at)"),
+        bullet("notifications (id_notification, #id_user_to, #id_user_from, type_notification, entity_type, entity_id, message, is_read)"),
+        space(),
+
+        heading2("4.3.2. Schéma physique de la base de données"),
+        para("Le schéma physique intègre les contraintes d'intégrité référentielle, les index de performance et les types de données optimisés pour MySQL :"),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 15 : Schéma physique de la base de données SWAFY]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+        para("Principales optimisations physiques implémentées :"),
+        bullet("Index sur les clés étrangères pour accélérer les jointures (ex : idx_reactions_comment, idx_reactions_user)."),
+        bullet("Contraintes UNIQUE KEY pour garantir l'unicité des votes et des réactions (ex : UNIQUE(id_comment, id_user) dans comment_reactions)."),
+        bullet("Cascade DELETE pour nettoyer automatiquement les données liées lors de la suppression d'un utilisateur ou d'une publication."),
+        bullet("Types ENUM pour les champs à valeurs limitées (status_user, role, type_reaction, status_live, etc.) pour économiser de l'espace et garantir l'intégrité."),
+        bullet("Champs TIMESTAMP avec DEFAULT CURRENT_TIMESTAMP et ON UPDATE CURRENT_TIMESTAMP pour le suivi automatique des modifications."),
+        space(),
+
+        heading1("4.4. Présentation des interfaces"),
+
+        heading2("4.4.1. Page d'accueil – Swafy.jsx"),
+        para("La page d'accueil présente le projet SWAFY avec une navigation claire vers les sections principales : inscription, connexion, présentation du programme EU4Youth et informations sur les activités SWAFY."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 16 : Interface – Page d'accueil SWAFY]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.2. Inscription et vérification email"),
+        para("Le processus d'inscription comprend deux étapes : le formulaire d'inscription (Register.jsx) avec validation des champs, puis la vérification par code email (VerifyCode.jsx). Cette approche garantit l'authenticité des utilisateurs."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 17 : Interface – Inscription & Vérification email]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.3. Tableau de bord Jeune – JeuneDashboard.jsx"),
+        para("Le tableau de bord du jeune offre une vue centralisée sur toutes ses activités : fil d'actualité des publications, accès rapide aux Lives, notifications en temps réel, accès à la messagerie et au profil. L'interface est responsive et adaptée aux appareils mobiles."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 18 : Interface – Tableau de bord Jeune]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.4. Section Lives"),
+        para("La section Lives (Livesection.jsx, LiveViewer.jsx, MeetRoom.jsx) permet aux jeunes de consulter les sessions disponibles, de rejoindre un Live en cours (via room_code ou stream_link), de poser des questions en temps réel et de participer aux enquêtes associées."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 19 : Interface – Section Lives et salle de réunion]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.5. Publications et Débats"),
+        para("Le fil de publications (PublicationFeed.jsx, PublicationCard.jsx) affiche les contenus publiés par les jeunes avec les réactions, commentaires et partages. Pour les débats, les jeunes peuvent visualiser la répartition Pour/Contre et publier des arguments. L'interface de publication (PublierPage.jsx) supporte les types : texte, image, vidéo, PDF et débat."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 20 : Interface – Publications et DebateBlock]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.6. Messagerie instantanée – Swafy_Meet.jsx"),
+        para("La messagerie (Swafy_Meet.jsx, MeetRoom.jsx) offre des conversations privées en temps réel entre utilisateurs ainsi qu'un groupe public. Les fonctionnalités incluent : envoi de messages texte et fichiers, réactions emoji, votes de groupe et partage de médias. La communication s'effectue via Socket.IO."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 21 : Interface – Messagerie instantanée SWAFY]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.7. Tableau de bord Administrateur – AdminDashboard.jsx"),
+        para("Le tableau de bord administrateur offre une vue complète sur l'activité de la plateforme : statistiques de participation, graphiques de répartition géographique, gestion des utilisateurs (ManageUsers.jsx), gestion des Lives (AdminLiveStream.jsx), modération des publications signalées et configuration des paramètres."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 22 : Interface – Tableau de bord Administrateur]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.8. Gestion des utilisateurs – ManageUsers.jsx"),
+        para("L'interface de gestion des utilisateurs permet à l'administrateur de visualiser la liste complète des utilisateurs avec filtres (statut, rôle), de consulter les profils détaillés incluant le gouvernorat, la délégation et le statut académique, de bloquer/débloquer des comptes et de gérer les rôles."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 23 : Interface – Gestion des utilisateurs]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.9. Statistiques de participation"),
+        para("Le module de statistiques offre à l'équipe SWAFY une vision analytique complète : répartition des jeunes par gouvernorat sur une carte de Tunisie, distribution par tranche d'âge et statut académique, évolution des inscriptions, participation aux Lives et aux enquêtes, et activité sur les publications."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 24 : Interface – Statistiques de participation]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading2("4.4.10. Paramètres – ParametrePage.jsx"),
+        para("La page de paramètres (ParametrePage.jsx, Settings.jsx) permet à l'utilisateur de modifier son profil, son mot de passe, ses préférences de notification, la langue de l'interface (FR/AR via LanguageContext.jsx) et de gérer son compte. L'administrateur dispose de paramètres supplémentaires pour la configuration globale de la plateforme."),
+        space(),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 }, children: [new TextRun({ text: "[Figure 25 : Interface – Paramètres et profil utilisateur]", italics: true, size: 22, color: "888888", font: "Times New Roman" })] }),
+        space(),
+
+        heading1("Conclusion"),
+        para("La phase de réalisation a permis de concrétiser l'ensemble des fonctionnalités définies dans les chapitres précédents. La plateforme SWAFY est désormais pleinement opérationnelle et déployée sur des infrastructures cloud fiables. L'architecture technique choisie (Node.js, React.js, MySQL, Socket.IO) garantit performance, sécurité et scalabilité pour accompagner la croissance du projet SWAFY."),
+      ]
+    },
+
+    // ====== CONCLUSION GÉNÉRALE ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Plateforme SWAFY – Rapport de PFE", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        heading1("Conclusion Générale"),
+        space(),
+        para("Ce projet de fin d'études nous a permis de concevoir et de développer une plateforme web complète et fonctionnelle pour le projet SWAFY, une initiative portée par l'Agence Nationale de la Promotion de la Recherche Scientifique (ANPR) dans le cadre du programme européen EU4Youth Tunisie."),
+        space(),
+        para("Notre travail a couvert l'intégralité du cycle de développement logiciel : de l'analyse de l'existant et l'identification des besoins, en passant par la modélisation UML rigoureuse, jusqu'à l'implémentation technique et le déploiement sur des infrastructures cloud."),
+        space(),
+        heading2("Apports et points forts du projet"),
+        bullet("Une plateforme centrale et unifiée qui remplace les outils dispersés et non structurés utilisés avant ce projet."),
+        bullet("Un système d'authentification sécurisé avec vérification par email et gestion des rôles."),
+        bullet("Des fonctionnalités temps réel (messagerie, notifications, participation aux Lives) grâce à Socket.IO."),
+        bullet("Un système de publications multimédias riche avec débats Pour/Contre et réactions."),
+        bullet("Un tableau de bord analytique offrant une visibilité complète sur la participation des jeunes par gouvernorat, âge et statut."),
+        bullet("Une architecture cloud scalable avec Railway (BDD), Vercel (frontend) et Render (backend)."),
+        space(),
+        heading2("Limites et améliorations possibles"),
+        bullet("Intégration d'un système de Live streaming natif (actuellement basé sur des liens externes) avec WebRTC."),
+        bullet("Développement d'une application mobile native (React Native) pour améliorer l'accessibilité."),
+        bullet("Mise en place d'un moteur de recommandation de contenus basé sur les intérêts des jeunes (IA/Machine Learning)."),
+        bullet("Intégration d'un chatbot SWAFY pour guider les nouveaux utilisateurs."),
+        bullet("Développement d'un module de gamification pour encourager la participation active."),
+        bullet("Amélioration du moteur de recherche avec ElasticSearch pour une recherche full-text."),
+        space(),
+        para("Ce projet a été une expérience extrêmement enrichissante, tant sur le plan technique que humain. Il nous a permis de mettre en pratique les connaissances acquises durant notre formation à l'ISAAS de Sfax, tout en contribuant concrètement à une initiative nationale au service de la jeunesse tunisienne. Nous sommes fières d'avoir développé un outil qui donnera aux jeunes un espace numérique digne pour exprimer leurs idées scientifiques et participer activement à la construction de l'avenir de la Tunisie."),
+      ]
+    },
+
+    // ====== BIBLIOGRAPHIE ======
+    {
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, right: 1440, bottom: 1440, left: 1800 } } },
+      headers: { default: new Header({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Plateforme SWAFY – Rapport de PFE", italics: true, size: 20, color: "666666" })] })] }) },
+      footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: "Page ", size: 20 }), new TextRun({ children: [PageNumber.CURRENT], size: 20 })] })] }) },
+      children: [
+        heading1("Bibliographie et Webographie"),
+        space(),
+        heading2("Livres et ouvrages"),
+        bullet("Muller P.A. & Gaertner N. (2005). Modélisation objet avec UML. Eyrolles."),
+        bullet("Roques P. & Vallée F. (2002). UML 2 en action. Eyrolles."),
+        bullet("Morley C., Hugues J., Leblanc B. (2003). UML pour l'analyse d'un système d'information. Dunod."),
+        bullet("Flanagan D. (2020). JavaScript: The Definitive Guide, 7th Edition. O'Reilly Media."),
+        bullet("Banks A. & Porcello E. (2020). Learning React, 2nd Edition. O'Reilly Media."),
+        space(),
+        heading2("Documentation technique"),
+        bullet("Documentation officielle Node.js : https://nodejs.org/docs/"),
+        bullet("Documentation Express.js : https://expressjs.com/"),
+        bullet("Documentation React.js : https://react.dev/"),
+        bullet("Documentation Socket.IO : https://socket.io/docs/"),
+        bullet("Documentation MySQL : https://dev.mysql.com/doc/"),
+        bullet("Documentation Cloudinary : https://cloudinary.com/documentation"),
+        bullet("Documentation Brevo (Sendinblue) API : https://developers.brevo.com/"),
+        bullet("Documentation JWT (jsonwebtoken) : https://jwt.io/"),
+        space(),
+        heading2("Sites web de référence"),
+        bullet("Site officiel ANPR Tunisie : https://www.anpr.tn"),
+        bullet("Programme EU4Youth SWAFY : https://eu4youth.tn/explorer/swafy/"),
+        bullet("Railway (hébergement cloud) : https://railway.app"),
+        bullet("Vercel (déploiement frontend) : https://vercel.com"),
+        bullet("Render (hébergement backend) : https://render.com"),
+        bullet("GitHub (versionning) : https://github.com"),
+      ]
+    },
+  ]
+});
+
+Packer.toBuffer(doc).then(buffer => {
+  fs.writeFileSync('/home/claude/rapport_swafy_pfe.docx', buffer);
+  console.log('✅ Rapport généré avec succès !');
+}).catch(err => {
+  console.error('❌ Erreur:', err.message);
+  process.exit(1);
+});
