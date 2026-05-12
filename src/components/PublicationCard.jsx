@@ -2,6 +2,14 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import API from "../services/api";
 import "./PublicationCard.css";
 
+/* ─── current user from localStorage ─── */
+const getCurrentUser = () => {
+  try {
+    const u = localStorage.getItem("user");
+    return u ? JSON.parse(u) : null;
+  } catch { return null; }
+};
+
 /* ─── helpers ─── */
 const BACKEND = API.defaults.baseURL?.split("/api")[0] || "https://debat-jeune-production.up.railway.app";
 const getImg = (p) => !p ? null : p.startsWith("http") ? p : `${BACKEND}/${p}`;
@@ -191,6 +199,8 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const [stkOpen,    setStkOpen]    = useState(false);
   const [lightbox,   setLightbox]   = useState(null);
   const [expanded,   setExpanded]   = useState(false);
+  const [cmtCount,   setCmtCount]   = useState(publication.nb_commentaires??0);
+  const currentUser = getCurrentUser();
   const pub = publication;
   const picRef  = useRef(null);
   const inputRef = useRef(null);
@@ -211,7 +221,11 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
     setCmtLoading(true);
     try {
       const res = await API.get(`/publications/${pub.id_publication}/comments`);
-      setComments(Array.isArray(res.data) ? res.data : []);
+      const list = Array.isArray(res.data) ? res.data : [];
+      setComments(list);
+      // count total including nested replies
+      const countAll = (arr) => arr.reduce((s,c)=>s+1+(c.replies?.length||0), 0);
+      setCmtCount(countAll(list));
     } catch { setComments([]); }
     finally { setCmtLoading(false); }
   }, [pub.id_publication]);
@@ -255,7 +269,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const media  = pub.medias||[];
   const body   = pub.contenu_publication||pub.contenu||"";
   const isLong = body.length>280;
-  const totalCmt = pub.nb_commentaires??comments.length??0;
+  const totalCmt = cmtCount;
 
   return (
     <>
@@ -295,22 +309,52 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 
         {/* media */}
         {media.length>0 && (
-          <div className={`pc-media pc-media-${Math.min(media.length,4)}`}>
-            {media.slice(0,4).map((m,i)=>{
+          <>
+            {/* PDFs rendered as download cards outside the grid */}
+            {media.filter(m=>{
+              const src=getImg(m.url_media||m.chemin_fichier)||"";
+              return /\.pdf$/i.test(src)||m.type_media==="pdf";
+            }).map((m,i)=>{
               const src=getImg(m.url_media||m.chemin_fichier);
-              const isImg=/\.(jpg|jpeg|png|gif|webp)/i.test(src||"")||m.type_media==="image";
-              const isVid=/\.(mp4|webm|ogg)/i.test(src||"")||m.type_media==="video";
-              const more=media.length>4&&i===3;
+              const filename=src?.split("/").pop()?.split("?")[0]||"document.pdf";
               return (
-                <div key={i} className="pc-media-item" onClick={()=>isImg&&setLightbox(i)}>
-                  {isImg&&<img src={src} alt="" loading="lazy"/>}
-                  {isVid&&<video src={src} controls preload="metadata"/>}
-                  {!isImg&&!isVid&&<a href={src} target="_blank" rel="noreferrer" className="pc-pdf"><span>📄</span><span>Ouvrir PDF</span></a>}
-                  {more&&<div className="pc-media-more">+{media.length-4}</div>}
+                <div key={`pdf-${i}`} className="pc-pdf-card">
+                  <span className="pc-pdf-icon">📄</span>
+                  <div className="pc-pdf-info">
+                    <span className="pc-pdf-name">{decodeURIComponent(filename)}</span>
+                    <span className="pc-pdf-meta">Document PDF</span>
+                  </div>
+                  <a href={src} target="_blank" rel="noreferrer" download={filename} className="pc-pdf-dl-btn">
+                    ⬇ Télécharger
+                  </a>
+                  <a href={src} target="_blank" rel="noreferrer" className="pc-pdf-view-btn">
+                    👁 Voir
+                  </a>
                 </div>
               );
             })}
-          </div>
+            {/* Images & videos in grid */}
+            {media.filter(m=>{
+              const src=getImg(m.url_media||m.chemin_fichier)||"";
+              return !/\.pdf$/i.test(src)&&m.type_media!=="pdf";
+            }).length>0 && (
+              <div className={`pc-media pc-media-${Math.min(media.filter(m=>{const s=getImg(m.url_media||m.chemin_fichier)||"";return !/\.pdf$/i.test(s)&&m.type_media!=="pdf";}).length,4)}`}>
+                {media.filter(m=>{const s=getImg(m.url_media||m.chemin_fichier)||"";return !/\.pdf$/i.test(s)&&m.type_media!=="pdf";}).slice(0,4).map((m,i,arr)=>{
+                  const src=getImg(m.url_media||m.chemin_fichier);
+                  const isImg=/\.(jpg|jpeg|png|gif|webp)/i.test(src||"")||m.type_media==="image";
+                  const isVid=/\.(mp4|webm|ogg|mov)/i.test(src||"")||m.type_media==="video";
+                  const more=media.length>4&&i===3;
+                  return (
+                    <div key={i} className={`pc-media-item${isVid?" pc-media-vid":""}`} onClick={()=>isImg&&setLightbox(i)}>
+                      {isImg&&<img src={src} alt="" loading="lazy"/>}
+                      {isVid&&<video src={src} controls playsInline preload="metadata" style={{width:"100%",display:"block",maxHeight:"460px",background:"#000"}}/>}
+                      {more&&<div className="pc-media-more">+{media.length-4}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
         )}
 
         {/* stats */}
@@ -340,7 +384,10 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
           <div className="pc-cmts-section">
             {/* input */}
             <div className="pc-new-cmt">
-              <img className="pc-cmt-ava" src="https://randomuser.me/api/portraits/men/44.jpg" alt="moi"/>
+              <img className="pc-cmt-ava"
+                src={getImg(currentUser?.photo_user)||avatar(currentUser?.prenom||currentUser?.prenom_user||"Moi")}
+                alt="moi"
+                onError={e=>{ e.target.src=avatar(currentUser?.prenom||"Moi"); }}/>
               <div className="pc-cmt-input-wrap">
                 <input ref={inputRef} className="pc-cmt-inp"
                   placeholder="Écrire un commentaire…"
