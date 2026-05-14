@@ -440,7 +440,8 @@
   animation : fadeIn .2s ease;
 }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-.pc-lb-img { max-width:92vw; max-height:90vh; border-radius:10px; object-fit:contain; animation:scaleIn .28s cubic-bezier(.34,1.56,.64,1); box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+.pc-lb-img { max-width:92vw; max-height:90vh; border-radius:10px; object-fit:contain; animation:scaleIn .28s cubic-bezier(.34,1.56,.64,1); box-shadow:0 20px 60px rgba(0,0,0,0.5); display:block; }
+.pc-lb-content { display:flex; align-items:center; justify-content:center; max-width:96vw; max-height:90vh; }
 @keyframes scaleIn { from{transform:scale(0.85)} to{transform:scale(1)} }
 .pc-lb-close, .pc-lb-nav {
   position  : absolute;

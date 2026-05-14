@@ -130,9 +130,18 @@ const MediaLightbox = ({ medias, startIndex, onClose }) => {
   return (
     <div className="pc-lightbox" onClick={onClose}>
       <button className="pc-lb-close" onClick={onClose}>✕</button>
-      <div className="pc-lb-counter">{idx+1} / {medias.length}</div>
+      {medias.length > 1 && <div className="pc-lb-counter">{idx+1} / {medias.length}</div>}
       {idx>0 && <button className="pc-lb-nav left" onClick={prev}>‹</button>}
-      <img className="pc-lb-img" src={src} alt="" onClick={e=>e.stopPropagation()} />
+      <div className="pc-lb-content" onClick={e=>e.stopPropagation()}>
+        {isVid(m)
+          ? <video src={src} controls autoPlay playsInline style={{maxWidth:"92vw",maxHeight:"86vh",display:"block"}}/>
+          : isPdf(m)
+            ? <iframe src={src} title="PDF" style={{width:"88vw",height:"86vh",border:"none",borderRadius:"12px"}}/>
+            : src
+              ? <img className="pc-lb-img" src={src} alt="" onError={e=>{e.target.style.display="none";}}/>
+              : <div style={{color:"#fff",padding:"40px",fontSize:"18px"}}>Média non disponible</div>
+        }
+      </div>
       {idx<medias.length-1 && <button className="pc-lb-nav right" onClick={next}>›</button>}
     </div>
   );
@@ -161,12 +170,13 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
   };
 
   const handleSave = async () => {
+    if (saving) return;
     setSaving(true);
     try {
       const form = new FormData();
-      if (titre)     form.append("titre_publication", titre);
-      if (sousTitre) form.append("sous_titre", sousTitre);
-      if (contenu)   form.append("contenu_publication", contenu);
+      form.append("titre_publication", titre);
+      form.append("sous_titre", sousTitre);
+      form.append("contenu_publication", contenu);
       // IDs des médias à garder
       medias.forEach(m => form.append("kept_media_ids[]", m.id_media||m.id));
       // nouveaux fichiers
@@ -175,10 +185,11 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
       await API.put(`/publications/${publication.id_publication}`, form, {
         headers: { "Content-Type": "multipart/form-data" }
       });
-      onSaved();
       onClose();
+      await onSaved();
     } catch(e) {
       console.error("edit publication:", e?.response?.data||e.message);
+      alert("Erreur lors de la modification. Veuillez réessayer.");
     } finally {
       setSaving(false);
     }
@@ -278,10 +289,11 @@ const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
     setSaving(true);
     try {
       await API.put(`/publications/${pubId}/comments/${comment.id_commentaire}`, { contenu_commentaire: t });
-      onSaved();
       onClose();
+      await onSaved();
     } catch(e) {
       console.error("edit comment:", e?.response?.data||e.message);
+      alert("Erreur lors de la modification. Veuillez réessayer.");
     } finally {
       setSaving(false);
     }
@@ -778,7 +790,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
       </article>
 
       {/* ── lightbox ── */}
-      {lightbox!==null && imgMedias.length>0 && (
+      {lightbox!==null && imgMedias.length>0 && imgMedias[lightbox] && (
         <MediaLightbox
           medias={imgMedias}
           startIndex={lightbox}
@@ -790,7 +802,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
         <EditPublicationModal
           publication={pub}
           onClose={()=>setEditOpen(false)}
-          onSaved={()=>{ if(onUpdate) onUpdate(); }}/>
+          onSaved={async()=>{ if(onUpdate) await onUpdate(); }}/>
       )}
     </>
   );
