@@ -165,67 +165,38 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
   const handleSave = async () => {
     setSaving(true);
     setSaveError("");
-
-    // Construit le FormData (marche pour PATCH et PUT)
-    const buildForm = () => {
+    try {
       const form = new FormData();
       form.append("titre_publication",   titre);
       form.append("sous_titre",          sousTitre);
       form.append("contenu_publication", contenu);
       form.append("contenu",             contenu);
+      // IDs des médias existants à garder
       medias.forEach(m => {
         const id = m.id_media ?? m.id ?? "";
         if (id !== "") form.append("kept_media_ids[]", String(id));
       });
+      // Nouveaux fichiers
       newFiles.forEach(f => form.append("medias", f.file));
-      return form;
-    };
 
-    // Construit le body JSON (fallback si pas de fichiers)
-    const buildJson = () => ({
-      titre_publication:   titre,
-      sous_titre:          sousTitre,
-      contenu_publication: contenu,
-      contenu:             contenu,
-      kept_media_ids: medias.map(m => m.id_media ?? m.id).filter(id => id != null),
-    });
-
-    const id  = publication.id_publication;
-    const hasFiles = newFiles.length > 0;
-
-    // Routes à essayer dans l'ordre
-    const attempts = [
-      () => API.patch(`/publications/${id}`, buildForm(), { headers:{ "Content-Type":"multipart/form-data" }}),
-      () => API.put  (`/publications/${id}`, buildForm(), { headers:{ "Content-Type":"multipart/form-data" }}),
-      ...(!hasFiles ? [
-        () => API.patch(`/publications/${id}`, buildJson()),
-        () => API.put  (`/publications/${id}`, buildJson()),
-      ] : []),
-    ];
-
-    let lastErr = null;
-    for (const tryIt of attempts) {
-      try {
-        await tryIt();
-        onSaved();
-        onClose();
-        return;
-      } catch(e) {
-        lastErr = e;
-        const status = e?.response?.status;
-        // continue only on 404 or 405 (method not allowed)
-        if (status !== 404 && status !== 405) break;
-      }
+      await API.patch(
+        `/publications/${publication.id_publication}`,
+        form,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      onSaved();
+      onClose();
+    } catch(e) {
+      const raw = e?.response?.data;
+      const msg = (typeof raw === "string" && raw.includes("<html"))
+        ? `Erreur ${e?.response?.status} — vérifier le backend`
+        : raw?.message || raw?.error || (typeof raw === "string" ? raw : null)
+          || e.message || "Erreur inconnue";
+      console.error("edit pub:", e?.response?.status, raw);
+      setSaveError(String(msg));
+    } finally {
+      setSaving(false);
     }
-
-    const raw = lastErr?.response?.data;
-    const msg = (typeof raw === "string" && raw.includes("<html"))
-      ? `Erreur ${lastErr?.response?.status} — route introuvable sur le backend`
-      : raw?.message || raw?.error || (typeof raw === "string" ? raw : null)
-        || lastErr?.message || "Erreur inconnue";
-    console.error("edit pub:", lastErr?.response?.status, raw);
-    setSaveError(msg);
-    setSaving(false);
   };
 
   // prevent body scroll
@@ -324,34 +295,23 @@ const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
     const t = text.trim(); if(!t||saving) return;
     setSaving(true);
     setSaveError("");
-    const payload = { contenu_commentaire: t, contenu: t };
-    const routes = [
-      () => API.put(`/publications/${pubId}/comments/${comment.id_commentaire}`, payload),
-      () => API.patch(`/publications/${pubId}/comments/${comment.id_commentaire}`, payload),
-      () => API.put(`/comments/${comment.id_commentaire}`, payload),
-      () => API.patch(`/comments/${comment.id_commentaire}`, payload),
-    ];
-    let lastErr = null;
-    for (const tryRoute of routes) {
-      try {
-        await tryRoute();
-        onSaved();
-        onClose();
-        return;
-      } catch(e) {
-        lastErr = e;
-        const status = e?.response?.status;
-        if (status !== 404 && status !== 405) break;
-      }
+    try {
+      await API.patch(
+        `/publications/${pubId}/comments/${comment.id_commentaire}`,
+        { contenu_commentaire: t, contenu: t }
+      );
+      onSaved();
+      onClose();
+    } catch(e) {
+      const raw = e?.response?.data;
+      const msg = (typeof raw === "string" && raw.includes("<html"))
+        ? `Erreur ${e?.response?.status} — vérifier le backend`
+        : raw?.message || raw?.error || (typeof raw === "string" ? raw : null)
+          || e.message || "Erreur inconnue";
+      console.error("edit comment:", e?.response?.status, raw);
+      setSaveError(String(msg));
+      setSaving(false);
     }
-    const raw = lastErr?.response?.data;
-    const msg = (typeof raw === "string" && raw.includes("<html"))
-      ? `Erreur ${lastErr?.response?.status} — route introuvable sur le backend`
-      : raw?.message || raw?.error || (typeof raw === "string" ? raw : null)
-        || lastErr?.message || "Erreur inconnue";
-    console.error("edit comment:", lastErr?.response?.status, raw);
-    setSaveError(typeof msg === "string" ? msg : JSON.stringify(msg));
-    setSaving(false);
   };
 
   useEffect(()=>{ document.body.style.overflow="hidden"; return()=>{ document.body.style.overflow=""; }; },[]);
