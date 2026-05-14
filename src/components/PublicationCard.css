@@ -585,13 +585,22 @@
   border-radius: 10px;
   overflow     : hidden;
   border       : 1.5px solid rgba(90,63,160,0.14);
-  background   : #f8f5ff;
+  background   : #f0eeff;
   aspect-ratio : 1;
   display      : flex;
   align-items  : center;
   justify-content: center;
+  min-height   : 80px;
 }
-.pc-modal-media-item img { width:100%; height:100%; object-fit:cover; display:block; }
+.pc-modal-media-item img {
+  position  : absolute;
+  inset     : 0;
+  width     : 100%;
+  height    : 100%;
+  object-fit: cover;
+  display   : block;
+  border-radius: 9px;
+}
 .pc-modal-media-pdf { font-size:11px; font-weight:700; color:#5a3fa0; text-align:center; padding:4px; }
 .pc-modal-media-del {
   position  : absolute; top:4px; right:4px;

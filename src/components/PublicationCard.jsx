@@ -226,12 +226,21 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
               <label className="pc-modal-label">Médias actuels</label>
               <div className="pc-modal-media-list">
                 {medias.map((m,i)=>{
-                  const src = getSrc(m);
+                  const src  = getSrc(m);
+                  const type = m.type_media || (isPdf(m)?"pdf": isVid(m)?"video":"image");
                   return (
                     <div key={i} className="pc-modal-media-item">
-                      {isPdf(m) ? <span className="pc-modal-media-pdf">📄 PDF</span>
-                       : isVid(m) ? <span className="pc-modal-media-pdf">🎥 Vidéo</span>
-                       : <img src={src} alt="" onError={e=>{e.target.style.display="none";}}/>}
+                      {type==="pdf"
+                        ? <span className="pc-modal-media-pdf">📄<br/>PDF</span>
+                        : type==="video"
+                        ? <span className="pc-modal-media-pdf">🎥<br/>Vidéo</span>
+                        : src
+                        ? <img src={src} alt=""
+                            style={{position:"absolute",inset:0,width:"100%",height:"100%",objectFit:"cover",borderRadius:"9px"}}
+                            onError={e=>{e.target.replaceWith(Object.assign(document.createElement("span"),{className:"pc-modal-media-pdf",textContent:"🖼️"}));}}
+                          />
+                        : <span className="pc-modal-media-pdf">🖼️</span>
+                      }
                       <button className="pc-modal-media-del" onClick={()=>removeExisting(i)} type="button" title="Supprimer">✕</button>
                     </div>
                   );
@@ -556,10 +565,12 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const inputRef    = useRef(null);
   const stkRef      = useRef(null);
 
+  const isAdmin = currentUser?.role === "admin";
+  // Owner = proprio de la publication OU admin
   const isOwner = currentUser && (
-    currentUser.id_user === pub.id_user ||
-    currentUser.id === pub.id_user ||
-    currentUser.role === "admin"
+    currentUser.id_user === pub.user_id ||
+    currentUser.id      === pub.user_id ||
+    isAdmin
   );
 
   useEffect(()=>{
@@ -667,10 +678,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
               )}
             </div>
           </div>
-          {pubMenuItems.length > 0
-            ? <DotsMenu items={pubMenuItems}/>
-            : <button className="pc-more" type="button" aria-label="Options"><DotsIcon/></button>
-          }
+          {pubMenuItems.length > 0 && <DotsMenu items={pubMenuItems}/>}
         </div>
 
         {/* ── body ── */}
