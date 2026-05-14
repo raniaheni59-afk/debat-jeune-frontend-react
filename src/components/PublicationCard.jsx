@@ -99,17 +99,19 @@ const StickerPicker = ({ onPick, onClose }) => {
   },[onClose]);
   return (
     <div className="pc-stk-picker" ref={ref}>
-      <div className="pc-stk-tabs">
-        {STICKERS.map((s,i)=>(
-          <button key={i} className={`pc-stk-tab${cat===i?" on":""}`}
-            onClick={()=>setCat(i)} type="button">{s.cat}</button>
-        ))}
-      </div>
-      <div className="pc-stk-grid">
-        {STICKERS[cat].items.map((s,i)=>(
-          <button key={i} className="pc-stk-btn"
-            onClick={()=>{onPick(s);onClose();}} type="button">{s}</button>
-        ))}
+      <div className="pc-stk-inner">
+        <div className="pc-stk-tabs">
+          {STICKERS.map((s,i)=>(
+            <button key={i} className={`pc-stk-tab${cat===i?" on":""}`}
+              onClick={()=>setCat(i)} type="button">{s.cat}</button>
+          ))}
+        </div>
+        <div className="pc-stk-grid">
+          {STICKERS[cat].items.map((s,i)=>(
+            <button key={i} className="pc-stk-btn"
+              onClick={(e)=>{e.stopPropagation();onPick(s);onClose();}} type="button">{s}</button>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -210,6 +212,7 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
           <span>Modifier la publication</span>
           <button className="pc-modal-close" onClick={onClose} type="button">✕</button>
         </div>
+        {saving && <div className="pc-modal-progress"><div className="pc-modal-progress-bar"/></div>}
 
         <div className="pc-modal-body">
           <label className="pc-modal-label">Titre</label>
@@ -523,7 +526,18 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
                   </button>
                 </div>
               </div>
-              {stkOpen && <StickerPicker onPick={s=>{setReplyText(t=>t+s);setStkOpen(false);}} onClose={()=>setStkOpen(false)}/>}
+              {stkOpen && <StickerPicker
+                onPick={s=>{
+                  setStkOpen(false);
+                  if(!replyText.trim()){
+                    // Envoyer le sticker seul
+                    setReplyText(s);
+                    setTimeout(()=>sendReply(),0);
+                  } else {
+                    setReplyText(t=>t+s);
+                  }
+                }}
+                onClose={()=>setStkOpen(false)}/>}
             </div>
           )}
 
