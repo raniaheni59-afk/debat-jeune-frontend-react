@@ -73,9 +73,12 @@ const ReactionPicker = ({ onPick, current, mini }) => (
 
 /* ─── ReactionSummary ───────────────────────────────────────── */
 const ReactionSummary = ({ counts={} }) => {
-  const top = REACTIONS.filter(r=>(counts[r.key]||0)>0)
-    .sort((a,b)=>(counts[b.key]||0)-(counts[a.key]||0)).slice(0,3);
-  const total = Object.values(counts).reduce((s,v)=>s+v,0);
+  // Force all values to numbers (MySQL can return strings)
+  const nc = {};
+  for (const k of Object.keys(counts)) nc[k] = Number(counts[k])||0;
+  const top = REACTIONS.filter(r=>(nc[r.key]||0)>0)
+    .sort((a,b)=>(nc[b.key]||0)-(nc[a.key]||0)).slice(0,3);
+  const total = Object.values(nc).reduce((s,v)=>s+v,0);
   if (!total) return null;
   return (
     <span className="pc-rs">
@@ -400,7 +403,12 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const [replySending, setReplySending] = useState(false);
   const [showReplies,  setShowReplies]  = useState(false);
   const [myReaction,   setMyReaction]   = useState(comment.my_reaction||null);
-  const [counts,       setCounts]       = useState(comment.reaction_counts||{});
+  const [counts,       setCounts]       = useState(()=>{
+    const raw = comment.reaction_counts||{};
+    const nc = {};
+    for (const k of Object.keys(raw)) nc[k] = Number(raw[k])||0;
+    return nc;
+  });
   const [pickerOpen,   setPickerOpen]   = useState(false);
   const [stkOpen,      setStkOpen]      = useState(false);
   const [editOpen,     setEditOpen]     = useState(false);
@@ -546,7 +554,12 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const [cmtText,    setCmtText]    = useState("");
   const [cmtSending, setCmtSending] = useState(false);
   const [myReaction, setMyReaction] = useState(publication.my_reaction||null);
-  const [counts,     setCounts]     = useState(publication.reaction_counts||{});
+  const [counts,     setCounts]     = useState(()=>{
+    const raw = publication.reaction_counts||{};
+    const nc = {};
+    for (const k of Object.keys(raw)) nc[k] = Number(raw[k])||0;
+    return nc;
+  });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [stkOpen,    setStkOpen]    = useState(false);
   const [lightbox,   setLightbox]   = useState(null);
@@ -594,8 +607,8 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
     setTimeout(()=>inputRef.current?.focus(),200);
   };
 
-  const sendComment = async()=>{
-    const t=cmtText.trim(); if(!t||cmtSending) return;
+  const sendComment = async(text_override)=>{
+    const t=(text_override||cmtText).trim(); if(!t||cmtSending) return;
     setCmtSending(true);
     try {
       await API.post(`/publications/${pub.id_publication}/comments`,{ contenu_commentaire:t });
@@ -786,11 +799,21 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
                       onClick={()=>setStkOpen(o=>!o)} title="Stickers">😊</button>
                     {stkOpen && (
                       <StickerPicker
-                        onPick={s=>{setCmtText(t=>t+s);setStkOpen(false);inputRef.current?.focus();}}
+                        onPick={s=>{
+                          setStkOpen(false);
+                          if(!cmtText.trim()){
+                            // Envoyer le sticker seul directement
+                            sendComment(s);
+                          } else {
+                            // Ajouter au texte existant
+                            setCmtText(t=>t+s);
+                            inputRef.current?.focus();
+                          }
+                        }}
                         onClose={()=>setStkOpen(false)}/>
                     )}
                   </div>
-                  <button className="pc-send-btn" onClick={sendComment}
+                  <button className="pc-send-btn" onClick={()=>sendComment()}
                     disabled={!cmtText.trim()||cmtSending} type="button">
                     {cmtSending?<div className="pc-btn-spin"/>:<SendIcon/>}
                   </button>
