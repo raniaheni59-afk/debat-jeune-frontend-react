@@ -2,82 +2,67 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import API from "../services/api";
 import "./PublicationCard.css";
 
-/* ─── current user from localStorage ─── */
+/* ─── current user ──────────────────────────────────────────── */
 const getCurrentUser = () => {
-  try {
-    const u = localStorage.getItem("user");
-    return u ? JSON.parse(u) : null;
-  } catch { return null; }
+  try { const u = localStorage.getItem("user"); return u ? JSON.parse(u) : null; }
+  catch { return null; }
 };
 
-/* ─── helpers ─── */
+/* ─── URL helper ────────────────────────────────────────────── */
 const BACKEND = (() => {
-  const base = API.defaults.baseURL || "";
-  // strip /api or /api/ suffix to get root URL
+  const base = (API.defaults?.baseURL || "");
   return base.replace(/\/api\/?$/, "").replace(/\/$/, "");
 })();
 
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  // ensure single slash between backend and path
-  const clean = p.startsWith("/") ? p : `/${p}`;
-  return `${BACKEND}${clean}`;
+  return `${BACKEND}${p.startsWith("/") ? p : `/${p}`}`;
 };
 
 const avatar = (name) =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || "U")}&background=5a3fa0&color=fff&size=80`;
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name||"U")}&background=5a3fa0&color=fff&size=80`;
 
 const timeAgo = (d) => {
   if (!d) return "";
   const s = (Date.now() - new Date(d)) / 1000;
   if (s < 60) return "À l'instant";
-  if (s < 3600) return `${Math.floor(s / 60)} min`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  if (s < 604800) return `${Math.floor(s / 86400)}j`;
+  if (s < 3600) return `${Math.floor(s/60)} min`;
+  if (s < 86400) return `${Math.floor(s/3600)}h`;
+  if (s < 604800) return `${Math.floor(s/86400)}j`;
   return new Date(d).toLocaleDateString("fr-FR");
 };
 
-const getMediaSrc = (m) => getMediaUrl(m.url_media || m.chemin_fichier || m.url || "");
+const getSrc   = (m) => getMediaUrl(m.url_media || m.chemin_fichier || m.url || "");
+const isImg    = (m) => { const s=getSrc(m)||""; return m.type_media==="image"||/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(s); };
+const isVid    = (m) => { const s=getSrc(m)||""; return m.type_media==="video"||/\.(mp4|webm|ogg|mov|avi)(\?|$)/i.test(s); };
+const isPdf    = (m) => { const s=getSrc(m)||""; return m.type_media==="pdf"||/\.pdf(\?|$)/i.test(s); };
 
-const isImageMedia = (m) => {
-  const src = getMediaSrc(m) || "";
-  return m.type_media === "image" || /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(src);
-};
-const isVideoMedia = (m) => {
-  const src = getMediaSrc(m) || "";
-  return m.type_media === "video" || /\.(mp4|webm|ogg|mov|avi)(\?|$)/i.test(src);
-};
-const isPdfMedia = (m) => {
-  const src = getMediaSrc(m) || "";
-  return m.type_media === "pdf" || /\.pdf(\?|$)/i.test(src);
-};
-
-/* ─── data ─── */
+/* ─── data ──────────────────────────────────────────────────── */
 const REACTIONS = [
-  { key: "like",  emoji: "👍", label: "J'aime"  },
-  { key: "love",  emoji: "❤️", label: "J'adore" },
-  { key: "haha",  emoji: "😂", label: "Haha"    },
-  { key: "wow",   emoji: "😮", label: "Wow"     },
-  { key: "sad",   emoji: "😢", label: "Triste"  },
-  { key: "angry", emoji: "😡", label: "Grrrr"   },
+  { key:"like",  emoji:"👍", label:"J'aime"  },
+  { key:"love",  emoji:"❤️", label:"J'adore" },
+  { key:"haha",  emoji:"😂", label:"Haha"    },
+  { key:"wow",   emoji:"😮", label:"Wow"     },
+  { key:"sad",   emoji:"😢", label:"Triste"  },
+  { key:"angry", emoji:"😡", label:"Grrrr"   },
 ];
 
 const STICKERS = [
-  { cat: "😄", items: ["😀","😂","🤣","😍","🥰","😎","🤩","😭","😤","🥺","😅","😇","🤔","😏","🙄","😬","🥳","😴","🤯","😱"] },
-  { cat: "👋", items: ["👍","👎","👏","🙌","🤝","✌️","🤞","👌","🤌","💪","🫶","🤙","☝️","👊","🫂","🙏","🤲","👐","🫁","💅"] },
-  { cat: "❤️", items: ["❤️","🧡","💛","💚","💙","💜","🖤","🤍","💕","💞","💓","💗","💖","💘","💝","💔","❣️","💟","🩷","🩵"] },
-  { cat: "🎉", items: ["🎉","🎊","🎈","🎁","🥂","🍾","🎂","🎆","🎇","✨","🌟","⭐","🏆","🥇","🎖️","🎗️","🎟️","🎠","🎡","🎢"] },
-  { cat: "🐾", items: ["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🦁","🐯","🐸","🐵","🦄","🐧","🦋","🐝","🦅","🦜","🐙"] },
-  { cat: "🍕", items: ["🍕","🍔","🌮","🍜","🍣","🍰","🎂","🧁","🍩","🍪","🍫","🥗","🍱","🍛","☕","🧋","🥤","🍺","🧃","🍭"] },
+  { cat:"😄", items:["😀","😂","🤣","😍","🥰","😎","🤩","😭","😤","🥺","😅","😇","🤔","😏","🙄","😬","🥳","😴","🤯","😱"] },
+  { cat:"👋", items:["👍","👎","👏","🙌","🤝","✌️","🤞","👌","🤌","💪","🫶","🤙","☝️","👊","🫂","🙏","🤲","👐","🫁","💅"] },
+  { cat:"❤️", items:["❤️","🧡","💛","💚","💙","💜","🖤","🤍","💕","💞","💓","💗","💖","💘","💝","💔","❣️","💟","🩷","🩵"] },
+  { cat:"🎉", items:["🎉","🎊","🎈","🎁","🥂","🍾","🎂","🎆","🎇","✨","🌟","⭐","🏆","🥇","🎖️","🎗️","🎟️","🎠","🎡","🎢"] },
+  { cat:"🐾", items:["🐶","🐱","🐭","🐹","🐰","🦊","🐻","🐼","🐨","🦁","🐯","🐸","🐵","🦄","🐧","🦋","🐝","🦅","🦜","🐙"] },
+  { cat:"🍕", items:["🍕","🍔","🌮","🍜","🍣","🍰","🎂","🧁","🍩","🍪","🍫","🥗","🍱","🍛","☕","🧋","🥤","🍺","🧃","🍭"] },
 ];
 
-/* ─── ReactionPicker ─── */
+/* ─── ReactionPicker ────────────────────────────────────────── */
 const ReactionPicker = ({ onPick, current, mini }) => (
-  <div className={`pc-rpicker${mini ? " mini" : ""}`}>
-    {REACTIONS.map((r) => (
-      <button key={r.key} className={`pc-rp-btn${current === r.key ? " on" : ""}`}
-        onClick={() => onPick(r.key)} title={r.label} type="button">
+  <div className={`pc-rpicker${mini?" mini":""}`}>
+    {REACTIONS.map(r=>(
+      <button key={r.key} className={`pc-rp-btn${current===r.key?" on":""}`}
+        onClick={()=>onPick(r.key)} title={r.label} type="button">
         <span className="pc-rp-e">{r.emoji}</span>
         {!mini && <span className="pc-rp-l">{r.label}</span>}
       </button>
@@ -85,194 +70,190 @@ const ReactionPicker = ({ onPick, current, mini }) => (
   </div>
 );
 
-/* ─── ReactionSummary ─── */
-const ReactionSummary = ({ counts = {} }) => {
-  const top = REACTIONS
-    .filter(r => (counts[r.key] || 0) > 0)
-    .sort((a, b) => (counts[b.key] || 0) - (counts[a.key] || 0))
-    .slice(0, 3);
-  const total = Object.values(counts).reduce((s, v) => s + v, 0);
+/* ─── ReactionSummary ───────────────────────────────────────── */
+const ReactionSummary = ({ counts={} }) => {
+  const top = REACTIONS.filter(r=>(counts[r.key]||0)>0)
+    .sort((a,b)=>(counts[b.key]||0)-(counts[a.key]||0)).slice(0,3);
+  const total = Object.values(counts).reduce((s,v)=>s+v,0);
   if (!total) return null;
   return (
     <span className="pc-rs">
-      {top.map(r => <span key={r.key} className="pc-rs-e">{r.emoji}</span>)}
+      {top.map(r=><span key={r.key} className="pc-rs-e">{r.emoji}</span>)}
       <span className="pc-rs-n">{total}</span>
     </span>
   );
 };
 
-/* ─── StickerPicker ─── */
+/* ─── StickerPicker ─────────────────────────────────────────── */
 const StickerPicker = ({ onPick, onClose }) => {
-  const [cat, setCat] = useState(0);
+  const [cat,setCat] = useState(0);
   const ref = useRef(null);
-  useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
-    setTimeout(() => document.addEventListener("mousedown", h), 10);
-    return () => document.removeEventListener("mousedown", h);
-  }, [onClose]);
+  useEffect(()=>{
+    const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) onClose(); };
+    setTimeout(()=>document.addEventListener("mousedown",h),10);
+    return ()=>document.removeEventListener("mousedown",h);
+  },[onClose]);
   return (
     <div className="pc-stk-picker" ref={ref}>
       <div className="pc-stk-tabs">
-        {STICKERS.map((s, i) => (
-          <button key={i} className={`pc-stk-tab${cat === i ? " on" : ""}`}
-            onClick={() => setCat(i)} type="button">{s.cat}</button>
+        {STICKERS.map((s,i)=>(
+          <button key={i} className={`pc-stk-tab${cat===i?" on":""}`}
+            onClick={()=>setCat(i)} type="button">{s.cat}</button>
         ))}
       </div>
       <div className="pc-stk-grid">
-        {STICKERS[cat].items.map((s, i) => (
+        {STICKERS[cat].items.map((s,i)=>(
           <button key={i} className="pc-stk-btn"
-            onClick={() => { onPick(s); onClose(); }} type="button">{s}</button>
+            onClick={()=>{onPick(s);onClose();}} type="button">{s}</button>
         ))}
       </div>
     </div>
   );
 };
 
-/* ─── Comment ─── */
-const Comment = ({ comment, pubId, onRefresh, depth = 0 }) => {
+/* ─── MediaLightbox — affiche 1 photo à la fois avec nav ─────── */
+const MediaLightbox = ({ medias, startIndex, onClose }) => {
+  const [idx, setIdx] = useState(startIndex);
+  const m = medias[idx];
+  const src = getSrc(m);
+
+  const prev = (e) => { e.stopPropagation(); setIdx(i=>Math.max(0,i-1)); };
+  const next = (e) => { e.stopPropagation(); setIdx(i=>Math.min(medias.length-1,i+1)); };
+
+  useEffect(()=>{
+    const h=(e)=>{ if(e.key==="Escape") onClose(); if(e.key==="ArrowLeft") setIdx(i=>Math.max(0,i-1)); if(e.key==="ArrowRight") setIdx(i=>Math.min(medias.length-1,i+1)); };
+    document.addEventListener("keydown",h);
+    return ()=>document.removeEventListener("keydown",h);
+  },[medias.length, onClose]);
+
+  return (
+    <div className="pc-lightbox" onClick={onClose}>
+      <button className="pc-lb-close" onClick={onClose}>✕</button>
+      <div className="pc-lb-counter">{idx+1} / {medias.length}</div>
+      {idx>0 && <button className="pc-lb-nav left" onClick={prev}>‹</button>}
+      <img className="pc-lb-img" src={src} alt="" onClick={e=>e.stopPropagation()} />
+      {idx<medias.length-1 && <button className="pc-lb-nav right" onClick={next}>›</button>}
+    </div>
+  );
+};
+
+/* ─── Comment ───────────────────────────────────────────────── */
+const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const [replyOpen,    setReplyOpen]    = useState(false);
   const [replyText,    setReplyText]    = useState("");
   const [replySending, setReplySending] = useState(false);
   const [showReplies,  setShowReplies]  = useState(false);
-  const [myReaction,   setMyReaction]   = useState(comment.my_reaction || null);
-  const [counts,       setCounts]       = useState(comment.reaction_counts || {});
+  const [myReaction,   setMyReaction]   = useState(comment.my_reaction||null);
+  const [counts,       setCounts]       = useState(comment.reaction_counts||{});
   const [pickerOpen,   setPickerOpen]   = useState(false);
   const [stkOpen,      setStkOpen]      = useState(false);
   const picRef = useRef(null);
 
-  useEffect(() => {
-    const h = (e) => { if (picRef.current && !picRef.current.contains(e.target)) setPickerOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  useEffect(()=>{
+    const h=(e)=>{ if(picRef.current&&!picRef.current.contains(e.target)) setPickerOpen(false); };
+    document.addEventListener("mousedown",h);
+    return ()=>document.removeEventListener("mousedown",h);
+  },[]);
 
-  const reactCmt = async (key) => {
+  const reactCmt = async(key)=>{
     setPickerOpen(false);
-    const same = myReaction === key, prev = myReaction;
-    setMyReaction(same ? null : key);
-    setCounts(c => {
-      const n = { ...c };
-      if (prev) n[prev] = Math.max(0, (n[prev] || 1) - 1);
-      if (!same) n[key] = (n[key] || 0) + 1;
-      return n;
-    });
-    try {
-      await API.post(
-        `/publications/${pubId}/comments/${comment.id_commentaire}/react`,
-        { type_reaction: same ? null : key }
-      );
-    } catch { onRefresh(); }
+    const same=myReaction===key, prev=myReaction;
+    setMyReaction(same?null:key);
+    setCounts(c=>{ const n={...c}; if(prev) n[prev]=Math.max(0,(n[prev]||1)-1); if(!same) n[key]=(n[key]||0)+1; return n; });
+    try { await API.post(`/publications/${pubId}/comments/${comment.id_commentaire}/react`,{type_reaction:same?null:key}); }
+    catch { onRefresh(); }
   };
 
-  const sendReply = async () => {
-    const t = replyText.trim();
-    if (!t || replySending) return;
+  const sendReply = async()=>{
+    const t=replyText.trim(); if(!t||replySending) return;
     setReplySending(true);
     try {
-      await API.post(`/publications/${pubId}/comments`, {
-        contenu_commentaire: t,
-        parent_id: comment.id_commentaire,
-      });
-      setReplyText("");
-      setReplyOpen(false);
-      onRefresh();
-    } catch (e) {
-      console.error("reply err:", e?.response?.data || e.message);
-    } finally {
-      setReplySending(false);
-    }
+      await API.post(`/publications/${pubId}/comments`,{ contenu_commentaire:t, parent_id:comment.id_commentaire });
+      setReplyText(""); setReplyOpen(false); onRefresh();
+    } catch(e){ console.error("reply:",e?.response?.data||e.message); }
+    finally{ setReplySending(false); }
   };
 
-  const myDef  = REACTIONS.find(r => r.key === myReaction);
-  const replies = comment.replies || [];
+  const myDef  = REACTIONS.find(r=>r.key===myReaction);
+  const replies= comment.replies||[];
 
   return (
-    <div className={`pc-cmt${depth > 0 ? " nested" : ""}`}>
-      {depth > 0 && <div className="pc-nest-line" />}
+    <div className={`pc-cmt${depth>0?" nested":""}`}>
+      {depth>0 && <div className="pc-nest-line"/>}
       <img className="pc-cmt-ava"
-        src={getMediaUrl(comment.photo_user) || avatar(comment.prenom_user)}
+        src={getMediaUrl(comment.photo_user)||avatar(comment.prenom_user)}
         alt={comment.prenom_user}
-        onError={e => { e.target.src = avatar(comment.prenom_user); }} />
+        onError={e=>{e.target.src=avatar(comment.prenom_user);}}/>
       <div className="pc-cmt-right">
         <div className="pc-cmt-bubble">
           <span className="pc-cmt-nm">{comment.prenom_user} {comment.nom_user}</span>
-          <p className="pc-cmt-txt">{comment.contenu_commentaire}</p>
+          <p className="pc-cmt-txt">{comment.contenu_commentaire||comment.contenu}</p>
         </div>
-        <ReactionSummary counts={counts} />
+        <ReactionSummary counts={counts}/>
         <div className="pc-cmt-meta">
           <span className="pc-cmt-time">{timeAgo(comment.created_at)}</span>
           <div className="pc-cmt-rpick-wrap" ref={picRef}>
-            <button className={`pc-cmt-act${myReaction ? " on" : ""}`}
-              onClick={() => setPickerOpen(o => !o)} type="button">
-              {myDef ? `${myDef.emoji} ${myDef.label}` : "👍 J'aime"}
+            <button className={`pc-cmt-act${myReaction?" on":""}`}
+              onClick={()=>setPickerOpen(o=>!o)} type="button">
+              {myDef?`${myDef.emoji} ${myDef.label}`:"👍 J'aime"}
             </button>
-            {pickerOpen && <ReactionPicker onPick={reactCmt} current={myReaction} mini />}
+            {pickerOpen && <ReactionPicker onPick={reactCmt} current={myReaction} mini/>}
           </div>
-          {depth < 2 && (
-            <button className="pc-cmt-act" onClick={() => setReplyOpen(o => !o)} type="button">
-              Répondre
-            </button>
+          {depth<2 && (
+            <button className="pc-cmt-act" onClick={()=>setReplyOpen(o=>!o)} type="button">Répondre</button>
           )}
-          {replies.length > 0 && (
-            <button className="pc-cmt-act accent" onClick={() => setShowReplies(o => !o)} type="button">
-              {showReplies ? "Masquer" : `${replies.length} réponse${replies.length > 1 ? "s" : ""}`}
+          {replies.length>0 && (
+            <button className="pc-cmt-act accent" onClick={()=>setShowReplies(o=>!o)} type="button">
+              {showReplies?"Masquer":`${replies.length} réponse${replies.length>1?"s":""}`}
             </button>
           )}
         </div>
 
-        {/* Reply input */}
         {replyOpen && (
           <div className="pc-reply-row">
             <div className="pc-reply-box">
               <input className="pc-reply-inp"
                 placeholder={`Répondre à ${comment.prenom_user}…`}
                 value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendReply()}
-                autoFocus />
+                onChange={e=>setReplyText(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendReply()}
+                autoFocus/>
               <div className="pc-reply-acts">
-                <button className="pc-cmt-emoji-btn" type="button" onClick={() => setStkOpen(o => !o)}>😊</button>
-                <button className="pc-send-btn"
-                  onClick={sendReply}
-                  disabled={!replyText.trim() || replySending}
-                  type="button">
-                  {replySending ? <div className="pc-btn-spin" /> : <SendIcon />}
+                <button className="pc-cmt-emoji-btn" type="button" onClick={()=>setStkOpen(o=>!o)}>😊</button>
+                <button className="pc-send-btn" onClick={sendReply}
+                  disabled={!replyText.trim()||replySending} type="button">
+                  {replySending?<div className="pc-btn-spin"/>:<SendIcon/>}
                 </button>
               </div>
             </div>
-            {stkOpen && (
-              <StickerPicker
-                onPick={s => { setReplyText(t => t + s); setStkOpen(false); }}
-                onClose={() => setStkOpen(false)} />
-            )}
+            {stkOpen && <StickerPicker onPick={s=>{setReplyText(t=>t+s);setStkOpen(false);}} onClose={()=>setStkOpen(false)}/>}
           </div>
         )}
 
-        {/* Nested replies */}
-        {showReplies && replies.map(r => (
-          <Comment key={r.id_commentaire} comment={r} pubId={pubId} onRefresh={onRefresh} depth={depth + 1} />
+        {showReplies && replies.map(r=>(
+          <Comment key={r.id_commentaire} comment={r} pubId={pubId} onRefresh={onRefresh} depth={depth+1}/>
         ))}
       </div>
     </div>
   );
 };
 
-/* ═══════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════
    MAIN CARD
-═══════════════════════════════════════════════ */
-export default function PublicationCard({ publication, onUpdate, defaultShowComments = false }) {
+═══════════════════════════════════════════════════════════════ */
+export default function PublicationCard({ publication, onUpdate, defaultShowComments=false }) {
   const [showCmts,   setShowCmts]   = useState(defaultShowComments);
   const [comments,   setComments]   = useState([]);
   const [cmtLoading, setCmtLoading] = useState(false);
   const [cmtText,    setCmtText]    = useState("");
   const [cmtSending, setCmtSending] = useState(false);
-  const [myReaction, setMyReaction] = useState(publication.my_reaction || null);
-  const [counts,     setCounts]     = useState(publication.reaction_counts || {});
+  const [myReaction, setMyReaction] = useState(publication.my_reaction||null);
+  const [counts,     setCounts]     = useState(publication.reaction_counts||{});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [stkOpen,    setStkOpen]    = useState(false);
-  const [lightbox,   setLightbox]   = useState(null);
+  const [lightbox,   setLightbox]   = useState(null); // index or null
   const [expanded,   setExpanded]   = useState(false);
-  const [cmtCount,   setCmtCount]   = useState(publication.nb_commentaires ?? 0);
+  const [cmtCount,   setCmtCount]   = useState(publication.nb_commentaires??0);
 
   const currentUser = getCurrentUser();
   const pub         = publication;
@@ -280,81 +261,73 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const inputRef    = useRef(null);
   const stkRef      = useRef(null);
 
-  /* close reaction picker on outside click */
-  useEffect(() => {
-    const h = (e) => { if (picRef.current && !picRef.current.contains(e.target)) setPickerOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
+  useEffect(()=>{
+    const h=(e)=>{ if(picRef.current&&!picRef.current.contains(e.target)) setPickerOpen(false); };
+    document.addEventListener("mousedown",h);
+    return ()=>document.removeEventListener("mousedown",h);
+  },[]);
 
-  useEffect(() => { if (defaultShowComments) loadComments(); }, []);
+  useEffect(()=>{ if(defaultShowComments) loadComments(); },[]);
 
   /* ── load comments ── */
-  const loadComments = useCallback(async () => {
+  const loadComments = useCallback(async()=>{
     setCmtLoading(true);
     try {
       const res  = await API.get(`/publications/${pub.id_publication}/comments`);
-      const list = Array.isArray(res.data) ? res.data : [];
+      const list = Array.isArray(res.data)?res.data:[];
       setComments(list);
-      // count root comments + all nested replies
-      const countAll = (arr) => arr.reduce((s, c) => s + 1 + (c.replies?.length || 0), 0);
+      const countAll=(arr)=>arr.reduce((s,c)=>s+1+(c.replies?.length||0),0);
       setCmtCount(countAll(list));
     } catch { setComments([]); }
     finally  { setCmtLoading(false); }
-  }, [pub.id_publication]);
+  },[pub.id_publication]);
 
-  const toggleCmts = () => {
-    if (!showCmts) loadComments();
-    setShowCmts(o => !o);
-    setTimeout(() => inputRef.current?.focus(), 200);
+  const toggleCmts = ()=>{
+    if(!showCmts) loadComments();
+    setShowCmts(o=>!o);
+    setTimeout(()=>inputRef.current?.focus(),200);
   };
 
   /* ── send comment ── */
-  const sendComment = async () => {
-    const t = cmtText.trim();
-    if (!t || cmtSending) return;
+  const sendComment = async()=>{
+    const t=cmtText.trim(); if(!t||cmtSending) return;
     setCmtSending(true);
     try {
-      await API.post(`/publications/${pub.id_publication}/comments`, {
-        contenu_commentaire: t,
-      });
+      await API.post(`/publications/${pub.id_publication}/comments`,{ contenu_commentaire:t });
       setCmtText("");
       await loadComments();
       onUpdate?.();
-    } catch (e) {
-      console.error("comment error:", e?.response?.status, e?.response?.data || e.message);
-    } finally {
-      setCmtSending(false);
-    }
+    } catch(e){ console.error("comment:",e?.response?.status, e?.response?.data||e.message); }
+    finally{ setCmtSending(false); }
   };
 
-  /* ── react to publication ── */
-  const reactPub = async (key) => {
+  /* ── react publication ── */
+  const reactPub = async(key)=>{
     setPickerOpen(false);
-    const same = myReaction === key, prev = myReaction;
-    setMyReaction(same ? null : key);
-    setCounts(c => {
-      const n = { ...c };
-      if (prev) n[prev] = Math.max(0, (n[prev] || 1) - 1);
-      if (!same) n[key] = (n[key] || 0) + 1;
-      return n;
-    });
+    const same=myReaction===key, prev=myReaction;
+    setMyReaction(same?null:key);
+    setCounts(c=>{ const n={...c}; if(prev) n[prev]=Math.max(0,(n[prev]||1)-1); if(!same) n[key]=(n[key]||0)+1; return n; });
     try {
-      await API.post(`/publications/${pub.id_publication}/react`, { type_reaction: same ? null : key });
+      await API.post(`/publications/${pub.id_publication}/react`,{ type_reaction:same?null:key });
       onUpdate?.();
     } catch { onUpdate?.(); }
   };
 
-  const myDef    = REACTIONS.find(r => r.key === myReaction);
-  const media    = pub.medias || [];
-  const body     = pub.contenu_publication || pub.contenu || "";
-  const isLong   = body.length > 280;
-  const totalCmt = cmtCount;
+  const myDef  = REACTIONS.find(r=>r.key===myReaction);
+  const media  = pub.medias||[];
+  const body   = pub.contenu_publication||pub.contenu||"";
+  const isLong = body.length>280;
 
-  /* split media by type */
-  const pdfMedias  = media.filter(isPdfMedia);
-  const viewMedias = media.filter(m => !isPdfMedia(m));
-  const imgMedias  = viewMedias.filter(isImageMedia);
+  /* split media */
+  const pdfMedias  = media.filter(isPdf);
+  const imgMedias  = media.filter(m=>!isPdf(m)&&isImg(m));
+  const vidMedias  = media.filter(m=>!isPdf(m)&&isVid(m));
+
+  /* grid layout for images */
+  const gridClass = imgMedias.length===1?"pc-media-1"
+                  : imgMedias.length===2?"pc-media-2"
+                  : imgMedias.length===3?"pc-media-3"
+                  : "pc-media-4";
 
   return (
     <>
@@ -362,45 +335,45 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
         {/* ── header ── */}
         <div className="pc-header">
           <img className="pc-ava"
-            src={getMediaUrl(pub.photo_user) || avatar(pub.prenom_user || "U")}
+            src={getMediaUrl(pub.photo_user)||avatar(pub.prenom_user||"U")}
             alt={pub.prenom_user}
-            onError={e => { e.target.src = avatar(pub.prenom_user || "U"); }} />
+            onError={e=>{e.target.src=avatar(pub.prenom_user||"U");}}/>
           <div className="pc-author">
             <span className="pc-nm">{pub.prenom_user} {pub.nom_user}</span>
             <div className="pc-meta">
-              <span className="pc-time">{timeAgo(pub.created_at)}</span>
+              <span className="pc-time">{timeAgo(pub.created_at||pub.date_publication)}</span>
               {pub.type_publication && (
                 <span className="pc-type">
-                  {pub.type_publication === "debat" && "⚖️ Débat"}
-                  {pub.type_publication === "photo" && "📷 Photo"}
-                  {pub.type_publication === "video" && "🎥 Vidéo"}
-                  {pub.type_publication === "pdf"   && "📄 PDF"}
-                  {pub.type_publication === "texte" && "📝 Texte"}
+                  {pub.type_publication==="debat"&&"⚖️ Débat"}
+                  {pub.type_publication==="photo"&&"📷 Photo"}
+                  {pub.type_publication==="video"&&"🎥 Vidéo"}
+                  {pub.type_publication==="pdf"  &&"📄 PDF"}
+                  {pub.type_publication==="texte"&&"📝 Texte"}
                 </span>
               )}
             </div>
           </div>
-          <button className="pc-more" type="button" aria-label="Options"><DotsIcon /></button>
+          <button className="pc-more" type="button" aria-label="Options"><DotsIcon/></button>
         </div>
 
-        {/* ── body text ── */}
+        {/* ── body ── */}
         {pub.titre_publication && <h3 className="pc-title">{pub.titre_publication}</h3>}
         {body && (
           <p className="pc-body">
-            {isLong && !expanded ? body.slice(0, 280) + "… " : body}
-            {isLong && (
-              <button className="pc-more-txt" onClick={() => setExpanded(o => !o)} type="button">
-                {expanded ? "Voir moins" : "Voir plus"}
+            {isLong&&!expanded?body.slice(0,280)+"… ":body}
+            {isLong&&(
+              <button className="pc-more-txt" onClick={()=>setExpanded(o=>!o)} type="button">
+                {expanded?"Voir moins":"Voir plus"}
               </button>
             )}
           </p>
         )}
 
-        {/* ── PDF cards ── */}
-        {pdfMedias.map((m, i) => {
-          const src = getMediaSrc(m);
-          const raw = m.url_media || m.chemin_fichier || "";
-          const filename = decodeURIComponent(raw.split("/").pop().split("?")[0]) || "document.pdf";
+        {/* ── PDFs ── */}
+        {pdfMedias.map((m,i)=>{
+          const src=getSrc(m);
+          const raw=m.url_media||m.chemin_fichier||"";
+          const filename=decodeURIComponent(raw.split("/").pop().split("?")[0])||"document.pdf";
           return (
             <div key={`pdf-${i}`} className="pc-pdf-card">
               <span className="pc-pdf-icon">📄</span>
@@ -408,39 +381,31 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
                 <span className="pc-pdf-name">{filename}</span>
                 <span className="pc-pdf-meta">Document PDF</span>
               </div>
-              <a href={src} target="_blank" rel="noreferrer" className="pc-pdf-view-btn">
-                👁 Voir
-              </a>
-              <a href={src} download={filename} target="_blank" rel="noreferrer" className="pc-pdf-dl-btn">
-                ⬇ Télécharger
-              </a>
+              <a href={src} target="_blank" rel="noreferrer" className="pc-pdf-view-btn">👁 Voir</a>
+              <a href={src} download={filename} target="_blank" rel="noreferrer" className="pc-pdf-dl-btn">⬇ Télécharger</a>
             </div>
           );
         })}
 
-        {/* ── image / video grid ── */}
-        {viewMedias.length > 0 && (
-          <div className={`pc-media pc-media-${Math.min(viewMedias.length, 4)}`}>
-            {viewMedias.slice(0, 4).map((m, i) => {
-              const src  = getMediaSrc(m);
-              const isImg = isImageMedia(m);
-              const isVid = isVideoMedia(m);
-              const more  = viewMedias.length > 4 && i === 3;
+        {/* ── videos ── */}
+        {vidMedias.map((m,i)=>(
+          <div key={`vid-${i}`} className="pc-vid-wrap">
+            <video src={getSrc(m)} controls playsInline preload="metadata"
+              style={{width:"100%",display:"block",maxHeight:"460px",background:"#000"}}/>
+          </div>
+        ))}
+
+        {/* ── image grid ── */}
+        {imgMedias.length>0 && (
+          <div className={`pc-media ${gridClass}`}>
+            {imgMedias.slice(0,4).map((m,i)=>{
+              const more = imgMedias.length>4 && i===3;
               return (
-                <div key={i}
-                  className={`pc-media-item${isVid ? " pc-media-vid" : ""}`}
-                  onClick={() => isImg && !more && setLightbox(i)}>
-                  {isImg && <img src={src} alt="" loading="lazy" />}
-                  {isVid && (
-                    <video
-                      src={src}
-                      controls
-                      playsInline
-                      preload="metadata"
-                      style={{ width: "100%", display: "block", maxHeight: "460px", background: "#000" }}
-                    />
+                <div key={i} className="pc-media-item" onClick={()=>setLightbox(i)}>
+                  <img src={getSrc(m)} alt="" loading="lazy"/>
+                  {more && (
+                    <div className="pc-media-more">+{imgMedias.length-4}</div>
                   )}
-                  {more && <div className="pc-media-more">+{viewMedias.length - 4}</div>}
                 </div>
               );
             })}
@@ -449,117 +414,97 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 
         {/* ── stats ── */}
         <div className="pc-stats">
-          <ReactionSummary counts={counts} />
+          <ReactionSummary counts={counts}/>
           <span className="pc-cmt-cnt" onClick={toggleCmts}>
-            {totalCmt} commentaire{totalCmt !== 1 ? "s" : ""}
+            {cmtCount} commentaire{cmtCount!==1?"s":""}
           </span>
         </div>
 
-        {/* ── actions bar ── */}
+        {/* ── actions ── */}
         <div className="pc-actions">
           <div className="pc-act-wrap" ref={picRef}>
             <button
-              className={`pc-act-btn${myReaction ? " on" : ""}`}
-              onClick={() => myReaction ? reactPub(myReaction) : setPickerOpen(o => !o)}
+              className={`pc-act-btn${myReaction?" on":""}`}
+              onClick={()=>myReaction?reactPub(myReaction):setPickerOpen(o=>!o)}
+              onMouseEnter={()=>setPickerOpen(true)}
               type="button">
-              {myDef ? <span className="pc-act-emoji">{myDef.emoji}</span> : <ThumbIcon />}
-              <span style={{ color: myReaction ? "#5a3fa0" : "inherit" }}>
-                {myDef ? myDef.label : "J'aime"}
-              </span>
+              {myDef
+                ? <><span className="pc-act-emoji">{myDef.emoji}</span><span style={{color:"#5a3fa0"}}>{myDef.label}</span></>
+                : <><ThumbIcon/><span>J'aime</span></>}
             </button>
-            {pickerOpen && <ReactionPicker onPick={reactPub} current={myReaction} />}
+            {pickerOpen && <ReactionPicker onPick={reactPub} current={myReaction}/>}
           </div>
           <button className="pc-act-btn" onClick={toggleCmts} type="button">
-            <CommentIcon /><span>Commenter</span>
+            <CommentIcon/><span>Commenter</span>
           </button>
           <button className="pc-act-btn"
-            onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/publication/${pub.id_publication}`)}
+            onClick={()=>navigator.clipboard?.writeText(`${window.location.origin}/publication/${pub.id_publication}`)}
             type="button">
-            <ShareIcon /><span>Partager</span>
+            <ShareIcon/><span>Partager</span>
           </button>
         </div>
 
         {/* ── comments section ── */}
         {showCmts && (
           <div className="pc-cmts-section">
-            {/* new comment input */}
             <div className="pc-new-cmt">
               <img className="pc-cmt-ava"
-                src={getMediaUrl(currentUser?.photo_user) || avatar(currentUser?.prenom || currentUser?.prenom_user || "Moi")}
+                src={getMediaUrl(currentUser?.photo_user)||avatar(currentUser?.prenom||currentUser?.prenom_user||"Moi")}
                 alt="moi"
-                onError={e => { e.target.src = avatar(currentUser?.prenom || currentUser?.prenom_user || "Moi"); }} />
+                onError={e=>{e.target.src=avatar(currentUser?.prenom||"Moi");}}/>
               <div className="pc-cmt-input-wrap">
-                <input
-                  ref={inputRef}
-                  className="pc-cmt-inp"
+                <input ref={inputRef} className="pc-cmt-inp"
                   placeholder="Écrire un commentaire…"
                   value={cmtText}
-                  onChange={e => setCmtText(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendComment(); } }} />
+                  onChange={e=>setCmtText(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendComment();}}}/>
                 <div className="pc-cmt-inp-acts">
                   <div className="pc-stk-wrap" ref={stkRef}>
                     <button className="pc-cmt-emoji-btn" type="button"
-                      onClick={() => setStkOpen(o => !o)} title="Stickers">😊</button>
+                      onClick={()=>setStkOpen(o=>!o)} title="Stickers">😊</button>
                     {stkOpen && (
                       <StickerPicker
-                        onPick={s => { setCmtText(t => t + s); setStkOpen(false); inputRef.current?.focus(); }}
-                        onClose={() => setStkOpen(false)} />
+                        onPick={s=>{setCmtText(t=>t+s);setStkOpen(false);inputRef.current?.focus();}}
+                        onClose={()=>setStkOpen(false)}/>
                     )}
                   </div>
-                  <button className="pc-send-btn"
-                    onClick={sendComment}
-                    disabled={!cmtText.trim() || cmtSending}
-                    type="button">
-                    {cmtSending ? <div className="pc-btn-spin" /> : <SendIcon />}
+                  <button className="pc-send-btn" onClick={sendComment}
+                    disabled={!cmtText.trim()||cmtSending} type="button">
+                    {cmtSending?<div className="pc-btn-spin"/>:<SendIcon/>}
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* comment list */}
             {cmtLoading
-              ? <div className="pc-spin-wrap"><div className="pc-spin" /></div>
-              : comments.length === 0
+              ? <div className="pc-spin-wrap"><div className="pc-spin"/></div>
+              : comments.length===0
                 ? <p className="pc-cmt-empty">Soyez le premier à commenter 💬</p>
-                : (
-                  <div className="pc-cmt-list">
-                    {comments.map(c => (
-                      <Comment
-                        key={c.id_commentaire}
-                        comment={c}
-                        pubId={pub.id_publication}
-                        onRefresh={loadComments} />
+                : <div className="pc-cmt-list">
+                    {comments.map(c=>(
+                      <Comment key={c.id_commentaire} comment={c}
+                        pubId={pub.id_publication} onRefresh={loadComments}/>
                     ))}
                   </div>
-                )}
+            }
           </div>
         )}
       </article>
 
       {/* ── lightbox ── */}
-      {lightbox !== null && (
-        <div className="pc-lightbox" onClick={() => setLightbox(null)}>
-          <button className="pc-lb-close" onClick={() => setLightbox(null)}>✕</button>
-          {lightbox > 0 && (
-            <button className="pc-lb-nav left"
-              onClick={e => { e.stopPropagation(); setLightbox(i => i - 1); }}>‹</button>
-          )}
-          <img className="pc-lb-img"
-            src={getMediaSrc(imgMedias[lightbox] || viewMedias[lightbox] || {})}
-            alt=""
-            onClick={e => e.stopPropagation()} />
-          {lightbox < imgMedias.length - 1 && (
-            <button className="pc-lb-nav right"
-              onClick={e => { e.stopPropagation(); setLightbox(i => i + 1); }}>›</button>
-          )}
-        </div>
+      {lightbox!==null && imgMedias.length>0 && (
+        <MediaLightbox
+          medias={imgMedias}
+          startIndex={lightbox}
+          onClose={()=>setLightbox(null)}/>
       )}
     </>
   );
 }
 
-const ThumbIcon   = () => <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z" /><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>;
-const CommentIcon = () => <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>;
-const ShareIcon   = () => <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>;
-const SendIcon    = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>;
-const DotsIcon    = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></svg>;
+/* ── icons ── */
+const ThumbIcon   = ()=><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>;
+const CommentIcon = ()=><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
+const ShareIcon   = ()=><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>;
+const SendIcon    = ()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
+const DotsIcon    = ()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>;
