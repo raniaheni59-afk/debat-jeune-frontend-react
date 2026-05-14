@@ -6,7 +6,7 @@ import PublicationCard from "../components/PublicationCard";
 import Chatbot from "../components/Chatbot";
 import JeuneContact from "./JeuneContact";
 import "./JeuneLayout.css";
-import JeuneEnquete from "./JeuneEnquete";
+import JeuneEnquete from "./Jeuneenquete";
 import LiveBanner from "../components/LiveBanner";
 
 

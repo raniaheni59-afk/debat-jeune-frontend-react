@@ -7,7 +7,7 @@ import AdminLiveStream from "./AdminLiveStream";
 import Swafy_Meet from "./Swafy_Meet";
 import ArchivePage from "./ArchivePage";
 import ParametrePage from "./ParametrePage";
-import EnquetePage from "./EnquetePage"; // ✅ AJOUT
+import EnquetePage from "./Enquetepage";
 import { useLang } from "../i18n/LanguageContext";
 import { useNotifications } from "../hooks/useNotifications";
 import ParametreContact from "./ParametreContact";
