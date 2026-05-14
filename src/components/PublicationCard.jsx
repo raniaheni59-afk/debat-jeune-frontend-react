@@ -173,23 +173,34 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
     if (saving) return;
     setSaving(true);
     try {
-      const form = new FormData();
-      form.append("titre_publication", titre);
-      form.append("sous_titre", sousTitre);
-      form.append("contenu_publication", contenu);
-      // IDs des médias à garder
-      medias.forEach(m => form.append("kept_media_ids[]", m.id_media||m.id));
-      // nouveaux fichiers
-      newFiles.forEach(f => form.append("medias", f.file));
-
-      await API.put(`/publications/${publication.id_publication}`, form, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
+      if (newFiles.length > 0) {
+        // multipart only when there are new files — let axios set boundary automatically
+        const form = new FormData();
+        form.append("titre_publication", titre);
+        form.append("sous_titre", sousTitre);
+        form.append("contenu_publication", contenu);
+        medias.forEach(m => {
+          const id = m.id_media || m.id;
+          if (id != null) form.append("kept_media_ids[]", id);
+        });
+        newFiles.forEach(f => form.append("medias", f.file));
+        await API.put(`/publications/${publication.id_publication}`, form);
+      } else {
+        // plain JSON when no new files — simpler + more compatible
+        const keptIds = medias.map(m => m.id_media || m.id).filter(Boolean);
+        await API.put(`/publications/${publication.id_publication}`, {
+          titre_publication:   titre,
+          sous_titre:          sousTitre,
+          contenu_publication: contenu,
+          kept_media_ids:      keptIds,
+        });
+      }
       onClose();
       await onSaved();
     } catch(e) {
-      console.error("edit publication:", e?.response?.data||e.message);
-      alert("Erreur lors de la modification. Veuillez réessayer.");
+      console.error("edit publication:", e?.response?.data || e?.response?.status || e.message);
+      const msg = e?.response?.data?.message || e?.response?.data?.error || "Erreur lors de la modification. Veuillez réessayer.";
+      alert(msg);
     } finally {
       setSaving(false);
     }
