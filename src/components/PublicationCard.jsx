@@ -17,7 +17,6 @@ const BACKEND = (() => {
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  // normalize Windows backslashes from Railway disk paths
   const clean = p.split("\\").join("/").replace(/^\/+/, "");
   return BACKEND + "/" + clean;
 };
@@ -113,7 +112,7 @@ const StickerPicker = ({ onPick, onClose }) => {
   );
 };
 
-/* ─── MediaLightbox — affiche 1 photo à la fois avec nav ─────── */
+/* ─── MediaLightbox ─────────────────────────────────────────── */
 const MediaLightbox = ({ medias, startIndex, onClose }) => {
   const [idx, setIdx] = useState(startIndex);
   const m = medias[idx];
@@ -139,6 +138,224 @@ const MediaLightbox = ({ medias, startIndex, onClose }) => {
   );
 };
 
+/* ─── EditPublicationModal ──────────────────────────────────── */
+const EditPublicationModal = ({ publication, onClose, onSaved }) => {
+  const [titre,     setTitre]     = useState(publication.titre_publication||"");
+  const [sousTitre, setSousTitre] = useState(publication.sous_titre||"");
+  const [contenu,   setContenu]   = useState(publication.contenu_publication||publication.contenu||"");
+  const [medias,    setMedias]    = useState(publication.medias||[]);
+  const [newFiles,  setNewFiles]  = useState([]);   // { file, preview, type }
+  const [saving,    setSaving]    = useState(false);
+  const fileRef = useRef(null);
+
+  const removeExisting = (idx) => setMedias(m=>m.filter((_,i)=>i!==idx));
+  const removeNew      = (idx) => setNewFiles(f=>f.filter((_,i)=>i!==idx));
+
+  const addFiles = (files) => {
+    Array.from(files).forEach(file=>{
+      const url = URL.createObjectURL(file);
+      const type = file.type.startsWith("video") ? "video"
+                 : file.type === "application/pdf" ? "pdf" : "image";
+      setNewFiles(f=>[...f, { file, preview: url, type }]);
+    });
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const form = new FormData();
+      if (titre)     form.append("titre_publication", titre);
+      if (sousTitre) form.append("sous_titre", sousTitre);
+      if (contenu)   form.append("contenu_publication", contenu);
+      // IDs des médias à garder
+      medias.forEach(m => form.append("kept_media_ids[]", m.id_media||m.id));
+      // nouveaux fichiers
+      newFiles.forEach(f => form.append("medias", f.file));
+
+      await API.put(`/publications/${publication.id_publication}`, form, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      onSaved();
+      onClose();
+    } catch(e) {
+      console.error("edit publication:", e?.response?.data||e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // prevent body scroll
+  useEffect(()=>{ document.body.style.overflow="hidden"; return()=>{ document.body.style.overflow=""; }; },[]);
+
+  return (
+    <div className="pc-modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="pc-modal">
+        <div className="pc-modal-header">
+          <span>Modifier la publication</span>
+          <button className="pc-modal-close" onClick={onClose} type="button">✕</button>
+        </div>
+
+        <div className="pc-modal-body">
+          <label className="pc-modal-label">Titre</label>
+          <input className="pc-modal-inp" value={titre} onChange={e=>setTitre(e.target.value)} placeholder="Titre…"/>
+
+          <label className="pc-modal-label">Sous-titre</label>
+          <input className="pc-modal-inp" value={sousTitre} onChange={e=>setSousTitre(e.target.value)} placeholder="Sous-titre…"/>
+
+          <label className="pc-modal-label">Contenu</label>
+          <textarea className="pc-modal-ta" value={contenu} onChange={e=>setContenu(e.target.value)} rows={4} placeholder="Contenu…"/>
+
+          {/* ── médias existants ── */}
+          {medias.length>0 && (
+            <>
+              <label className="pc-modal-label">Médias actuels</label>
+              <div className="pc-modal-media-list">
+                {medias.map((m,i)=>{
+                  const src = getSrc(m);
+                  return (
+                    <div key={i} className="pc-modal-media-item">
+                      {isPdf(m) ? <span className="pc-modal-media-pdf">📄 PDF</span>
+                       : isVid(m) ? <span className="pc-modal-media-pdf">🎥 Vidéo</span>
+                       : <img src={src} alt="" onError={e=>{e.target.style.display="none";}}/>}
+                      <button className="pc-modal-media-del" onClick={()=>removeExisting(i)} type="button" title="Supprimer">✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* ── nouveaux fichiers ── */}
+          {newFiles.length>0 && (
+            <>
+              <label className="pc-modal-label">Nouveaux médias</label>
+              <div className="pc-modal-media-list">
+                {newFiles.map((f,i)=>(
+                  <div key={i} className="pc-modal-media-item">
+                    {f.type==="pdf" ? <span className="pc-modal-media-pdf">📄 PDF</span>
+                     : f.type==="video" ? <span className="pc-modal-media-pdf">🎥 Vidéo</span>
+                     : <img src={f.preview} alt=""/>}
+                    <button className="pc-modal-media-del" onClick={()=>removeNew(i)} type="button" title="Supprimer">✕</button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* ── ajouter médias ── */}
+          <div className="pc-modal-add-row">
+            <button className="pc-modal-add-btn" type="button"
+              onClick={()=>fileRef.current?.click()}>
+              + Ajouter image / vidéo / PDF
+            </button>
+            <input ref={fileRef} type="file" multiple
+              accept="image/*,video/*,application/pdf"
+              style={{display:"none"}}
+              onChange={e=>{ addFiles(e.target.files); e.target.value=""; }}/>
+          </div>
+        </div>
+
+        <div className="pc-modal-footer">
+          <button className="pc-modal-cancel" onClick={onClose} type="button">Annuler</button>
+          <button className="pc-modal-save" onClick={handleSave} disabled={saving} type="button">
+            {saving ? <span className="pc-btn-spin" style={{display:"inline-block"}}/> : "Enregistrer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── EditCommentModal ──────────────────────────────────────── */
+const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
+  const [text,    setText]    = useState(comment.contenu_commentaire||comment.contenu||"");
+  const [stkOpen, setStkOpen] = useState(false);
+  const [saving,  setSaving]  = useState(false);
+  const inputRef = useRef(null);
+
+  const handleSave = async () => {
+    const t = text.trim(); if(!t||saving) return;
+    setSaving(true);
+    try {
+      await API.put(`/publications/${pubId}/comments/${comment.id_commentaire}`, { contenu_commentaire: t });
+      onSaved();
+      onClose();
+    } catch(e) {
+      console.error("edit comment:", e?.response?.data||e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(()=>{ document.body.style.overflow="hidden"; return()=>{ document.body.style.overflow=""; }; },[]);
+
+  return (
+    <div className="pc-modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="pc-modal pc-modal-sm">
+        <div className="pc-modal-header">
+          <span>Modifier le commentaire</span>
+          <button className="pc-modal-close" onClick={onClose} type="button">✕</button>
+        </div>
+        <div className="pc-modal-body">
+          <div className="pc-cmt-input-wrap" style={{borderRadius:"14px",padding:"4px 6px 4px 0"}}>
+            <input ref={inputRef} className="pc-cmt-inp" value={text}
+              onChange={e=>setText(e.target.value)}
+              onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSave();}}}
+              placeholder="Modifier le commentaire…" autoFocus
+              style={{padding:"10px 14px"}}/>
+            <div className="pc-cmt-inp-acts" style={{position:"relative"}}>
+              <button className="pc-cmt-emoji-btn" type="button"
+                onClick={()=>setStkOpen(o=>!o)} title="Stickers">😊</button>
+              {stkOpen && (
+                <StickerPicker
+                  onPick={s=>{setText(t=>t+s);setStkOpen(false);inputRef.current?.focus();}}
+                  onClose={()=>setStkOpen(false)}/>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="pc-modal-footer">
+          <button className="pc-modal-cancel" onClick={onClose} type="button">Annuler</button>
+          <button className="pc-modal-save" onClick={handleSave} disabled={saving||!text.trim()} type="button">
+            {saving ? <span className="pc-btn-spin" style={{display:"inline-block"}}/> : "Enregistrer"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─── DotsMenu ──────────────────────────────────────────────── */
+const DotsMenu = ({ items }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(()=>{
+    const h=(e)=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown",h);
+    return ()=>document.removeEventListener("mousedown",h);
+  },[]);
+  return (
+    <div className="pc-dots-menu" ref={ref}>
+      <button className="pc-more" type="button" aria-label="Options" onClick={()=>setOpen(o=>!o)}>
+        <DotsIcon/>
+      </button>
+      {open && (
+        <div className="pc-dots-dropdown">
+          {items.map((item,i)=>(
+            <button key={i}
+              className={`pc-dots-item${item.danger?" danger":""}`}
+              type="button"
+              onClick={()=>{ setOpen(false); item.onClick(); }}>
+              {item.icon && <span>{item.icon}</span>}
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ─── Comment ───────────────────────────────────────────────── */
 const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const [replyOpen,    setReplyOpen]    = useState(false);
@@ -149,7 +366,15 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const [counts,       setCounts]       = useState(comment.reaction_counts||{});
   const [pickerOpen,   setPickerOpen]   = useState(false);
   const [stkOpen,      setStkOpen]      = useState(false);
+  const [editOpen,     setEditOpen]     = useState(false);
   const picRef = useRef(null);
+
+  const currentUser = getCurrentUser();
+  const isOwner = currentUser && (
+    currentUser.id_user === comment.id_user ||
+    currentUser.id === comment.id_user ||
+    currentUser.role === "admin"
+  );
 
   useEffect(()=>{
     const h=(e)=>{ if(picRef.current&&!picRef.current.contains(e.target)) setPickerOpen(false); };
@@ -166,6 +391,12 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
     catch { onRefresh(); }
   };
 
+  const deleteCmt = async () => {
+    if(!window.confirm("Supprimer ce commentaire ?")) return;
+    try { await API.delete(`/publications/${pubId}/comments/${comment.id_commentaire}`); onRefresh(); }
+    catch(e) { console.error("delete comment:", e?.response?.data||e.message); }
+  };
+
   const sendReply = async()=>{
     const t=replyText.trim(); if(!t||replySending) return;
     setReplySending(true);
@@ -179,72 +410,92 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const myDef  = REACTIONS.find(r=>r.key===myReaction);
   const replies= comment.replies||[];
 
+  const menuItems = [];
+  if (isOwner) {
+    menuItems.push({ icon:"✏️", label:"Modifier", onClick:()=>setEditOpen(true) });
+    menuItems.push({ icon:"🗑️", label:"Supprimer", danger:true, onClick:deleteCmt });
+  }
+
   return (
-    <div className={`pc-cmt${depth>0?" nested":""}`}>
-      {depth>0 && <div className="pc-nest-line"/>}
-      <img className="pc-cmt-ava"
-        src={getMediaUrl(comment.photo_user)||avatar(comment.prenom_user)}
-        alt={comment.prenom_user}
-        onError={e=>{e.target.src=avatar(comment.prenom_user);}}/>
-      <div className="pc-cmt-right">
-        <div className="pc-cmt-bubble">
-          <span className="pc-cmt-nm">{comment.prenom_user} {comment.nom_user}</span>
-          {(() => {
-            const txt = comment.contenu_commentaire||comment.contenu||"";
-            // si le contenu est 1-3 emojis seulement, les afficher en grand
-            const onlyEmoji = /^[\p{Emoji}\s]{1,6}$/u.test(txt) && txt.trim().length <= 6;
-            return onlyEmoji
-              ? <p className="pc-cmt-sticker">{txt}</p>
-              : <p className="pc-cmt-txt">{txt}</p>;
-          })()}
-        </div>
-        <ReactionSummary counts={counts}/>
-        <div className="pc-cmt-meta">
-          <span className="pc-cmt-time">{timeAgo(comment.created_at)}</span>
-          <div className="pc-cmt-rpick-wrap" ref={picRef}>
-            <button className={`pc-cmt-act${myReaction?" on":""}`}
-              onClick={()=>setPickerOpen(o=>!o)} type="button"
-              style={myReaction==="like"?{color:"#1877f2"}:myReaction?{color:"#5a3fa0"}:{}}>
-              {myDef?`${myDef.emoji} ${myDef.label}`:"👍 J'aime"}
-            </button>
-            {pickerOpen && <ReactionPicker onPick={reactCmt} current={myReaction} mini/>}
-          </div>
-          {depth<2 && (
-            <button className="pc-cmt-act" onClick={()=>setReplyOpen(o=>!o)} type="button">Répondre</button>
-          )}
-          {replies.length>0 && (
-            <button className="pc-cmt-act accent" onClick={()=>setShowReplies(o=>!o)} type="button">
-              {showReplies?"Masquer":`${replies.length} réponse${replies.length>1?"s":""}`}
-            </button>
-          )}
-        </div>
-
-        {replyOpen && (
-          <div className="pc-reply-row">
-            <div className="pc-reply-box">
-              <input className="pc-reply-inp"
-                placeholder={`Répondre à ${comment.prenom_user}…`}
-                value={replyText}
-                onChange={e=>setReplyText(e.target.value)}
-                onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendReply()}
-                autoFocus/>
-              <div className="pc-reply-acts">
-                <button className="pc-cmt-emoji-btn" type="button" onClick={()=>setStkOpen(o=>!o)}>😊</button>
-                <button className="pc-send-btn" onClick={sendReply}
-                  disabled={!replyText.trim()||replySending} type="button">
-                  {replySending?<div className="pc-btn-spin"/>:<SendIcon/>}
-                </button>
-              </div>
+    <>
+      <div className={`pc-cmt${depth>0?" nested":""}`}>
+        {depth>0 && <div className="pc-nest-line"/>}
+        <img className="pc-cmt-ava"
+          src={getMediaUrl(comment.photo_user)||avatar(comment.prenom_user)}
+          alt={comment.prenom_user}
+          onError={e=>{e.target.src=avatar(comment.prenom_user);}}/>
+        <div className="pc-cmt-right">
+          <div className="pc-cmt-bubble-row">
+            <div className="pc-cmt-bubble">
+              <span className="pc-cmt-nm">{comment.prenom_user} {comment.nom_user}</span>
+              {(() => {
+                const txt = comment.contenu_commentaire||comment.contenu||"";
+                const onlyEmoji = /^[\p{Emoji}\s]{1,6}$/u.test(txt) && txt.trim().length <= 6;
+                return onlyEmoji
+                  ? <p className="pc-cmt-sticker">{txt}</p>
+                  : <p className="pc-cmt-txt">{txt}</p>;
+              })()}
             </div>
-            {stkOpen && <StickerPicker onPick={s=>{setReplyText(t=>t+s);setStkOpen(false);}} onClose={()=>setStkOpen(false)}/>}
+            {menuItems.length > 0 && (
+              <DotsMenu items={menuItems}/>
+            )}
           </div>
-        )}
+          <ReactionSummary counts={counts}/>
+          <div className="pc-cmt-meta">
+            <span className="pc-cmt-time">{timeAgo(comment.created_at)}</span>
+            <div className="pc-cmt-rpick-wrap" ref={picRef}>
+              <button className={`pc-cmt-act${myReaction?" on":""}`}
+                onClick={()=>setPickerOpen(o=>!o)} type="button"
+                style={myReaction==="like"?{color:"#1877f2"}:myReaction?{color:"#5a3fa0"}:{}}>
+                {myDef?`${myDef.emoji} ${myDef.label}`:"👍 J'aime"}
+              </button>
+              {pickerOpen && <ReactionPicker onPick={reactCmt} current={myReaction} mini/>}
+            </div>
+            {depth<2 && (
+              <button className="pc-cmt-act" onClick={()=>setReplyOpen(o=>!o)} type="button">Répondre</button>
+            )}
+            {replies.length>0 && (
+              <button className="pc-cmt-act accent" onClick={()=>setShowReplies(o=>!o)} type="button">
+                {showReplies?"Masquer":`${replies.length} réponse${replies.length>1?"s":""}`}
+              </button>
+            )}
+          </div>
 
-        {showReplies && replies.map(r=>(
-          <Comment key={r.id_commentaire} comment={r} pubId={pubId} onRefresh={onRefresh} depth={depth+1}/>
-        ))}
+          {replyOpen && (
+            <div className="pc-reply-row">
+              <div className="pc-reply-box">
+                <input className="pc-reply-inp"
+                  placeholder={`Répondre à ${comment.prenom_user}…`}
+                  value={replyText}
+                  onChange={e=>setReplyText(e.target.value)}
+                  onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendReply()}
+                  autoFocus/>
+                <div className="pc-reply-acts">
+                  <button className="pc-cmt-emoji-btn" type="button" onClick={()=>setStkOpen(o=>!o)}>😊</button>
+                  <button className="pc-send-btn" onClick={sendReply}
+                    disabled={!replyText.trim()||replySending} type="button">
+                    {replySending?<div className="pc-btn-spin"/>:<SendIcon/>}
+                  </button>
+                </div>
+              </div>
+              {stkOpen && <StickerPicker onPick={s=>{setReplyText(t=>t+s);setStkOpen(false);}} onClose={()=>setStkOpen(false)}/>}
+            </div>
+          )}
+
+          {showReplies && replies.map(r=>(
+            <Comment key={r.id_commentaire} comment={r} pubId={pubId} onRefresh={onRefresh} depth={depth+1}/>
+          ))}
+        </div>
       </div>
-    </div>
+
+      {editOpen && (
+        <EditCommentModal
+          comment={comment}
+          pubId={pubId}
+          onClose={()=>setEditOpen(false)}
+          onSaved={onRefresh}/>
+      )}
+    </>
   );
 };
 
@@ -261,15 +512,22 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const [counts,     setCounts]     = useState(publication.reaction_counts||{});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [stkOpen,    setStkOpen]    = useState(false);
-  const [lightbox,   setLightbox]   = useState(null); // index or null
+  const [lightbox,   setLightbox]   = useState(null);
   const [expanded,   setExpanded]   = useState(false);
   const [cmtCount,   setCmtCount]   = useState(publication.nb_commentaires??0);
+  const [editOpen,   setEditOpen]   = useState(false);
 
   const currentUser = getCurrentUser();
   const pub         = publication;
   const picRef      = useRef(null);
   const inputRef    = useRef(null);
   const stkRef      = useRef(null);
+
+  const isOwner = currentUser && (
+    currentUser.id_user === pub.id_user ||
+    currentUser.id === pub.id_user ||
+    currentUser.role === "admin"
+  );
 
   useEffect(()=>{
     const h=(e)=>{ if(picRef.current&&!picRef.current.contains(e.target)) setPickerOpen(false); };
@@ -279,7 +537,6 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 
   useEffect(()=>{ if(defaultShowComments) loadComments(); },[]);
 
-  /* ── load comments ── */
   const loadComments = useCallback(async()=>{
     setCmtLoading(true);
     try {
@@ -298,32 +555,36 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
     setTimeout(()=>inputRef.current?.focus(),200);
   };
 
-  /* ── send comment ── */
   const sendComment = async()=>{
     const t=cmtText.trim(); if(!t||cmtSending) return;
     setCmtSending(true);
     try {
       await API.post(`/publications/${pub.id_publication}/comments`,{ contenu_commentaire:t });
       setCmtText("");
-      await loadComments(); // recharge les commentaires localement sans re-render du feed
+      await loadComments();
     } catch(e){ console.error("comment:",e?.response?.status, e?.response?.data||e.message); }
     finally{ setCmtSending(false); }
   };
 
-  /* ── react publication ── */
   const reactPub = async(key)=>{
     setPickerOpen(false);
     const same=myReaction===key, prev=myReaction;
-    // optimistic — update local state only, no re-render of feed
     setMyReaction(same?null:key);
     setCounts(c=>{ const n={...c}; if(prev) n[prev]=Math.max(0,(n[prev]||1)-1); if(!same) n[key]=(n[key]||0)+1; return n; });
     try {
       await API.post(`/publications/${pub.id_publication}/react`,{ type_reaction:same?null:key });
     } catch(e) {
-      // rollback on error
       setMyReaction(prev);
       setCounts(c=>{ const n={...c}; if(!same) n[key]=Math.max(0,(n[key]||1)-1); if(prev) n[prev]=(n[prev]||0)+1; return n; });
     }
+  };
+
+  const deletePub = async () => {
+    if(!window.confirm("Supprimer cette publication ?")) return;
+    try {
+      await API.delete(`/publications/${pub.id_publication}`);
+      if(onUpdate) onUpdate();
+    } catch(e) { console.error("delete pub:", e?.response?.data||e.message); }
   };
 
   const myDef  = REACTIONS.find(r=>r.key===myReaction);
@@ -331,16 +592,23 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const body   = pub.contenu_publication||pub.contenu||"";
   const isLong = body.length>280;
 
-  /* split media */
-  const pdfMedias  = media.filter(isPdf);
-  const imgMedias  = media.filter(m=>!isPdf(m)&&isImg(m));
-  const vidMedias  = media.filter(m=>!isPdf(m)&&isVid(m));
+  /* split media — skip medias without valid src */
+  const pdfMedias  = media.filter(m=>isPdf(m) && getSrc(m));
+  const imgMedias  = media.filter(m=>!isPdf(m)&&isImg(m) && getSrc(m));
+  const vidMedias  = media.filter(m=>!isPdf(m)&&isVid(m) && getSrc(m));
 
   /* grid layout for images */
   const gridClass = imgMedias.length===1?"pc-media-1"
                   : imgMedias.length===2?"pc-media-2"
                   : imgMedias.length===3?"pc-media-3"
                   : "pc-media-4";
+
+  /* pub dots menu */
+  const pubMenuItems = [];
+  if (isOwner) {
+    pubMenuItems.push({ icon:"✏️", label:"Modifier", onClick:()=>setEditOpen(true) });
+    pubMenuItems.push({ icon:"🗑️", label:"Supprimer", danger:true, onClick:deletePub });
+  }
 
   return (
     <>
@@ -366,7 +634,10 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
               )}
             </div>
           </div>
-          <button className="pc-more" type="button" aria-label="Options"><DotsIcon/></button>
+          {pubMenuItems.length > 0
+            ? <DotsMenu items={pubMenuItems}/>
+            : <button className="pc-more" type="button" aria-label="Options"><DotsIcon/></button>
+          }
         </div>
 
         {/* ── body ── */}
@@ -408,14 +679,20 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
           </div>
         ))}
 
-        {/* ── image grid ── */}
+        {/* ── image grid — only if valid images ── */}
         {imgMedias.length>0 && (
           <div className={`pc-media ${gridClass}`}>
             {imgMedias.slice(0,4).map((m,i)=>{
+              const src = getSrc(m);
               const more = imgMedias.length>4 && i===3;
               return (
                 <div key={i} className="pc-media-item" onClick={()=>setLightbox(i)}>
-                  <img src={getSrc(m)} alt="" loading="lazy"/>
+                  <img
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    onError={e=>{ e.target.closest(".pc-media-item").style.display="none"; }}
+                  />
                   {more && (
                     <div className="pc-media-more">+{imgMedias.length-4}</div>
                   )}
@@ -507,6 +784,14 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
           startIndex={lightbox}
           onClose={()=>setLightbox(null)}/>
       )}
+
+      {/* ── edit publication modal ── */}
+      {editOpen && (
+        <EditPublicationModal
+          publication={pub}
+          onClose={()=>setEditOpen(false)}
+          onSaved={()=>{ if(onUpdate) onUpdate(); }}/>
+      )}
     </>
   );
 }
@@ -514,6 +799,5 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 /* ── icons ── */
 const ThumbIcon   = ()=><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>;
 const CommentIcon = ()=><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
-const ShareIcon   = ()=><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>;
 const SendIcon    = ()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>;
 const DotsIcon    = ()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>;
