@@ -6,6 +6,7 @@ import PublicationCard from "../components/PublicationCard";
 import Chatbot from "../components/Chatbot";
 import JeuneContact from "./JeuneContact";
 import "./JeuneLayout.css";
+import JeuneEnquete from "./JeuneEnquete";
 import LiveBanner from "../components/LiveBanner";
 
 
@@ -28,6 +29,7 @@ const PAGES = {
   PUBLIER  : "publier",
   CALENDAR : "calendar",
   LIVE     : "live",
+  ENQUETE  : "enquete",
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -325,6 +327,7 @@ const JeuneLayout = () => {
     { icon:"message",  label:"Messages",        page:PAGES.MESSAGES,  badge:unreadMessages||null },
     { icon:"calendar", label:"Calendrier",      page:PAGES.CALENDAR },
     { icon:"radio",    label:"Live",            page:PAGES.LIVE,      live:true },
+    { icon:"pencil",   label:"Enquêtes",        page:PAGES.ENQUETE },
     { icon:"bell",     label:"Notifications",   page:PAGES.NOTIFS,    badge:unreadNotifs||null },
     { icon:"settings", label:"Paramètres",      page:PAGES.SETTINGS },
   ];
@@ -461,7 +464,7 @@ const JeuneLayout = () => {
         return (
           <div className="jl-page">
             <h2 className="jl-section-title"><Icon name="radio" size={18}/> Sessions Live</h2>
-      <LiveBanner />
+            <LiveBanner />
             <div className="jl-live-banner">
               <div className="jl-live-top">
                 <span className="jl-live-badge">● LIVE</span>
@@ -491,6 +494,10 @@ const JeuneLayout = () => {
             ))}
           </div>
         );
+
+      /* ── ENQUETE ── */
+      case PAGES.ENQUETE:
+        return <JeuneEnquete />;
 
       /* ── SETTINGS ── */
       case PAGES.SETTINGS:
@@ -576,7 +583,7 @@ const JeuneLayout = () => {
                 <div className="jl-banner-body">
                   <span className="jl-banner-tag">Nouveau</span>
                   <h2>Participez aux<br/>Enquêtes</h2>
-                  <button className="jl-banner-btn">
+                  <button className="jl-banner-btn" onClick={() => goTo(PAGES.ENQUETE)}>
                     <Icon name="chevron" size={12}/>Participer
                   </button>
                 </div>

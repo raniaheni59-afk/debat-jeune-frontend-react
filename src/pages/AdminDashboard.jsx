@@ -7,6 +7,7 @@ import AdminLiveStream from "./AdminLiveStream";
 import Swafy_Meet from "./Swafy_Meet";
 import ArchivePage from "./ArchivePage";
 import ParametrePage from "./ParametrePage";
+import EnquetePage from "./EnquetePage"; // ✅ AJOUT
 import { useLang } from "../i18n/LanguageContext";
 import { useNotifications } from "../hooks/useNotifications";
 import ParametreContact from "./ParametreContact";
@@ -361,12 +362,12 @@ useEffect(() => {
   // ── Chart CRUD ──
 const openEditChart = (chart) => {
   const copy = JSON.parse(JSON.stringify(chart));
-  copy.labels.push(""); // Ajouter un nouveau label vide
+  copy.labels.push("");
   if (copy.type === "doughnut") { 
     copy.datasets[0].data.push(0); 
     copy.datasets[0].colors.push("#3b82f6"); 
   } else {
-    copy.datasets.forEach((ds) => ds.data.push(0)); // Ajouter 0 pour chaque série
+    copy.datasets.forEach((ds) => ds.data.push(0));
   }
   setEditModal({ open:true, mode:"edit-chart", targetId:chart.id, data:copy });
 };
@@ -385,12 +386,6 @@ const openAddData = (chart) => {
   const saveModal = async () => {
   const { mode, targetId, data } = editModal;
 
-  console.log("🔵 SAVE clicked");
-  console.log("mode:", mode);
-  console.log("targetId:", targetId);
-  console.log("data:", data);
-
-  // ✅ 1) الحالة الخاصة: إضافة Event للـ chart-event
   if (targetId === "chart-event" && mode === "add-data") {
     try {
       const payload = {
@@ -399,8 +394,6 @@ const openAddData = (chart) => {
         date_evenement: data.date_evenement,
         id_user: user?.id_user || user?.id || user?.userId,
       };
-
-      console.log("📤 Payload à envoyer :", JSON.stringify(payload, null, 2));
 
       if (
         !payload.titre_evenement?.trim() ||
@@ -412,34 +405,24 @@ const openAddData = (chart) => {
       }
 
       const token = localStorage.getItem("token");
-
-      const response = await API.post("/events", payload, {
+      await API.post("/events", payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      console.log("✅ Réponse backend :", response.data);
 
       toast("✅ Événement ajouté avec succès !");
       await fetchGouvernoratStats();
       closeModal();
-      return; // ✅ مهم برشا باش ما يكملش لباقي الحالات
+      return;
     } catch (error) {
-      console.error("❌ Erreur ajout événement :", {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-      });
-
       toast(
         error.response?.data?.message ||
           "❌ Erreur serveur lors de l'ajout de l'événement",
         "error"
       );
-      return; // ✅ زادة مهم
+      return;
     }
   }
 
-  // ✅ 2) باقي الحالات: تعديل stat
   if (mode === "edit-stat" && targetId?.startsWith("stat-")) {
     setStatCards((p) =>
       p.map((s) =>
@@ -453,7 +436,6 @@ const openAddData = (chart) => {
     return;
   }
 
-  // ✅ 3) تعديل chart / إضافة data للـ charts العاديين
   if ((mode === "edit-chart" || mode === "add-data") && targetId) {
     setCharts((p) => p.map((c) => (c.id === targetId ? data : c)));
     toast("✅ Diagramme mis à jour");
@@ -461,7 +443,6 @@ const openAddData = (chart) => {
     return;
   }
 
-  // ✅ fallback
   closeModal();
 };
   const closeModal = () => setEditModal({ open:false, mode:"", targetId:null, data:{} });
@@ -600,16 +581,16 @@ const openAddData = (chart) => {
   const Comp = { line:Line, bar:Bar, doughnut:Doughnut };
 
   
-  //   NAV ITEMS — مع NewLive مضاف
-  
+  // ── NAV ITEMS ── ✅ ENQUETES AJOUTÉ
 const navItems = [
   { key:"accueil",      label: t("accueil") },
   { key:"dashboard",    label: t("dashboard") },
   { key:"messages",     label: t("messages") },
   { key:"publier",      label: t("publier") },
   { key:"calendrier",   label: t("calendrier") },
-  { key:"swafyMeet",    label: "Swafy Meet" }, // اسم خاص نخليه
+  { key:"swafyMeet",    label: "Swafy Meet" },
   { key:"live",         label: t("live"), isLive:true },
+  { key:"enquetes",     label: "Enquêtes", icon: "📋" }, // ✅ AJOUT
   { key:"participant",  label: t("participants") },
   { key:"notification", label: t("notifications"), badge: adminUnread || null },
   { key:"archive",      label: t("archive") },
@@ -669,7 +650,8 @@ const navItems = [
   "archive",
   "parametre",
   "parametreContact",
-  "publier"
+  "publier",
+  "enquetes", // ✅ AJOUT
 ];
 
   const isFullPage = fullPages.includes(activePage);
@@ -726,6 +708,10 @@ const navItems = [
 
         <button style={S.exitBtn} onClick={logout}> {t("logout")}</button>
       </aside>
+
+      {/* ══════════════════════════════════
+           CALENDRIER
+      ══════════════════════════════════ */}
       {activePage === "calendrier" && (
   <>
     {calSplash && (
@@ -784,9 +770,8 @@ const navItems = [
         </div>
       )}
 
-
       {/* ══════════════════════════════════
-           NEW LIVE PAGE ✅
+           NEW LIVE PAGE
       ══════════════════════════════════ */}
       {activePage === "newlive" && (
         <div style={{
@@ -806,9 +791,10 @@ const navItems = [
           />
         </div>
       )}
+
       {/* ══════════════════════════════════
-     LIVE ✅
-══════════════════════════════════ */}
+           LIVE
+      ══════════════════════════════════ */}
 {activePage === "live" && (
   <div
     style={{
@@ -835,6 +821,25 @@ const navItems = [
     <Swafy_Meet onNouvelleReunion={() => setActivePage("newlive")} />
   </div>
 )}
+
+{/* ══════════════════════════════════
+     ENQUETES PAGE  ✅ AJOUT
+══════════════════════════════════ */}
+{activePage === "enquetes" && (
+  <div
+    style={{
+      marginLeft: sidebarVisible ? 240 : 0,
+      transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+      minHeight: "100vh",
+      background: "linear-gradient(135deg,#b8a9e0,#9b89d0 20%,#8b7bc8 40%,#7c6cbf 60%,#9584cf 80%,#a897da)",
+      padding: "30px 40px 80px",
+      boxSizing: "border-box",
+    }}
+  >
+    <EnquetePage />
+  </div>
+)}
+
 {activePage === "archive" && (
   <>
     {archiveSplash && (
@@ -937,7 +942,6 @@ const navItems = [
     padding: "20px 30px 80px",
     boxSizing: "border-box",
   }}>
-    {/* ── Welcome ── */}
     <div style={{
       background: "rgba(255,255,255,.93)", backdropFilter: "blur(10px)",
       borderRadius: 18, border: "1px solid rgba(255,255,255,.5)",
@@ -955,7 +959,6 @@ const navItems = [
       </p>
     </div>
 
-    {/* ── Feed Publications ── */}
     <div style={{ marginTop: 8 }}>
       <h2 style={{ fontFamily:"Poppins,sans-serif", fontSize:18, fontWeight:800, color:"#fff", marginBottom:16, textShadow:"0 1px 4px rgba(0,0,0,.2)" }}>
         Fil d'actualité
@@ -1213,209 +1216,194 @@ const navItems = [
               {/* ADD CHART */}
               <div style={S.addSection}>
                 <button style={S.addChartBtn} onClick={() => setAddChartModal(true)}>
-                  ➕ Ajouter un Diagramme
+                  ➕ Nouveau Diagramme
                 </button>
                 <button style={S.pbiBtn} onClick={openPowerBI}>
-                  📊 Ouvrir Power BI Desktop
+                  📊 Power BI
                 </button>
               </div>
+
             </div>
           )}
-         
-        </div>
-      )}
-     {/* ══════════════════════════════════
-           E D I T   M O D A L
-      ══════════════════════════════════ */}
-      {editModal.open && (
-        <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
-          <div style={S.modal}>
-            <div style={S.mHead}>
-              <h3 style={S.mTitle}>
-                {editModal.targetId === "chart-event" && editModal.mode === "add-data" 
-                  ? "➕ Ajouter un nouvel événement" 
-                  : (editModal.mode === "edit-stat" ? `✏️ ${editModal.data.label}` : `✏️ Modifier — ${editModal.data.title}`)}
-              </h3>
-              <button style={S.mClose} onClick={closeModal}>✕</button>
-            </div>
 
-            <div style={S.mBody}>
-              {/* 1. حالة تعديل الإحصائيات الفردية (Cards) */}
-              {editModal.mode === "edit-stat" && (
-                <>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Label</label>
-                    <input style={S.fi} value={editModal.data.label}
-                      onChange={(e) => updateModalData((d) => ({ ...d, label:e.target.value }))} />
-                  </div>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Valeur</label>
-                    <input style={S.fi} type="number" value={editModal.data.value}
-                      onChange={(e) => updateModalData((d) => ({ ...d, value:parseInt(e.target.value)||0 }))} />
-                  </div>
-                </>
-              )}
+          {/* ── EDIT / ADD DATA MODAL ── */}
+          {editModal.open && (
+            <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
+              <div style={S.modal}>
+                <div style={S.mHead}>
+                  <h3 style={S.mTitle}>
+                    {editModal.mode === "edit-stat" ? "✏️ Modifier la statistique"
+                      : editModal.mode === "add-data" ? "➕ Ajouter des données"
+                      : "✏️ Modifier le diagramme"}
+                  </h3>
+                  <button style={S.mClose} onClick={closeModal}>✕</button>
+                </div>
+                <div style={S.mBody}>
 
-              {/* 2. حالة إضافة بيانات لجدول evenement (خاص بمخطط الولايات) */}
-              {editModal.targetId === "chart-event" && editModal.mode === "add-data" ? (
-                <>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Titre de l'événement</label>
-                    <input 
-                      style={S.fi} 
-                      placeholder="Ex: Conférence Jeunesse" 
-                      onChange={(e) => updateModalData(d => ({...d, titre_evenement: e.target.value}))} 
-                    />
-                  </div>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Gouvernorat</label>
-                    <select 
-                      style={S.fi} 
-                      onChange={(e) => updateModalData(d => ({...d, id_gouvernorat: parseInt(e.target.value)}))}
-                      defaultValue={1}
-                    >
-                      {charts[0].labels.map((gouv, i) => (
-                        <option key={i} value={i + 1}>{gouv}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Date de l'événement</label>
-                    <input 
-                      type="date" 
-                      style={S.fi} 
-                      onChange={(e) => updateModalData(d => ({...d, date_evenement: e.target.value}))} 
-                    />
-                  </div>
-                </>
-              ) : (
-                /* 3. الحالة الافتراضية لبقية المخططات (المنطق القديم) */
-                (editModal.mode === "edit-chart" || editModal.mode === "add-data") && editModal.data.type !== "doughnut" && (
-                  <>
-                    {editModal.mode === "edit-chart" && (
+                  {editModal.mode === "edit-stat" && (
+                    <>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Label</label>
+                        <input style={S.fi} value={editModal.data.label || ""}
+                          onChange={(e) => updateModalData((d) => ({ ...d, label:e.target.value }))} />
+                      </div>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Valeur</label>
+                        <input style={S.fi} type="number" value={editModal.data.value || 0}
+                          onChange={(e) => updateModalData((d) => ({ ...d, value:e.target.value }))} />
+                      </div>
+                    </>
+                  )}
+
+                  {editModal.targetId === "chart-event" && editModal.mode === "add-data" && (
+                    <>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Titre de l'événement</label>
+                        <input style={S.fi} placeholder="Ex: Conférence Tunis"
+                          onChange={(e) => updateModalData(d => ({...d, titre_evenement: e.target.value}))} />
+                      </div>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Gouvernorat</label>
+                        <select style={S.fi}
+                          onChange={(e) => updateModalData(d => ({...d, id_gouvernorat: parseInt(e.target.value)}))}>
+                          {charts[0].labels.map((gouv, i) => (
+                            <option key={i} value={i + 1}>{gouv}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Date de l'événement</label>
+                        <input 
+                          type="date" 
+                          style={S.fi} 
+                          onChange={(e) => updateModalData(d => ({...d, date_evenement: e.target.value}))} 
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {(editModal.mode === "edit-chart" || editModal.mode === "add-data") && editModal.data.type !== "doughnut" && editModal.targetId !== "chart-event" && (
+                    <>
+                      {editModal.mode === "edit-chart" && (
+                        <div style={S.fg}>
+                          <label style={S.fl}>Titre</label>
+                          <input style={S.fi} value={editModal.data.title}
+                            onChange={(e) => updateModalData((d) => ({ ...d, title:e.target.value }))} />
+                        </div>
+                      )}
+                      <div style={S.fg}>
+                        <label style={S.fl}>Points de données</label>
+                        <div style={S.tableHead}>
+                          <span style={{ flex:1, fontSize:11, fontWeight:700, color:"#888" }}>Label</span>
+                          {editModal.data.datasets.map((ds, di) => (
+                            <span key={di} style={{ flex:1, fontSize:11, fontWeight:700, color:"#888" }}>{ds.label}</span>
+                          ))}
+                          <span style={{ width:36 }} />
+                        </div>
+                        {editModal.data.labels.map((lbl, i) => (
+                          <div key={i} style={S.dRow}>
+                            <input style={{ ...S.fi, flex:1 }} value={lbl}
+                              onChange={(e) => updateModalData((d) => { const c=JSON.parse(JSON.stringify(d)); c.labels[i]=e.target.value; return c; })} />
+                            {editModal.data.datasets.map((ds, di) => (
+                              <input key={di} style={{ ...S.fi, flex:1 }} type="number" value={ds.data[i]}
+                                onChange={(e) => updateModalData((d) => { const c=JSON.parse(JSON.stringify(d)); c.datasets[di].data[i]=parseInt(e.target.value)||0; return c; })} />
+                            ))}
+                            <button style={S.rmBtn} onClick={() => removeRow(i)}>🗑</button>
+                          </div>
+                        ))}
+                        <button style={S.addRowBtn} onClick={addRow}>➕ Ajouter un point</button>
+                      </div>
+                    </>
+                  )}
+
+                  {(editModal.mode === "edit-chart" || editModal.mode === "add-data") && editModal.data.type === "doughnut" && (
+                    <>
                       <div style={S.fg}>
                         <label style={S.fl}>Titre</label>
                         <input style={S.fi} value={editModal.data.title}
                           onChange={(e) => updateModalData((d) => ({ ...d, title:e.target.value }))} />
                       </div>
-                    )}
-                    <div style={S.fg}>
-                      <label style={S.fl}>Points de données</label>
-                      <div style={S.tableHead}>
-                        <span style={{ flex:1, fontSize:11, fontWeight:700, color:"#888" }}>Label</span>
-                        {editModal.data.datasets.map((ds, di) => (
-                          <span key={di} style={{ flex:1, fontSize:11, fontWeight:700, color:"#888" }}>{ds.label}</span>
-                        ))}
-                        <span style={{ width:36 }} />
-                      </div>
-                      {editModal.data.labels.map((lbl, i) => (
-                        <div key={i} style={S.dRow}>
-                          <input style={{ ...S.fi, flex:1 }} value={lbl}
-                            onChange={(e) => updateModalData((d) => { const c=JSON.parse(JSON.stringify(d)); c.labels[i]=e.target.value; return c; })} />
-                          {editModal.data.datasets.map((ds, di) => (
-                            <input key={di} style={{ ...S.fi, flex:1 }} type="number" value={ds.data[i]}
-                              onChange={(e) => updateModalData((d) => { const c=JSON.parse(JSON.stringify(d)); c.datasets[di].data[i]=parseInt(e.target.value)||0; return c; })} />
-                          ))}
-                          <button style={S.rmBtn} onClick={() => removeRow(i)}>🗑</button>
-                        </div>
-                      ))}
-                      <button style={S.addRowBtn} onClick={addRow}>➕ Ajouter un point</button>
-                    </div>
-                  </>
-                )
-              )}
+                    </>
+                  )}
+                </div>
 
-              {/* 4. حالة المخطط الدائري (Doughnut) */}
-              {(editModal.mode === "edit-chart" || editModal.mode === "add-data") && editModal.data.type === "doughnut" && (
-                <>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Titre</label>
-                    <input style={S.fi} value={editModal.data.title}
-                      onChange={(e) => updateModalData((d) => ({ ...d, title:e.target.value }))} />
-                  </div>
-                  {/* ... جدول الـ Doughnut كما هو ... */}
-                </>
-              )}
-            </div>
-
-            <div style={S.mFoot}>
-              <button style={S.cancelBtn} onClick={closeModal}>Annuler</button>
-              <button style={S.saveBtn} onClick={saveModal}>💾 Sauvegarder</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════
-           ADD CHART MODAL
-      ══════════════════════════════════ */}
-      {addChartModal && (
-        <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setAddChartModal(false)}>
-          <div style={{ ...S.modal, maxWidth:480 }}>
-            <div style={S.mHead}>
-              <h3 style={S.mTitle}>➕ Nouveau Diagramme</h3>
-              <button style={S.mClose} onClick={() => setAddChartModal(false)}>✕</button>
-            </div>
-            <div style={S.mBody}>
-              <div style={S.fg}>
-                <label style={S.fl}>Titre</label>
-                <input style={S.fi} placeholder="Ex : Revenus mensuels" value={newChart.title}
-                  onChange={(e) => setNewChart((p) => ({ ...p, title:e.target.value }))} />
-              </div>
-              <div style={S.fg}>
-                <label style={S.fl}>Type de diagramme</label>
-                <div style={S.typeGrid}>
-                  {[{t:"line",ico:"📈",l:"Ligne"},{t:"bar",ico:"📊",l:"Barres"},{t:"doughnut",ico:"🍩",l:"Donut"}].map((o) => (
-                    <button key={o.t}
-                      style={{ ...S.typeBtn, ...(newChart.type===o.t?S.typeBtnOn:{}) }}
-                      onClick={() => setNewChart((p) => ({ ...p, type:o.t }))}>
-                      <span style={{ fontSize:30 }}>{o.ico}</span>
-                      <span style={{ fontSize:12, fontWeight:600 }}>{o.l}</span>
-                    </button>
-                  ))}
+                <div style={S.mFoot}>
+                  <button style={S.cancelBtn} onClick={closeModal}>Annuler</button>
+                  <button style={S.saveBtn} onClick={saveModal}>💾 Sauvegarder</button>
                 </div>
               </div>
-              <div style={S.divider} />
-              <button style={S.pbiModalBtn} onClick={() => { setAddChartModal(false); openPowerBI(); }}>
-                📊 Ouvrir dans Power BI Desktop
-              </button>
-              <p style={{ fontSize:11, color:"#999", textAlign:"center", marginTop:6 }}>
-                Nécessite Microsoft Power BI Desktop installé sur votre machine
-              </p>
             </div>
-            <div style={S.mFoot}>
-              <button style={S.cancelBtn} onClick={() => setAddChartModal(false)}>Annuler</button>
-              <button style={S.saveBtn}   onClick={createChart}>➕ Créer</button>
-            </div>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* ══════════════════════════════════
-           CONFIRM DELETE
-      ══════════════════════════════════ */}
-      {confirmDel.open && (
-        <div style={S.overlay}
-          onClick={(e) => e.target===e.currentTarget && setConfirmDel({ open:false, id:null, title:"" })}>
-          <div style={{ ...S.modal, maxWidth:400, textAlign:"center", padding:"40px 30px" }}>
-            <div style={{ fontSize:52, marginBottom:14 }}>🗑️</div>
-            <h3 style={{ ...S.mTitle, textAlign:"center", marginBottom:8 }}>
-              Supprimer « {confirmDel.title} » ?
-            </h3>
-            <p style={{ fontSize:13, color:"#888", marginBottom:28 }}>
-              Cette action est irréversible. Toutes les données seront perdues.
-            </p>
-            <div style={{ ...S.mFoot, justifyContent:"center" }}>
-              <button style={S.cancelBtn}
-                onClick={() => setConfirmDel({ open:false, id:null, title:"" })}>
-                Annuler
-              </button>
-              <button style={{ ...S.saveBtn, background:"linear-gradient(135deg,#ef4444,#dc2626)" }}
-                onClick={deleteChart}>
-                🗑 Supprimer
-              </button>
+          {/* ── ADD CHART MODAL ── */}
+          {addChartModal && (
+            <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setAddChartModal(false)}>
+              <div style={{ ...S.modal, maxWidth:480 }}>
+                <div style={S.mHead}>
+                  <h3 style={S.mTitle}>➕ Nouveau Diagramme</h3>
+                  <button style={S.mClose} onClick={() => setAddChartModal(false)}>✕</button>
+                </div>
+                <div style={S.mBody}>
+                  <div style={S.fg}>
+                    <label style={S.fl}>Titre</label>
+                    <input style={S.fi} placeholder="Ex : Revenus mensuels" value={newChart.title}
+                      onChange={(e) => setNewChart((p) => ({ ...p, title:e.target.value }))} />
+                  </div>
+                  <div style={S.fg}>
+                    <label style={S.fl}>Type de diagramme</label>
+                    <div style={S.typeGrid}>
+                      {[{t:"line",ico:"📈",l:"Ligne"},{t:"bar",ico:"📊",l:"Barres"},{t:"doughnut",ico:"🍩",l:"Donut"}].map((o) => (
+                        <button key={o.t}
+                          style={{ ...S.typeBtn, ...(newChart.type===o.t?S.typeBtnOn:{}) }}
+                          onClick={() => setNewChart((p) => ({ ...p, type:o.t }))}>
+                          <span style={{ fontSize:30 }}>{o.ico}</span>
+                          <span style={{ fontSize:12, fontWeight:600 }}>{o.l}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={S.divider} />
+                  <button style={S.pbiModalBtn} onClick={() => { setAddChartModal(false); openPowerBI(); }}>
+                    📊 Ouvrir dans Power BI Desktop
+                  </button>
+                  <p style={{ fontSize:11, color:"#999", textAlign:"center", marginTop:6 }}>
+                    Nécessite Microsoft Power BI Desktop installé sur votre machine
+                  </p>
+                </div>
+                <div style={S.mFoot}>
+                  <button style={S.cancelBtn} onClick={() => setAddChartModal(false)}>Annuler</button>
+                  <button style={S.saveBtn}   onClick={createChart}>➕ Créer</button>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* ── CONFIRM DELETE ── */}
+          {confirmDel.open && (
+            <div style={S.overlay}
+              onClick={(e) => e.target===e.currentTarget && setConfirmDel({ open:false, id:null, title:"" })}>
+              <div style={{ ...S.modal, maxWidth:400, textAlign:"center", padding:"40px 30px" }}>
+                <div style={{ fontSize:52, marginBottom:14 }}>🗑️</div>
+                <h3 style={{ ...S.mTitle, textAlign:"center", marginBottom:8 }}>
+                  Supprimer « {confirmDel.title} » ?
+                </h3>
+                <p style={{ fontSize:13, color:"#888", marginBottom:28 }}>
+                  Cette action est irréversible. Toutes les données seront perdues.
+                </p>
+                <div style={{ ...S.mFoot, justifyContent:"center" }}>
+                  <button style={S.cancelBtn}
+                    onClick={() => setConfirmDel({ open:false, id:null, title:"" })}>
+                    Annuler
+                  </button>
+                  <button style={{ ...S.saveBtn, background:"linear-gradient(135deg,#ef4444,#dc2626)" }}
+                    onClick={deleteChart}>
+                    🗑 Supprimer
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
