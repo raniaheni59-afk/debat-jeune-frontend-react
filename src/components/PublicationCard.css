@@ -42,19 +42,44 @@
 .pc-more-txt:hover { opacity:.75; }
 
 /* ── media grid ── */
-.pc-media { display:grid; gap:2px; overflow:hidden; }
+.pc-media { display:grid; gap:3px; overflow:hidden; }
+
+/* 1 image — pleine largeur, hauteur confortable */
 .pc-media-1 { grid-template-columns:1fr; }
+.pc-media-1 .pc-media-item { height:380px; }
+.pc-media-1 .pc-media-item img { object-fit:contain; background:#f8f5ff; }
+
+/* 2 images cote a cote */
 .pc-media-2 { grid-template-columns:1fr 1fr; }
-.pc-media-3 { grid-template-columns:1fr 1fr; }
-.pc-media-3 .pc-media-item:first-child { grid-column:1/-1; }
+.pc-media-2 .pc-media-item { height:300px; }
+
+/* 3 images : 1 grande gauche, 2 petites droite */
+.pc-media-3 { grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; }
+.pc-media-3 .pc-media-item:first-child { grid-row:1/3; height:320px; }
+.pc-media-3 .pc-media-item:not(:first-child) { height:158px; }
+
+/* 4+ images grille 2x2 */
 .pc-media-4 { grid-template-columns:1fr 1fr; }
-.pc-media-item { position:relative; overflow:hidden; background:#f0eeff; aspect-ratio:4/3; cursor:pointer; }
-.pc-media-1 .pc-media-item { aspect-ratio:unset; max-height:400px; }
-.pc-media-item img, .pc-media-item video { width:100%; height:100%; object-fit:cover; display:block; transition:transform .3s ease; }
-.pc-media-item:hover img, .pc-media-item:hover video { transform:scale(1.04); }
-.pc-media-more { position:absolute; inset:0; background:rgba(0,0,0,0.52); color:#fff; font-size:28px; font-weight:800; display:flex; align-items:center; justify-content:center; }
-/* ── video item: no forced aspect-ratio ── */
-.pc-media-item.pc-media-vid { aspect-ratio: unset; background: #000; }
+.pc-media-4 .pc-media-item { height:240px; }
+
+.pc-media-item {
+  position  : relative;
+  overflow  : hidden;
+  background: #f0eeff;
+  cursor    : pointer;
+}
+.pc-media-item img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .3s ease; }
+.pc-media-item:hover img { transform:scale(1.03); }
+.pc-media-more {
+  position  : absolute; inset:0;
+  background: rgba(0,0,0,0.5);
+  color:#fff; font-size:34px; font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* videos hors grid */
+.pc-vid-wrap { margin:2px 0; }
+.pc-media-item.pc-media-vid { aspect-ratio:unset !important; background:#000; cursor:default; }
 
 /* ── PDF download card ── */
 .pc-pdf-card {
@@ -119,22 +144,22 @@
 
 /* ── REACTION PICKER — horizontal row ── */
 .pc-rpicker {
-  position   : absolute;
-  bottom     : calc(100% + 10px);
-  left       : 50%;
-  transform  : translateX(-50%);
-  z-index    : 900;
-  background : #fff;
-  border-radius: 50px;
-  box-shadow : 0 8px 32px rgba(0,0,0,0.16);
-  border     : 1px solid rgba(0,0,0,0.07);
-  padding    : 8px 12px;
-  display    : flex;         /* ← horizontal */
-  flex-direction: row;       /* ← row */
-  flex-wrap  : nowrap;
-  gap        : 4px;
-  animation  : pickerIn .22s cubic-bezier(.34,1.56,.64,1) both;
-  white-space: nowrap;
+  position      : absolute;
+  bottom        : calc(100% + 10px);
+  left          : 50%;
+  transform     : translateX(-30%);   /* leger decalage vers droite */
+  z-index       : 900;
+  background    : #fff;
+  border-radius : 50px;
+  box-shadow    : 0 8px 32px rgba(0,0,0,0.18);
+  border        : 1px solid rgba(0,0,0,0.07);
+  padding       : 8px 14px;
+  display       : flex;
+  flex-direction: row;
+  flex-wrap     : nowrap;
+  gap           : 4px;
+  animation     : pickerIn .22s cubic-bezier(.34,1.56,.64,1) both;
+  white-space   : nowrap;
 }
 .pc-rpicker.mini {
   bottom    : calc(100% + 6px);
@@ -144,13 +169,13 @@
   gap       : 2px;
 }
 @keyframes pickerIn {
-  from { opacity:0; transform:translateX(-50%) scale(0.7) translateY(8px); }
-  to   { opacity:1; transform:translateX(-50%) scale(1) translateY(0); }
+  from { opacity:0; transform:translateX(-30%) scale(0.7) translateY(8px); }
+  to   { opacity:1; transform:translateX(-30%) scale(1)   translateY(0); }
 }
 .pc-rpicker.mini { animation:pickerInMini .22s cubic-bezier(.34,1.56,.64,1) both; }
 @keyframes pickerInMini {
   from { opacity:0; transform:scale(0.7) translateY(8px); }
-  to   { opacity:1; transform:scale(1) translateY(0); }
+  to   { opacity:1; transform:scale(1)   translateY(0); }
 }
 
 .pc-rp-btn {
@@ -357,28 +382,38 @@
 /* ── lightbox ── */
 .pc-lightbox {
   position  : fixed; inset:0;
-  background: rgba(0,0,0,0.9);
+  background: rgba(0,0,0,0.92);
   z-index   : 1000;
   display   : flex; align-items:center; justify-content:center;
   animation : fadeIn .2s ease;
 }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-.pc-lb-img { max-width:90vw; max-height:90vh; border-radius:12px; object-fit:contain; animation:scaleIn .28s cubic-bezier(.34,1.56,.64,1); }
+.pc-lb-img { max-width:92vw; max-height:90vh; border-radius:10px; object-fit:contain; animation:scaleIn .28s cubic-bezier(.34,1.56,.64,1); box-shadow:0 20px 60px rgba(0,0,0,0.5); }
 @keyframes scaleIn { from{transform:scale(0.85)} to{transform:scale(1)} }
 .pc-lb-close, .pc-lb-nav {
   position  : absolute;
   background: rgba(255,255,255,0.14);
   border    : 1px solid rgba(255,255,255,0.22);
   color     : #fff; border-radius:50%;
-  width:44px; height:44px;
+  width:46px; height:46px;
   display   : flex; align-items:center; justify-content:center;
   cursor    : pointer; backdrop-filter:blur(8px);
   transition: background .2s, transform .2s;
+  font-size : 20px;
 }
-.pc-lb-close { top:20px; right:20px; font-size:18px; }
-.pc-lb-nav.left  { left:20px; font-size:28px; }
-.pc-lb-nav.right { right:20px; font-size:28px; }
-.pc-lb-close:hover, .pc-lb-nav:hover { background:rgba(255,255,255,0.28); transform:scale(1.08); }
+.pc-lb-close { top:20px; right:20px; }
+.pc-lb-nav.left  { left:20px;  font-size:30px; top:50%; transform:translateY(-50%); border-radius:50%; }
+.pc-lb-nav.right { right:20px; font-size:30px; top:50%; transform:translateY(-50%); border-radius:50%; }
+.pc-lb-nav.left:hover  { background:rgba(255,255,255,0.28); transform:translateY(-50%) scale(1.08); }
+.pc-lb-nav.right:hover { background:rgba(255,255,255,0.28); transform:translateY(-50%) scale(1.08); }
+.pc-lb-close:hover { background:rgba(255,255,255,0.28); transform:scale(1.08); }
+.pc-lb-counter {
+  position  : absolute; top:22px; left:50%; transform:translateX(-50%);
+  background: rgba(0,0,0,0.5); color:#fff;
+  padding   : 4px 14px; border-radius:20px;
+  font-size : 13px; font-weight:600; backdrop-filter:blur(6px);
+  border    : 1px solid rgba(255,255,255,0.15);
+}
 
 /* ════════════════════════════════════════════
    RIGHT SIDEBAR — sticky (à mettre dans JeuneLayout.css aussi)

@@ -295,8 +295,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
     try {
       await API.post(`/publications/${pub.id_publication}/comments`,{ contenu_commentaire:t });
       setCmtText("");
-      await loadComments();
-      onUpdate?.();
+      await loadComments(); // recharge les commentaires localement sans re-render du feed
     } catch(e){ console.error("comment:",e?.response?.status, e?.response?.data||e.message); }
     finally{ setCmtSending(false); }
   };
@@ -305,12 +304,16 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const reactPub = async(key)=>{
     setPickerOpen(false);
     const same=myReaction===key, prev=myReaction;
+    // optimistic — update local state only, no re-render of feed
     setMyReaction(same?null:key);
     setCounts(c=>{ const n={...c}; if(prev) n[prev]=Math.max(0,(n[prev]||1)-1); if(!same) n[key]=(n[key]||0)+1; return n; });
     try {
       await API.post(`/publications/${pub.id_publication}/react`,{ type_reaction:same?null:key });
-      onUpdate?.();
-    } catch { onUpdate?.(); }
+    } catch(e) {
+      // rollback on error
+      setMyReaction(prev);
+      setCounts(c=>{ const n={...c}; if(!same) n[key]=Math.max(0,(n[key]||1)-1); if(prev) n[prev]=(n[prev]||0)+1; return n; });
+    }
   };
 
   const myDef  = REACTIONS.find(r=>r.key===myReaction);
@@ -436,11 +439,6 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
           </div>
           <button className="pc-act-btn" onClick={toggleCmts} type="button">
             <CommentIcon/><span>Commenter</span>
-          </button>
-          <button className="pc-act-btn"
-            onClick={()=>navigator.clipboard?.writeText(`${window.location.origin}/publication/${pub.id_publication}`)}
-            type="button">
-            <ShareIcon/><span>Partager</span>
           </button>
         </div>
 
