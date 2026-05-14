@@ -141,7 +141,6 @@ const MediaLightbox = ({ medias, startIndex, onClose }) => {
 /* ─── EditPublicationModal ──────────────────────────────────── */
 const EditPublicationModal = ({ publication, onClose, onSaved }) => {
   const [titre,     setTitre]     = useState(publication.titre_publication||"");
-  const [sousTitre, setSousTitre] = useState(publication.sous_titre||"");
   const [contenu,   setContenu]   = useState(publication.contenu_publication||publication.contenu||"");
   const [medias,    setMedias]    = useState(publication.medias||[]);
   const [newFiles,  setNewFiles]  = useState([]);   // { file, preview, type }
@@ -168,7 +167,6 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
     try {
       const form = new FormData();
       form.append("titre_publication",   titre);
-      form.append("sous_titre",          sousTitre);
       form.append("contenu_publication", contenu);
       form.append("contenu",             contenu);
       // IDs des médias existants à garder
@@ -213,9 +211,6 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
         <div className="pc-modal-body">
           <label className="pc-modal-label">Titre</label>
           <input className="pc-modal-inp" value={titre} onChange={e=>setTitre(e.target.value)} placeholder="Titre…"/>
-
-          <label className="pc-modal-label">Sous-titre</label>
-          <input className="pc-modal-inp" value={sousTitre} onChange={e=>setSousTitre(e.target.value)} placeholder="Sous-titre…"/>
 
           <label className="pc-modal-label">Contenu</label>
           <textarea className="pc-modal-ta" value={contenu} onChange={e=>setContenu(e.target.value)} rows={4} placeholder="Contenu…"/>
