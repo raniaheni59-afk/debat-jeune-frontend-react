@@ -46,21 +46,21 @@
 
 /* 1 image — pleine largeur, hauteur confortable */
 .pc-media-1 { grid-template-columns:1fr; }
-.pc-media-1 .pc-media-item { height:380px; }
+.pc-media-1 .pc-media-item { height:280px; }
 .pc-media-1 .pc-media-item img { object-fit:contain; background:#f8f5ff; }
 
 /* 2 images cote a cote */
 .pc-media-2 { grid-template-columns:1fr 1fr; }
-.pc-media-2 .pc-media-item { height:300px; }
+.pc-media-2 .pc-media-item { height:220px; }
 
 /* 3 images : 1 grande gauche, 2 petites droite */
 .pc-media-3 { grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; }
-.pc-media-3 .pc-media-item:first-child { grid-row:1/3; height:320px; }
-.pc-media-3 .pc-media-item:not(:first-child) { height:158px; }
+.pc-media-3 .pc-media-item:first-child { grid-row:1/3; height:240px; }
+.pc-media-3 .pc-media-item:not(:first-child) { height:118px; }
 
 /* 4+ images grille 2x2 */
 .pc-media-4 { grid-template-columns:1fr 1fr; }
-.pc-media-4 .pc-media-item { height:240px; }
+.pc-media-4 .pc-media-item { height:190px; }
 
 .pc-media-item {
   position  : relative;
@@ -139,7 +139,8 @@
   transition:all .2s ease; white-space:nowrap; font-family:'Inter',sans-serif;
 }
 .pc-act-btn:hover { background:rgba(90,63,160,0.08); color:#5a3fa0; }
-.pc-act-btn.on { color:#5a3fa0; }
+.pc-act-btn.on { color:#1877f2; }
+.pc-act-btn.on span { color:#1877f2 !important; }
 .pc-act-emoji { font-size:18px; line-height:1; }
 
 /* ── REACTION PICKER — horizontal row ── */
@@ -355,7 +356,7 @@
   font-family:'Inter',sans-serif;
 }
 .pc-cmt-act:hover { color:#5a3fa0; background:rgba(90,63,160,0.08); }
-.pc-cmt-act.on     { color:#5a3fa0; }
+.pc-cmt-act.on { color:#1877f2; }
 .pc-cmt-act.accent { color:#5a3fa0; }
 
 /* reply input */
@@ -527,3 +528,18 @@
   .pc-pdf-card { flex-wrap: wrap; }
   .pc-pdf-info { width: 100%; order: -1; }
 }
+
+/* ── sticker in comment bubble ── */
+.pc-cmt-sticker {
+  font-size   : 36px;
+  line-height : 1.2;
+  margin      : 2px 0 0;
+  padding     : 0;
+}
+
+/* ── J'aime blue labels ── */
+.pc-act-label-blue  { color: #1877f2 !important; }
+.pc-act-label-react { color: #5a3fa0 !important; }
+
+/* ── video smaller ── */
+.pc-vid-wrap video { max-height: 320px !important; }
