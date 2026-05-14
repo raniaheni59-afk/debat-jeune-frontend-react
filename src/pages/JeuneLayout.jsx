@@ -323,7 +323,6 @@ const JeuneLayout = () => {
   const NAV = [
     { icon:"home",     label:"Accueil",        page:PAGES.HOME },
     { icon:"message",  label:"Messages",        page:PAGES.MESSAGES,  badge:unreadMessages||null },
-    { icon:"pencil",   label:"Publier",         page:PAGES.PUBLIER },
     { icon:"calendar", label:"Calendrier",      page:PAGES.CALENDAR },
     { icon:"radio",    label:"Live",            page:PAGES.LIVE,      live:true },
     { icon:"bell",     label:"Notifications",   page:PAGES.NOTIFS,    badge:unreadNotifs||null },
