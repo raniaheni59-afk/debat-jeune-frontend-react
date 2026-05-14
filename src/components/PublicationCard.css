@@ -15,7 +15,7 @@
   border       : 1px solid rgba(255,255,255,0.72);
   box-shadow   : 0 2px 18px rgba(90,63,160,0.09);
   margin-bottom: 14px;
-  overflow     : hidden;
+  overflow     : visible;
   font-family  : 'Inter', sans-serif;
   transition   : box-shadow .25s ease, transform .25s ease;
 }
@@ -130,8 +130,8 @@
 .pc-cmt-cnt:hover { color:#5a3fa0; }
 
 /* ── action bar ── */
-.pc-actions { display:flex; align-items:center; padding:3px 8px; border-bottom:1px solid rgba(90,63,160,0.07); gap:2px; }
-.pc-act-wrap { position:relative; flex:1; }
+.pc-actions { display:flex; align-items:center; padding:3px 8px; border-bottom:1px solid rgba(90,63,160,0.07); gap:2px; overflow:visible; position:relative; z-index:10; }
+.pc-act-wrap { position:relative; flex:1; overflow:visible; }
 .pc-act-btn {
   width:100%; display:flex; align-items:center; justify-content:center; gap:7px;
   padding:10px 8px; border-radius:10px; background:none; border:none;
@@ -148,7 +148,7 @@
   position      : absolute;
   bottom        : calc(100% + 10px);
   left          : 50%;
-  transform     : translateX(-30%);   /* leger decalage vers droite */
+  transform     : translateX(-40%);   /* centre sur le bouton */
   z-index       : 900;
   background    : #fff;
   border-radius : 50px;

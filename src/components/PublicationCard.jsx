@@ -10,14 +10,16 @@ const getCurrentUser = () => {
 
 /* ─── URL helper ────────────────────────────────────────────── */
 const BACKEND = (() => {
-  const base = (API.defaults?.baseURL || "");
+  const base = API.defaults?.baseURL || window.location.origin;
   return base.replace(/\/api\/?$/, "").replace(/\/$/, "");
 })();
 
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  return `${BACKEND}${p.startsWith("/") ? p : `/${p}`}`;
+  // normalize Windows backslashes from Railway disk paths
+  const clean = p.split("\\").join("/").replace(/^\/+/, "");
+  return BACKEND + "/" + clean;
 };
 
 const avatar = (name) =>
