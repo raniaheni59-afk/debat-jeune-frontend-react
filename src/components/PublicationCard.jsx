@@ -10,14 +10,16 @@ const getCurrentUser = () => {
 
 /* ─── URL helper ────────────────────────────────────────────── */
 const BACKEND = (() => {
-  const base = (API.defaults?.baseURL || "");
+  const base = API.defaults?.baseURL || window.location.origin;
   return base.replace(/\/api\/?$/, "").replace(/\/$/, "");
 })();
 
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  return `${BACKEND}${p.startsWith("/") ? p : `/${p}`}`;
+  // normalize Windows backslashes from Railway disk paths
+  const clean = p.split("\\").join("/").replace(/^\/+/, "");
+  return BACKEND + "/" + clean;
 };
 
 const avatar = (name) =>
@@ -187,14 +189,22 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
       <div className="pc-cmt-right">
         <div className="pc-cmt-bubble">
           <span className="pc-cmt-nm">{comment.prenom_user} {comment.nom_user}</span>
-          <p className="pc-cmt-txt">{comment.contenu_commentaire||comment.contenu}</p>
+          {(() => {
+            const txt = comment.contenu_commentaire||comment.contenu||"";
+            // si le contenu est 1-3 emojis seulement, les afficher en grand
+            const onlyEmoji = /^[\p{Emoji}\s]{1,6}$/u.test(txt) && txt.trim().length <= 6;
+            return onlyEmoji
+              ? <p className="pc-cmt-sticker">{txt}</p>
+              : <p className="pc-cmt-txt">{txt}</p>;
+          })()}
         </div>
         <ReactionSummary counts={counts}/>
         <div className="pc-cmt-meta">
           <span className="pc-cmt-time">{timeAgo(comment.created_at)}</span>
           <div className="pc-cmt-rpick-wrap" ref={picRef}>
             <button className={`pc-cmt-act${myReaction?" on":""}`}
-              onClick={()=>setPickerOpen(o=>!o)} type="button">
+              onClick={()=>setPickerOpen(o=>!o)} type="button"
+              style={myReaction==="like"?{color:"#1877f2"}:myReaction?{color:"#5a3fa0"}:{}}>
               {myDef?`${myDef.emoji} ${myDef.label}`:"👍 J'aime"}
             </button>
             {pickerOpen && <ReactionPicker onPick={reactCmt} current={myReaction} mini/>}
@@ -432,7 +442,8 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
               onMouseEnter={()=>setPickerOpen(true)}
               type="button">
               {myDef
-                ? <><span className="pc-act-emoji">{myDef.emoji}</span><span style={{color:"#5a3fa0"}}>{myDef.label}</span></>
+                ? <><span className="pc-act-emoji">{myDef.emoji}</span>
+                    <span className={myDef.key==="like"?"pc-act-label-blue":"pc-act-label-react"}>{myDef.label}</span></>
                 : <><ThumbIcon/><span>J'aime</span></>}
             </button>
             {pickerOpen && <ReactionPicker onPick={reactPub} current={myReaction}/>}
