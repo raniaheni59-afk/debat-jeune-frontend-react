@@ -130,18 +130,9 @@ const MediaLightbox = ({ medias, startIndex, onClose }) => {
   return (
     <div className="pc-lightbox" onClick={onClose}>
       <button className="pc-lb-close" onClick={onClose}>✕</button>
-      {medias.length > 1 && <div className="pc-lb-counter">{idx+1} / {medias.length}</div>}
+      <div className="pc-lb-counter">{idx+1} / {medias.length}</div>
       {idx>0 && <button className="pc-lb-nav left" onClick={prev}>‹</button>}
-      <div className="pc-lb-content" onClick={e=>e.stopPropagation()}>
-        {isVid(m)
-          ? <video src={src} controls autoPlay playsInline style={{maxWidth:"92vw",maxHeight:"86vh",display:"block"}}/>
-          : isPdf(m)
-            ? <iframe src={src} title="PDF" style={{width:"88vw",height:"86vh",border:"none",borderRadius:"12px"}}/>
-            : src
-              ? <img className="pc-lb-img" src={src} alt="" onError={e=>{e.target.style.display="none";}}/>
-              : <div style={{color:"#fff",padding:"40px",fontSize:"18px"}}>Média non disponible</div>
-        }
-      </div>
+      <img className="pc-lb-img" src={src} alt="" onClick={e=>e.stopPropagation()} />
       {idx<medias.length-1 && <button className="pc-lb-nav right" onClick={next}>›</button>}
     </div>
   );
@@ -169,38 +160,50 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
     });
   };
 
+  const [saveError, setSaveError] = useState("");
+
   const handleSave = async () => {
-    if (saving) return;
     setSaving(true);
+    setSaveError("");
     try {
-      if (newFiles.length > 0) {
-        // multipart only when there are new files — let axios set boundary automatically
+      const hasNewFiles = newFiles.length > 0;
+
+      if (hasNewFiles) {
+        // multipart si nouveaux fichiers
         const form = new FormData();
         form.append("titre_publication", titre);
-        form.append("sous_titre", sousTitre);
+        form.append("sous_titre",        sousTitre);
         form.append("contenu_publication", contenu);
         medias.forEach(m => {
-          const id = m.id_media || m.id;
-          if (id != null) form.append("kept_media_ids[]", id);
+          const id = m.id_media ?? m.id ?? "";
+          if (id !== "") form.append("kept_media_ids[]", id);
         });
         newFiles.forEach(f => form.append("medias", f.file));
-        await API.put(`/publications/${publication.id_publication}`, form);
-      } else {
-        // plain JSON when no new files — simpler + more compatible
-        const keptIds = medias.map(m => m.id_media || m.id).filter(Boolean);
-        await API.put(`/publications/${publication.id_publication}`, {
-          titre_publication:   titre,
-          sous_titre:          sousTitre,
-          contenu_publication: contenu,
-          kept_media_ids:      keptIds,
+        await API.put(`/publications/${publication.id_publication}`, form, {
+          headers: { "Content-Type": "multipart/form-data" }
         });
+      } else {
+        // JSON simple si pas de nouveaux fichiers
+        const body = {
+          titre_publication:    titre,
+          sous_titre:           sousTitre,
+          contenu_publication:  contenu,
+          contenu:              contenu,
+          kept_media_ids: medias.map(m => m.id_media ?? m.id).filter(Boolean),
+        };
+        await API.put(`/publications/${publication.id_publication}`, body);
       }
+
+      onSaved();
       onClose();
-      await onSaved();
     } catch(e) {
-      console.error("edit publication:", e?.response?.data || e?.response?.status || e.message);
-      const msg = e?.response?.data?.message || e?.response?.data?.error || "Erreur lors de la modification. Veuillez réessayer.";
-      alert(msg);
+      const msg = e?.response?.data?.message
+               || e?.response?.data?.error
+               || e?.response?.data
+               || e.message
+               || "Erreur inconnue";
+      console.error("edit publication:", e?.response?.status, msg);
+      setSaveError(typeof msg === "string" ? msg : JSON.stringify(msg));
     } finally {
       setSaving(false);
     }
@@ -275,8 +278,11 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
               style={{display:"none"}}
               onChange={e=>{ addFiles(e.target.files); e.target.value=""; }}/>
           </div>
-        </div>
 
+          {saveError && (
+            <div className="pc-modal-error">⚠️ {saveError}</div>
+          )}
+        </div>
         <div className="pc-modal-footer">
           <button className="pc-modal-cancel" onClick={onClose} type="button">Annuler</button>
           <button className="pc-modal-save" onClick={handleSave} disabled={saving} type="button">
@@ -288,26 +294,44 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
   );
 };
 
-/* ─── EditCommentModal ──────────────────────────────────────── */
 const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
-  const [text,    setText]    = useState(comment.contenu_commentaire||comment.contenu||"");
-  const [stkOpen, setStkOpen] = useState(false);
-  const [saving,  setSaving]  = useState(false);
+  const [text,      setText]     = useState(comment.contenu_commentaire||comment.contenu||"");
+  const [stkOpen,   setStkOpen]  = useState(false);
+  const [saving,    setSaving]   = useState(false);
+  const [saveError, setSaveError]= useState("");
   const inputRef = useRef(null);
 
   const handleSave = async () => {
     const t = text.trim(); if(!t||saving) return;
     setSaving(true);
-    try {
-      await API.put(`/publications/${pubId}/comments/${comment.id_commentaire}`, { contenu_commentaire: t });
-      onClose();
-      await onSaved();
-    } catch(e) {
-      console.error("edit comment:", e?.response?.data||e.message);
-      alert("Erreur lors de la modification. Veuillez réessayer.");
-    } finally {
-      setSaving(false);
+    setSaveError("");
+    const payload = { contenu_commentaire: t, contenu: t };
+    const routes = [
+      () => API.put(`/publications/${pubId}/comments/${comment.id_commentaire}`, payload),
+      () => API.patch(`/publications/${pubId}/comments/${comment.id_commentaire}`, payload),
+      () => API.put(`/comments/${comment.id_commentaire}`, payload),
+      () => API.patch(`/comments/${comment.id_commentaire}`, payload),
+    ];
+    let lastErr = null;
+    for (const tryRoute of routes) {
+      try {
+        await tryRoute();
+        onSaved();
+        onClose();
+        return;
+      } catch(e) {
+        lastErr = e;
+        if (e?.response?.status !== 404) break; // stop only on non-404
+      }
     }
+    const msg = lastErr?.response?.data?.message
+             || lastErr?.response?.data?.error
+             || lastErr?.response?.data
+             || lastErr?.message
+             || "Erreur inconnue";
+    console.error("edit comment:", lastErr?.response?.status, msg);
+    setSaveError(typeof msg === "string" ? msg : JSON.stringify(msg));
+    setSaving(false);
   };
 
   useEffect(()=>{ document.body.style.overflow="hidden"; return()=>{ document.body.style.overflow=""; }; },[]);
@@ -319,23 +343,29 @@ const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
           <span>Modifier le commentaire</span>
           <button className="pc-modal-close" onClick={onClose} type="button">✕</button>
         </div>
-        <div className="pc-modal-body">
-          <div className="pc-cmt-input-wrap" style={{borderRadius:"14px",padding:"4px 6px 4px 0"}}>
+        <div className="pc-modal-body" style={{position:"relative", overflow:"visible"}}>
+          {/* sticker picker — au-dessus du champ */}
+          {stkOpen && (
+            <div style={{position:"absolute", bottom:"calc(100% - 10px)", right:"0", zIndex:9999}}>
+              <StickerPicker
+                onPick={s=>{setText(t=>t+s); setStkOpen(false); setTimeout(()=>inputRef.current?.focus(),50);}}
+                onClose={()=>setStkOpen(false)}/>
+            </div>
+          )}
+          <div className="pc-cmt-input-wrap" style={{borderRadius:"14px", padding:"4px 6px 4px 0", minHeight:"48px"}}>
             <input ref={inputRef} className="pc-cmt-inp" value={text}
               onChange={e=>setText(e.target.value)}
               onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();handleSave();}}}
               placeholder="Modifier le commentaire…" autoFocus
-              style={{padding:"10px 14px"}}/>
-            <div className="pc-cmt-inp-acts" style={{position:"relative"}}>
+              style={{padding:"10px 14px", fontSize:"14px"}}/>
+            <div className="pc-cmt-inp-acts">
               <button className="pc-cmt-emoji-btn" type="button"
                 onClick={()=>setStkOpen(o=>!o)} title="Stickers">😊</button>
-              {stkOpen && (
-                <StickerPicker
-                  onPick={s=>{setText(t=>t+s);setStkOpen(false);inputRef.current?.focus();}}
-                  onClose={()=>setStkOpen(false)}/>
-              )}
             </div>
           </div>
+          {saveError && (
+            <div className="pc-modal-error" style={{marginTop:"8px"}}>⚠️ {saveError}</div>
+          )}
         </div>
         <div className="pc-modal-footer">
           <button className="pc-modal-cancel" onClick={onClose} type="button">Annuler</button>
@@ -463,7 +493,7 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
               <DotsMenu items={menuItems}/>
             )}
           </div>
-          <ReactionSummary counts={counts}/>
+          {Object.values(counts).reduce((s,v)=>s+(v||0),0) > 0 && <ReactionSummary counts={counts}/>}
           <div className="pc-cmt-meta">
             <span className="pc-cmt-time">{timeAgo(comment.created_at)}</span>
             <div className="pc-cmt-rpick-wrap" ref={picRef}>
@@ -727,9 +757,9 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 
         {/* ── stats ── */}
         <div className="pc-stats">
-          <ReactionSummary counts={counts}/>
+          {Object.values(counts).reduce((s,v)=>s+(v||0),0) > 0 && <ReactionSummary counts={counts}/>}
           <span className="pc-cmt-cnt" onClick={toggleCmts}>
-            {cmtCount} commentaire{cmtCount!==1?"s":""}
+            {cmtCount > 0 ? `${cmtCount} commentaire${cmtCount!==1?"s":""}` : ""}
           </span>
         </div>
 
@@ -801,7 +831,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
       </article>
 
       {/* ── lightbox ── */}
-      {lightbox!==null && imgMedias.length>0 && imgMedias[lightbox] && (
+      {lightbox!==null && imgMedias.length>0 && (
         <MediaLightbox
           medias={imgMedias}
           startIndex={lightbox}
@@ -813,7 +843,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
         <EditPublicationModal
           publication={pub}
           onClose={()=>setEditOpen(false)}
-          onSaved={async()=>{ if(onUpdate) await onUpdate(); }}/>
+          onSaved={()=>{ if(onUpdate) onUpdate(); }}/>
       )}
     </>
   );
