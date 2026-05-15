@@ -82,7 +82,7 @@ const Icon = ({ name, size = 20 }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   MODAL COMPONENT
+   MODAL COMPONENTS
 ═══════════════════════════════════════════════════════════ */
 const Toggle = ({ on, onToggle }) => (
   <div
@@ -232,15 +232,31 @@ const JeuneLayout = () => {
   ]);
   const cbEndRef = useRef(null);
 
-  /* ── SOCKET ── */
+  /* ── SOCKET ── ✅ FIX: useRef pour éviter le loop connect/disconnect */
+  const socketRef = useRef(null);
+
   useEffect(() => {
+    // ✅ FIX: si socket déjà créé, ne pas en créer un autre
+    if (socketRef.current) return;
+
     const token = localStorage.getItem("token");
     if (!token) return;
-    const socket = io(BACKEND, { auth:{ token }, transports:["websocket"] });
-    socket.on("connect_error", (e) => console.error("Socket:", e.message));
-    socket.on("new_message", () => setUnreadMessages((n) => n + 1));
-    return () => socket.disconnect();
-  }, []);
+
+    socketRef.current = io(BACKEND, {
+      auth: { token },
+      transports: ["websocket"],
+      reconnectionAttempts: 5,      // ✅ limite les tentatives
+      reconnectionDelay: 3000,      // ✅ attendre 3s avant retry
+    });
+
+    socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
+    socketRef.current.on("new_message", () => setUnreadMessages((n) => n + 1));
+
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, []); // ✅ dependency array vide = une seule fois
 
   /* ── FETCH ── */
   const fetchPublications = useCallback(async () => {
@@ -279,6 +295,8 @@ const JeuneLayout = () => {
 
   /* ── ACTIONS ── */
   const handleLogout = () => {
+    socketRef.current?.disconnect();
+    socketRef.current = null;
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     window.location.href = "/login";
@@ -495,7 +513,7 @@ const JeuneLayout = () => {
           </div>
         );
 
-      /* ── ENQUETE ── */
+      /* ── ENQUETE ── ✅ */
       case PAGES.ENQUETE:
         return <JeuneEnquete />;
 
