@@ -1,4 +1,4 @@
-// داخل VerifyEmail.jsx
+
 import { useLocation, useNavigate } from "react-router-dom";
 
 export default function VerifyEmail() {
