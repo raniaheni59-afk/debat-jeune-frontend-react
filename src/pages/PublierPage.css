@@ -3,7 +3,7 @@
 ============================================= */
 
 .publier-page {
-  min-height: 100vh;
+  padding: 30px 15px 80px;
   background: linear-gradient(135deg, #f5f2ff 0%, #ede9ff 100%);
   padding: 30px 15px 80px;
   display: block;
