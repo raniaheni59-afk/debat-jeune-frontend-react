@@ -33,7 +33,7 @@ import "./index.css";
 
 const BACKEND =
   import.meta.env.VITE_BACKEND_URL ||
-  "https://debat-jeune-production.up.railway.app";
+  "https://debat-jeune.onrender.com";
 
 const ProtectedAdminRoute = ({ children }) => {
   const token   = localStorage.getItem("token");

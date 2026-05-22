@@ -6,7 +6,7 @@ const baseURL =
   // CRA
   process?.env?.REACT_APP_API_URL ||
   // fallback
-  "https://debat-jeune-production.up.railway.app/api";
+  "https://debat-jeune.onrender.com/api";
 
 const API = axios.create({
   baseURL,
