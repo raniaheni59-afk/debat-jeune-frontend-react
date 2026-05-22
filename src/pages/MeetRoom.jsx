@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { io } from "socket.io-client";
 
-const SOCKET_URL = "https://debat-jeune-production.up.railway.app";
+const SOCKET_URL = "https://debat-jeune.onrender.com";
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 
 /* ── CSS animations ── */

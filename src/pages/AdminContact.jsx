@@ -18,7 +18,7 @@ import "./AdminContact.css";
 // ═══════════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════════
-const BACKEND = "https://debat-jeune-production.up.railway.app";
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
 const PALETTE = ["#7c5cbf","#3b82f6","#22c55e","#f59e0b","#ef4444","#ec4899","#06b6d4","#8b5cf6"];
 
 // ═══════════════════════════════════════════════════════════════

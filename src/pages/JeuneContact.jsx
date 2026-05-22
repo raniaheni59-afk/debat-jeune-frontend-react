@@ -6,7 +6,7 @@ import "./AdminContact.css";
 // ─────────────────────────────────────────────────────────────
 // CONSTANTS
 // ─────────────────────────────────────────────────────────────
-const BACKEND = "https://debat-jeune-production.up.railway.app";
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
 const COLORS = [
   "#6d56c1","#2563eb","#059669","#d97706",
   "#dc2626","#7c3aed","#0891b2","#be185d",

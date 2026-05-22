@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import "./LiveViewer.css";
 
-const SOCKET_URL = "https://swafy-backend.onrender.com";
+const SOCKET_URL = "https://debat-jeune.onrender.com";
 
 export default function LiveViewer() {
   const { roomCode } = useParams();

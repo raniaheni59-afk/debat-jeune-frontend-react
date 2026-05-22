@@ -5,7 +5,7 @@ import API from "../services/api";
 
 const BACKEND =
   API.defaults.baseURL?.split("/api")[0] ||
-  "https://debat-jeune-production.up.railway.app";
+  "https://debat-jeune.onrender.com";
 
 const getIcon = (type) => {
   const icons = {
