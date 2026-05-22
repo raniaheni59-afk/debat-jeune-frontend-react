@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import API from "../services/api";
 import "./PublicationCard.css";
+import DebateBlock from "./DebateBlock";
 
 /* ─── current user ──────────────────────────────────────────── */
 const getCurrentUser = () => {
@@ -17,8 +18,13 @@ const BACKEND = (() => {
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
+  // normalise backslashes + leading slashes
   const clean = p.split("\\").join("/").replace(/^\/+/, "");
-  return BACKEND + "/" + clean;
+  // avoid double /uploads/uploads
+  if (clean.startsWith("uploads/") || clean.startsWith("uploads\\")) {
+    return BACKEND + "/" + clean;
+  }
+  return BACKEND + "/uploads/" + clean;
 };
 
 const avatar = (name) =>
@@ -420,8 +426,10 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const currentUser = getCurrentUser();
   const isOwner = currentUser && (
     currentUser.id_user === comment.id_user ||
-    currentUser.id === comment.id_user ||
-    currentUser.role === "admin"
+    currentUser.id      === comment.id_user ||
+    currentUser.id_user === comment.user_id  ||
+    currentUser.id      === comment.user_id  ||
+    currentUser.role    === "admin"
   );
 
   useEffect(()=>{
@@ -445,14 +453,21 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
     catch(e) { console.error("delete comment:", e?.response?.data||e.message); }
   };
 
-  const sendReply = async()=>{
-    const t=replyText.trim(); if(!t||replySending) return;
+  const sendReply = async (textOverride) => {
+    const t = (textOverride || replyText).trim();
+    if (!t || replySending) return;
     setReplySending(true);
     try {
-      await API.post(`/publications/${pubId}/comments`,{ contenu_commentaire:t, parent_id:comment.id_commentaire });
-      setReplyText(""); setReplyOpen(false); onRefresh();
-    } catch(e){ console.error("reply:",e?.response?.data||e.message); }
-    finally{ setReplySending(false); }
+      await API.post(`/publications/${pubId}/comments`, {
+        contenu_commentaire: t,
+        parent_id: comment.id_commentaire,
+      });
+      setReplyText("");
+      setReplyOpen(false);
+      setShowReplies(true);
+      onRefresh();
+    } catch(e) { console.error("reply:", e?.response?.data || e.message); }
+    finally { setReplySending(false); }
   };
 
   const myDef  = REACTIONS.find(r=>r.key===myReaction);
@@ -460,8 +475,8 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
 
   const menuItems = [];
   if (isOwner) {
-    menuItems.push({ icon:"✏️", label:"Modifier", onClick:()=>setEditOpen(true) });
     menuItems.push({ icon:"🗑️", label:"Supprimer", danger:true, onClick:deleteCmt });
+    menuItems.push({ icon:"✏️", label:"Modifier",  onClick:()=>setEditOpen(true) });
   }
 
   return (
@@ -516,11 +531,11 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
                   placeholder={`Répondre à ${comment.prenom_user}…`}
                   value={replyText}
                   onChange={e=>setReplyText(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&!e.shiftKey&&sendReply()}
+                  onKeyDown={e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); sendReply(); } }}
                   autoFocus/>
                 <div className="pc-reply-acts">
                   <button className="pc-cmt-emoji-btn" type="button" onClick={()=>setStkOpen(o=>!o)}>😊</button>
-                  <button className="pc-send-btn" onClick={sendReply}
+                  <button className="pc-send-btn" onClick={()=>sendReply()}
                     disabled={!replyText.trim()||replySending} type="button">
                     {replySending?<div className="pc-btn-spin"/>:<SendIcon/>}
                   </button>
@@ -529,12 +544,10 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
               {stkOpen && <StickerPicker
                 onPick={s=>{
                   setStkOpen(false);
-                  if(!replyText.trim()){
-                    // Envoyer le sticker seul
-                    setReplyText(s);
-                    setTimeout(()=>sendReply(),0);
+                  if (!replyText.trim()) {
+                    sendReply(s);
                   } else {
-                    setReplyText(t=>t+s);
+                    setReplyText(t => t + s);
                   }
                 }}
                 onClose={()=>setStkOpen(false)}/>}
@@ -588,10 +601,11 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const stkRef      = useRef(null);
 
   const isAdmin = currentUser?.role === "admin";
-  // Owner = proprio de la publication OU admin
   const isOwner = currentUser && (
-    currentUser.id_user === pub.user_id ||
-    currentUser.id      === pub.user_id ||
+    currentUser.id_user === pub.user_id  ||
+    currentUser.id      === pub.user_id  ||
+    currentUser.id_user === pub.id_user  ||
+    currentUser.id      === pub.id_user  ||
     isAdmin
   );
 
@@ -658,10 +672,15 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const body   = pub.contenu_publication||pub.contenu||"";
   const isLong = body.length>280;
 
+  const getSrcSafe = (m) => {
+    const s = getSrc(m);
+    return s && s !== BACKEND + "/uploads/" ? s : null;
+  };
+
   /* split media — skip medias without valid src */
-  const pdfMedias  = media.filter(m=>isPdf(m) && getSrc(m));
-  const imgMedias  = media.filter(m=>!isPdf(m)&&isImg(m) && getSrc(m));
-  const vidMedias  = media.filter(m=>!isPdf(m)&&isVid(m) && getSrc(m));
+  const pdfMedias  = media.filter(m => isPdf(m) && getSrcSafe(m));
+  const vidMedias  = media.filter(m => !isPdf(m) && isVid(m) && getSrcSafe(m));
+  const imgMedias  = media.filter(m => !isPdf(m) && !isVid(m) && isImg(m) && getSrcSafe(m));
 
   /* grid layout for images */
   const gridClass = imgMedias.length===1?"pc-media-1"
@@ -672,8 +691,8 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   /* pub dots menu */
   const pubMenuItems = [];
   if (isOwner) {
-    pubMenuItems.push({ icon:"✏️", label:"Modifier", onClick:()=>setEditOpen(true) });
     pubMenuItems.push({ icon:"🗑️", label:"Supprimer", danger:true, onClick:deletePub });
+    pubMenuItems.push({ icon:"✏️", label:"Modifier",  onClick:()=>setEditOpen(true) });
   }
 
   return (
@@ -737,8 +756,9 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
         {/* ── videos ── */}
         {vidMedias.map((m,i)=>(
           <div key={`vid-${i}`} className="pc-vid-wrap">
-            <video src={getSrc(m)} controls playsInline preload="metadata"
-              style={{width:"100%",display:"block",maxHeight:"460px",background:"#000"}}/>
+            <video src={getSrcSafe(m)} controls playsInline preload="metadata"
+              style={{width:"100%",display:"block",maxHeight:"260px",background:"#000"}}
+              onError={e=>{ e.target.closest(".pc-vid-wrap").style.display="none"; }}/>
           </div>
         ))}
 
@@ -746,7 +766,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
         {imgMedias.length>0 && (
           <div className={`pc-media ${gridClass}`}>
             {imgMedias.slice(0,4).map((m,i)=>{
-              const src = getSrc(m);
+              const src = getSrcSafe(m);
               const more = imgMedias.length>4 && i===3;
               return (
                 <div key={i} className="pc-media-item" onClick={()=>setLightbox(i)}>
@@ -754,47 +774,54 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
                     src={src}
                     alt=""
                     loading="lazy"
-                    onError={e=>{ e.target.closest(".pc-media-item").style.display="none"; }}
+                    onError={e=>{ const item=e.target.closest(".pc-media-item"); if(item) item.style.display="none"; }}
                   />
-                  {more && (
-                    <div className="pc-media-more">+{imgMedias.length-4}</div>
-                  )}
+                  {more && <div className="pc-media-more">+{imgMedias.length-4}</div>}
                 </div>
               );
             })}
           </div>
         )}
 
-        {/* ── stats ── */}
-        <div className="pc-stats">
-          {Object.values(counts).reduce((s,v)=>s+(v||0),0) > 0 && <ReactionSummary counts={counts}/>}
-          <span className="pc-cmt-cnt" onClick={toggleCmts}>
-            {cmtCount > 0 ? `${cmtCount} commentaire${cmtCount!==1?"s":""}` : ""}
-          </span>
-        </div>
+        {/* ── debate block ── */}
+        {pub.type_publication === "debat" && (
+          <DebateBlock publication={pub} />
+        )}
 
-        {/* ── actions ── */}
-        <div className="pc-actions">
-          <div className="pc-act-wrap" ref={picRef}>
-            <button
-              className={`pc-act-btn${myReaction?" on":""}`}
-              onClick={()=>myReaction?reactPub(myReaction):setPickerOpen(o=>!o)}
-              onMouseEnter={()=>setPickerOpen(true)}
-              type="button">
-              {myDef
-                ? <><span className="pc-act-emoji">{myDef.emoji}</span>
-                    <span className={myDef.key==="like"?"pc-act-label-blue":"pc-act-label-react"}>{myDef.label}</span></>
-                : <><ThumbIcon/><span>J'aime</span></>}
-            </button>
-            {pickerOpen && <ReactionPicker onPick={reactPub} current={myReaction}/>}
+        {/* ── stats — hidden for debate ── */}
+        {pub.type_publication !== "debat" && (
+          <div className="pc-stats">
+            {Object.values(counts).reduce((s,v)=>s+(v||0),0) > 0 && <ReactionSummary counts={counts}/>}
+            <span className="pc-cmt-cnt" onClick={toggleCmts}>
+              {cmtCount > 0 ? `${cmtCount} commentaire${cmtCount!==1?"s":""}` : ""}
+            </span>
           </div>
-          <button className="pc-act-btn" onClick={toggleCmts} type="button">
-            <CommentIcon/><span>Commenter</span>
-          </button>
-        </div>
+        )}
 
-        {/* ── comments section ── */}
-        {showCmts && (
+        {/* ── actions — hidden for debate ── */}
+        {pub.type_publication !== "debat" && (
+          <div className="pc-actions">
+            <div className="pc-act-wrap" ref={picRef}>
+              <button
+                className={`pc-act-btn${myReaction?" on":""}`}
+                onClick={()=>myReaction?reactPub(myReaction):setPickerOpen(o=>!o)}
+                onMouseEnter={()=>setPickerOpen(true)}
+                type="button">
+                {myDef
+                  ? <><span className="pc-act-emoji">{myDef.emoji}</span>
+                      <span className={myDef.key==="like"?"pc-act-label-blue":"pc-act-label-react"}>{myDef.label}</span></>
+                  : <><ThumbIcon/><span>J'aime</span></>}
+              </button>
+              {pickerOpen && <ReactionPicker onPick={reactPub} current={myReaction}/>}
+            </div>
+            <button className="pc-act-btn" onClick={toggleCmts} type="button">
+              <CommentIcon/><span>Commenter</span>
+            </button>
+          </div>
+        )}
+
+        {/* ── comments section — hidden for debate ── */}
+        {pub.type_publication !== "debat" && showCmts && (
           <div className="pc-cmts-section">
             <div className="pc-new-cmt">
               <img className="pc-cmt-ava"

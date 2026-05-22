@@ -122,7 +122,7 @@ const handleSubmit = async (e) => {
 };
 
   return (
-    <div className="publier-page" style={{ overflowY: "scroll", height: "100vh" }}>
+    <div className="publier-page">
       <div className="publier-container">
 
         {/* HEADER */}
@@ -148,7 +148,7 @@ const handleSubmit = async (e) => {
               {type === "photo" && "📷 Photo"}
               {type === "video" && "🎥 Vidéo"}
               {type === "pdf" && "📄 PDF"}
-              {type === "debat" && "⚖️ Débat"}
+              {type === "debat" && "⚖️ Question P/C"}
             </button>
           ))}
         </div>
@@ -181,7 +181,7 @@ const handleSubmit = async (e) => {
   <input
     type="text"
     name="question_debat"
-    placeholder="Pose ta question de débat..."
+    placeholder="✍️ Pose ta question Pour / Contre..."
     value={formData.question_debat}
     onChange={handleChange}
     required
@@ -189,7 +189,7 @@ const handleSubmit = async (e) => {
 
   <textarea
     name="contenu"
-    placeholder="Ajoute une petite description du débat (optionnel)"
+    placeholder="💬 Description (optionnel) — contexte, infos supplémentaires..."
     value={formData.contenu}
     onChange={handleChange}
     rows="4"
@@ -200,15 +200,16 @@ const handleSubmit = async (e) => {
             {/* UPLOAD FICHIERS */}
             {(activeType === "photo" ||
               activeType === "video" ||
-              activeType === "pdf") && (
+              activeType === "pdf" ||
+              activeType === "debat") && (
               <div className="upload-zone">
                 <input
                   type="file"
                   id="fileInput"
-                  multiple={activeType === "photo"}
+                  multiple={activeType === "photo" || activeType === "debat"}
                   accept={
-                    activeType === "photo"
-                      ? "image/*"
+                    activeType === "photo" || activeType === "debat"
+                      ? "image/*,video/*"
                       : activeType === "video"
                       ? "video/*"
                       : "application/pdf"
@@ -217,12 +218,13 @@ const handleSubmit = async (e) => {
                 />
 
                 <label htmlFor="fileInput" className="upload-label">
-                  Choisir{" "}
-                  {activeType === "photo"
-                    ? "des photos"
+                  📎 {activeType === "debat"
+                    ? "Ajouter image ou vidéo (optionnel)"
+                    : activeType === "photo"
+                    ? "Choisir des photos"
                     : activeType === "video"
-                    ? "une vidéo"
-                    : "un PDF"}
+                    ? "Choisir une vidéo"
+                    : "Choisir un PDF"}
                 </label>
               </div>
             )}

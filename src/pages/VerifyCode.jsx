@@ -1,4 +1,3 @@
-// frontend/src/pages/VerifyCode.jsx (VERSION COMPLETE)
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import API from "../services/api";

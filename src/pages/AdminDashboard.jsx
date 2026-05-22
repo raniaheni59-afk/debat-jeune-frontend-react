@@ -1,16 +1,3 @@
-import CalendarPage from "./CalendarPage";
-import PublierPage from "./PublierPage";
-import PublicationCard from "../components/PublicationCard";
-import AdminContact from "./AdminContact";
-import NewLive from "./NewLive";
-import AdminLiveStream from "./AdminLiveStream";
-import Swafy_Meet from "./Swafy_Meet";
-import ArchivePage from "./ArchivePage";
-import ParametrePage from "./ParametrePage";
-import EnquetePage from "./EnquetePage";
-import { useLang } from "../i18n/LanguageContext";
-import { useNotifications } from "../hooks/useNotifications";
-import ParametreContact from "./ParametreContact";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -27,6 +14,9 @@ import {
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import API from "../services/api";
+import PublierPage from "./PublierPage";
+import PublicationCard from "../components/PublicationCard";
+
 
 
 ChartJS.register(
@@ -37,7 +27,7 @@ ChartJS.register(
 export default function AdminDashboard() {
   const user = JSON.parse(localStorage.getItem("user"));
   const navigate = useNavigate();
-  const { t } = useLang();
+  const t = (key) => key;
  
   const [activePage, setActivePage] = useState("dashboard");
   const [calSplash, setCalSplash] = useState(false);
@@ -55,7 +45,10 @@ export default function AdminDashboard() {
   const [editModal, setEditModal] = useState({ open: false, mode: "", targetId: null, data: {} });
 
   // ── Notifications real-time ──
-  const { notifications: adminNotifs, unreadCount: adminUnread, markRead: markNotifRead, markAllRead: markAllNotifsRead } = useNotifications();
+  const [adminNotifs, setAdminNotifs] = useState([]);
+  const adminUnread = 0;
+  const markNotifRead = () => {};
+  const markAllNotifsRead = () => {};
 
   // ── Socket géré dans App.jsx ──
   const [addChartModal, setAddChartModal] = useState(false);
@@ -987,6 +980,7 @@ const navItems = [
       marginLeft: sidebarVisible ? 240 : 0,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
+      background: "linear-gradient(135deg, #f5f2ff 0%, #ede9ff 100%)",
     }}
   >
     <PublierPage onBack={() => setActivePage("dashboard")} />
@@ -995,7 +989,7 @@ const navItems = [
 
 {/* ══════ NOTIFICATION PAGE ══════ */}
 {activePage === "notification" && !isFullPage && (() => {
-  const BACK = (typeof API !== "undefined" && API.defaults?.baseURL?.split("/api")[0]) || "https://debat-jeune-production.up.railway.app";
+  const BACK = (typeof API !== "undefined" && API.defaults?.baseURL?.split("/api")[0]) || "https://swafy-projet-production.up.railway.app";
   const getIcon = (type) => ({ new_post:"📢", publication_comment:"💬", publication_reaction:"❤️", debat_vote:"⚖️", comment_reaction:"👍" }[type] || "🔔");
   const timeAgo = (date) => {
     const d = Math.floor((Date.now() - new Date(date)) / 1000);

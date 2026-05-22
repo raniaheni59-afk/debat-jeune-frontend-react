@@ -2,17 +2,20 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
 import API from "../services/api";
-import PublicationCard from "../components/PublicationCard";
-import Chatbot from "../components/Chatbot";
-import JeuneContact from "./JeuneContact";
 import "./JeuneLayout.css";
-import JeuneEnquete from "./JeuneEnquete";
-import LiveBanner from "../components/LiveBanner";
+import PublicationCard from "../components/PublicationCard";
+
+// Import conditionnel — adapte les chemins selon ta structure
+let JeuneContact, LiveBanner, JeuneEnquete;
+try { JeuneContact  = require("./JeuneContact").default;  } catch { JeuneContact  = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Messages — bientôt disponible</div>; }
+try { LiveBanner    = require("../components/LiveBanner").default; } catch { LiveBanner = () => null; }
+try { JeuneEnquete  = require("./JeuneEnquete").default;  } catch { JeuneEnquete  = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Enquêtes — bientôt disponible</div>; }
+
 
 
 const BACKEND =
   API.defaults.baseURL?.split("/api")[0] ||
-  "https://debat-jeune-production.up.railway.app";
+  "https://swafy-projet-production.up.railway.app";
 
 const getAvatar = (photo, sexe) => {
   if (photo) return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;
@@ -245,8 +248,8 @@ const JeuneLayout = () => {
     socketRef.current = io(BACKEND, {
       auth: { token },
       transports: ["websocket"],
-      reconnectionAttempts: 5,      // ✅ limite les tentatives
-      reconnectionDelay: 3000,      // ✅ attendre 3s avant retry
+      reconnectionAttempts: 5,     
+      reconnectionDelay: 3000,     
     });
 
     socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
