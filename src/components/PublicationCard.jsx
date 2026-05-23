@@ -209,7 +209,13 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
   };
 
   // prevent body scroll
-  useEffect(()=>{ document.body.style.overflow="hidden"; return()=>{ document.body.style.overflow=""; }; },[]);
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "auto"; // On remet en 'auto' au lieu de vide
+      document.body.style.height = "auto";
+    };
+  }, []);
 
   return (
     <div className="pc-modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -330,7 +336,12 @@ const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
     }
   };
 
-  useEffect(()=>{ document.body.style.overflow="hidden"; return()=>{ document.body.style.overflow=""; }; },[]);
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, []);
 
   return (
     <div className="pc-modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>

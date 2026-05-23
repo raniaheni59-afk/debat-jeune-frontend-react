@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import API from "../services/api"; // Utilisez votre service API configuré
 import "./ManageUsers.css";
 
 // Helper pour avoir les headers avec token
@@ -25,10 +25,7 @@ const ManageUsers = () => {
   const fetchUsers = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
-        "http://localhost:5000/api/admin/users",
-        getAuthHeaders() // ✅ Token envoyé
-      );
+      const res = await API.get("/admin/users");
       setUsers(res.data);
     } catch (err) {
       console.error("Erreur fetchUsers:", err);
@@ -53,16 +50,9 @@ const ManageUsers = () => {
 
     try {
       if (action === "delete") {
-        await axios.delete(
-          `http://localhost:5000/api/admin/users/${id}`,
-          getAuthHeaders()
-        );
+        await API.delete(`/admin/users/${id}`);
       } else {
-        await axios.put(
-          `http://localhost:5000/api/admin/users/${id}/${action}`,
-          {},
-          getAuthHeaders()
-        );
+        await API.put(`/admin/users/${id}/${action}`);
       }
       fetchUsers(); // Rafraîchir
     } catch (err) {
