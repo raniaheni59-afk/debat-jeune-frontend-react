@@ -1,9 +1,4 @@
-/**
- * LiveSection.jsx
- * يُستخدم داخل صفحة Espace Jeune — يشوف Live الجاري
- * يدعم: زوار (تفرج فقط) + مسجلين (تعليق + reaction)
- * يتصل بـ socket ويتلقى "live-started" في الوقت الحقيقي
- */
+
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
