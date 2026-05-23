@@ -6,10 +6,11 @@ import "./JeuneLayout.css";
 import PublicationCard from "../components/PublicationCard";
 
 // Import conditionnel — adapte les chemins selon ta structure
-let JeuneContact, LiveBanner, JeuneEnquete;
+let JeuneContact, LiveBanner, JeuneEnquete, LiveSection;
 try { JeuneContact  = require("./JeuneContact").default;  } catch { JeuneContact  = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Messages — bientôt disponible</div>; }
 try { LiveBanner    = require("../components/LiveBanner").default; } catch { LiveBanner = () => null; }
 try { JeuneEnquete  = require("./JeuneEnquete").default;  } catch { JeuneEnquete  = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Enquêtes — bientôt disponible</div>; }
+try { LiveSection   = require("./Livesection").default;  } catch { LiveSection = () => <div style={{padding:40,textAlign:"center",color:"#777"}}>Section Live bientôt disponible</div>; }
 
 
 
@@ -501,39 +502,14 @@ const JeuneLayout = () => {
           </div>
         );
 
-      /* ── LIVE ── */
+      /* ── LIVE ── ✅ Uses Livesection with correct API + viewer link */
       case PAGES.LIVE:
         return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="radio" size={18}/> Sessions Live</h2>
-            <LiveBanner />
-            <div className="jl-live-banner">
-              <div className="jl-live-top">
-                <span className="jl-live-badge">● LIVE</span>
-                <span className="jl-live-desc">Débat : L'avenir de la jeunesse tunisienne</span>
-              </div>
-              <div className="jl-live-screen">
-                <div style={{ textAlign:"center" }}>
-                  <div style={{ fontSize:44, marginBottom:8 }}>🎙️</div>
-                  <p style={{ fontSize:12, color:"rgba(255,255,255,0.72)" }}>342 spectateurs en direct</p>
-                </div>
-              </div>
-              <button className="jl-submit-btn"><Icon name="play" size={16}/>Rejoindre le Live</button>
-            </div>
-            <h2 className="jl-section-title" style={{ marginTop:8 }}>Prochains lives</h2>
-            {[
-              { title:"Santé mentale des jeunes",    date:"Demain · 19h00" },
-              { title:"Entrepreneuriat & Innovation", date:"Jeudi · 20h00" },
-            ].map((l, i) => (
-              <div key={i} className="jl-event-item" style={{ animationDelay:`${i*0.08}s` }}>
-                <div className="jl-event-dot"><Icon name="mic" size={22}/></div>
-                <div>
-                  <p className="jl-event-title">{l.title}</p>
-                  <p className="jl-event-meta"><Icon name="clock" size={12}/>{l.date}</p>
-                </div>
-                <button className="jl-event-btn">Rappel</button>
-              </div>
-            ))}
+          <div className="jl-page" style={{ background:"#ffffff", minHeight:"100%" }}>
+            <h2 className="jl-section-title" style={{ color:"#1f2937" }}>
+              <Icon name="radio" size={18}/> Sessions Live
+            </h2>
+            <LiveSection />
           </div>
         );
 

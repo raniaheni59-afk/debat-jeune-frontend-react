@@ -866,6 +866,25 @@ const navItems = [
       padding: "30px 40px",
     }}
   >
+    {/* ✅ Copy live viewer link for admin to share with jeunes */}
+    {(() => {
+      const vLink = localStorage.getItem("currentLiveViewerLink");
+      if (!vLink) return null;
+      return (
+        <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:14, padding:"14px 18px", marginBottom:20, display:"flex", alignItems:"center", gap:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+          <span style={{ fontSize:20 }}>🔗</span>
+          <div style={{ flex:1, minWidth:0 }}>
+            <p style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:3 }}>Lien à envoyer aux jeunes inscrits</p>
+            <p style={{ fontSize:11, color:"#6b7280", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{vLink}</p>
+          </div>
+          <button
+            onClick={()=>{ navigator.clipboard.writeText(vLink); }}
+            style={{ background:"linear-gradient(135deg,#7c3aed,#3b82f6)", border:"none", borderRadius:10, padding:"8px 18px", color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
+            📋 Copier le lien
+          </button>
+        </div>
+      );
+    })()}
     <AdminLiveStream />
   </div>
 )}
