@@ -1,11 +1,7 @@
 import axios from "axios";
 
 const baseURL =
-  // Vite
   import.meta?.env?.VITE_API_URL ||
-  // CRA
-  process?.env?.REACT_APP_API_URL ||
-  // fallback
   "https://debat-jeune.onrender.com/api";
 
 const API = axios.create({
