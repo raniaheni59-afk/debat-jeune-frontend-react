@@ -105,7 +105,7 @@ body {
 }
 
 /* ── PAGE WRAP ── */
-.sw-page { position: relative; z-index: 1; }
+.sw-page { position: relative; z-index: 1; overflow-x: hidden; }
 .sw-container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
 
 /* ── NAV ── */
@@ -162,7 +162,7 @@ body {
 .sw-hero {
   position: relative; min-height: 100vh;
   display: flex; align-items: center;
-  padding: 140px 24px 100px; overflow: hidden;
+  padding: 140px 24px 100px;
 }
 .sw-hero-inner {
   max-width: 1180px; margin: 0 auto; width: 100%;
