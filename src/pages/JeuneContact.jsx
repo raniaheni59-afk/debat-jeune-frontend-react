@@ -138,14 +138,33 @@ export default function JeuneContact() {
   // ── Socket ──────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const sock  = io(BACKEND, { auth: { token }, transports: ["websocket"] });
+    const sock  = io(BACKEND, {
+      auth: { token },
+      transports: ["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+    });
     sockRef.current = sock;
+
+    // ✅ Rejoindre dès que connecté (et à chaque reconnexion)
+    sock.on("connect", () => {
+      sock.emit("joinGroup");
+      const selNow = selRef.current;
+      if (selNow && selNow !== "group" && selNow.id) {
+        sock.emit("joinConversation", { conversationId: selNow.id });
+      }
+    });
 
     sock.on("newMessage", (m) => {
       const selNow = selRef.current;
-      // ✅ Accolades correctes — setMsgs seulement si on est dans la bonne conversation
       if (selNow && selNow !== "group" && Number(m.conversation_id) === Number(selNow.id)) {
-        setMsgs((p) => p.find((x) => Number(x.id) === Number(m.id)) ? p : [...p, m]);
+        setMsgs((p) => {
+          if (p.find((x) => Number(x.id) === Number(m.id))) return p;
+          // Supprimer le message optimiste correspondant s'il existe
+          const filtered = p.filter((x) => !x._temp);
+          return [...filtered, m];
+        });
       }
       setConvs((p) =>
         p.map((c) => Number(c.id) === Number(m.conversation_id)
@@ -159,7 +178,8 @@ export default function JeuneContact() {
       setGrpMsgs((p) => p.find((x) => Number(x.id) === Number(m.id)) ? p : [...p, m]);
     });
 
-    sock.emit("joinGroup");
+    sock.on("connect_error", (e) => console.error("JeuneContact socket:", e.message));
+
     return () => sock.disconnect();
   }, []);
 
@@ -257,15 +277,41 @@ export default function JeuneContact() {
     const file    = filePrev;
     setText(""); setFilePrev(null);
     setSending(true);
+
+    // ✅ Optimistic update — afficher le message immédiatement sans attendre socket
+    const tempId = `temp_${Date.now()}`;
+    const optimistic = {
+      id: tempId,
+      _temp: true,
+      conversation_id: sel !== "group" ? sel.id : null,
+      sender_id: myId,
+      text: msgText || null,
+      file_url: file ? URL.createObjectURL(file) : null,
+      msg_type: file
+        ? (file.type.startsWith("image/") ? "image"
+          : file.type.startsWith("video/") ? "video" : "pdf")
+        : "text",
+      created_at: new Date(),
+    };
+
+    if (sel === "group") {
+      setGrpMsgs((p) => [...p, optimistic]);
+    } else {
+      setMsgs((p) => [...p, optimistic]);
+    }
+
     try {
       if (sel === "group") {
         if (file) {
           const fd = new FormData();
           fd.append("file", file);
           if (msgText) fd.append("text", msgText);
-          await API.post("/messenger/group/messages/upload", fd);
+          const res = await API.post("/messenger/group/messages/upload", fd);
+          // Remplacer optimiste par le vrai message
+          setGrpMsgs((p) => p.map((x) => x._temp ? res.data : x));
         } else {
-          await API.post("/messenger/group/messages", { text: msgText });
+          const res = await API.post("/messenger/group/messages", { text: msgText });
+          setGrpMsgs((p) => p.map((x) => x._temp ? res.data : x));
         }
       } else {
         if (file) {
@@ -273,14 +319,23 @@ export default function JeuneContact() {
           fd.append("file", file);
           fd.append("conversationId", String(sel.id));
           if (msgText) fd.append("text", msgText);
-          await API.post("/messenger/messages/upload", fd);
+          const res = await API.post("/messenger/messages/upload", fd);
+          setMsgs((p) => p.map((x) => x._temp ? res.data : x));
         } else {
-          await API.post("/messenger/messages", { conversationId: sel.id, text: msgText });
+          const res = await API.post("/messenger/messages", { conversationId: sel.id, text: msgText });
+          setMsgs((p) => p.map((x) => x._temp ? res.data : x));
         }
       }
     } catch (e) {
       console.error("send:", e);
+      // Supprimer le message optimiste en cas d'erreur
+      if (sel === "group") {
+        setGrpMsgs((p) => p.filter((x) => !x._temp));
+      } else {
+        setMsgs((p) => p.filter((x) => !x._temp));
+      }
       if (msgText) setText(msgText);
+      if (file) setFilePrev(file);
     } finally {
       setSending(false);
     }

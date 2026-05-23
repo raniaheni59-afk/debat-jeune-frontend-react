@@ -125,14 +125,32 @@ export default function AdminContact() {
   // ── Socket ─────────────────────────────────────────────────────────
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const s = io(BACKEND, { auth:{token}, transports:["websocket"] });
+    const s = io(BACKEND, {
+      auth:{token},
+      transports:["websocket"],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000,
+    });
     sockRef.current = s;
 
+    // ✅ Rejoindre dès que connecté (et à chaque reconnexion)
+    s.on("connect", () => {
+      s.emit("joinGroup");
+      const selNow = selRef.current;
+      if (selNow && selNow !== "group" && selNow.id) {
+        s.emit("joinConversation", { conversationId: selNow.id });
+      }
+    });
+
     s.on("newMessage", (m) => {
-      // ✅ Condition correcte: ajoute le message SEULEMENT si c'est la conv active
       if (selRef.current && selRef.current !== "group" &&
           Number(m.conversation_id) === Number(selRef.current.id)) {
-        setMsgs(p => p.find(x => Number(x.id)===Number(m.id)) ? p : [...p, m]);
+        setMsgs(p => {
+          if (p.find(x => Number(x.id)===Number(m.id))) return p;
+          const filtered = p.filter(x => !x._temp);
+          return [...filtered, m];
+        });
       }
       setConvs(p => p
         .map(c => Number(c.id)===Number(m.conversation_id)
@@ -146,7 +164,8 @@ export default function AdminContact() {
       setGrpMsgs(p => p.find(x => Number(x.id)===Number(m.id)) ? p : [...p, m]);
     });
 
-    s.emit("joinGroup");
+    s.on("connect_error", (e) => console.error("AdminContact socket:", e.message));
+
     return () => s.disconnect();
   }, []);
 
@@ -236,28 +255,61 @@ export default function AdminContact() {
     const t = text.trim(), f = file;
     setText(""); setFile(null);
     setSending(true);
+
+    // ✅ Optimistic update — afficher immédiatement
+    const optimistic = {
+      id: `temp_${Date.now()}`,
+      _temp: true,
+      conversation_id: sel !== "group" ? sel.id : null,
+      sender_id: ME,
+      text: t || null,
+      file_url: f ? URL.createObjectURL(f) : null,
+      msg_type: f
+        ? (f.type.startsWith("image/") ? "image"
+          : f.type.startsWith("video/") ? "video" : "pdf")
+        : "text",
+      created_at: new Date(),
+    };
+
+    if (sel === "group") {
+      setGrpMsgs(p => [...p, optimistic]);
+    } else {
+      setMsgs(p => [...p, optimistic]);
+    }
+
     try {
       if (sel==="group") {
         if (f) {
           const fd=new FormData(); fd.append("file",f);
           if(t) fd.append("text",t);
-          await API.post("/messenger/group/messages/upload", fd);
+          const res = await API.post("/messenger/group/messages/upload", fd);
+          setGrpMsgs(p => p.map(x => x._temp ? res.data : x));
         } else {
-          await API.post("/messenger/group/messages", {text:t});
+          const res = await API.post("/messenger/group/messages", {text:t});
+          setGrpMsgs(p => p.map(x => x._temp ? res.data : x));
         }
       } else {
         if (f) {
           const fd=new FormData(); fd.append("file",f);
           fd.append("conversationId", String(sel.id));
           if(t) fd.append("text",t);
-          await API.post("/messenger/messages/upload", fd);
+          const res = await API.post("/messenger/messages/upload", fd);
+          setMsgs(p => p.map(x => x._temp ? res.data : x));
         } else {
-          await API.post("/messenger/messages", {conversationId:sel.id, text:t});
+          const res = await API.post("/messenger/messages", {conversationId:sel.id, text:t});
+          setMsgs(p => p.map(x => x._temp ? res.data : x));
         }
       }
     } catch(e) {
       console.error("send:",e);
+      // Annuler le message optimiste
+      if (sel === "group") {
+        setGrpMsgs(p => p.filter(x => !x._temp));
+      } else {
+        setMsgs(p => p.filter(x => !x._temp));
+      }
       if(t) setText(t);
+      if(f) setFile(f);
     } finally { setSending(false); }
   };
 
