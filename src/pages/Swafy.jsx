@@ -1,824 +1,397 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   FiArrowLeft, FiPlay, FiUsers, FiHeadphones,
-  FiAward, FiZap, FiX, FiChevronLeft, FiChevronRight,
-  FiArrowRight,
+  FiAward, FiZap, FiX, FiChevronLeft, FiChevronRight, FiArrowRight, FiExternalLink,
 } from "react-icons/fi";
 
-
-/* ═══════════════════════════════════════════════
-   GLOBAL CSS — injected once
-═══════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════
+   CSS — page Swafy (fond violet glassmorphism)
+════════════════════════════════════════════════ */
 const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#7260A7;--bd:#5a4d8a;--bl:#8e7ec0;
+  --gl:rgba(255,255,255,.10);--glb:rgba(255,255,255,.18);--gls:rgba(255,255,255,.22);
+  --bdr:rgba(255,255,255,.18);
+  --txt:#fff;--ts:rgba(255,255,255,.72);--tm:rgba(255,255,255,.46);
+  --acc:#c8b8ff;--tl:#7FFFEE;--pk:#FF8EC8;--gd:#FFD166;
+  --r1:12px;--r2:20px;--r3:32px;--r4:48px;
+  --shd:0 24px 80px rgba(50,30,100,.45);
+}
+html{scroll-behavior:smooth}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden;min-height:100vh}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.32);border-radius:2px}
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+@keyframes d1{from{transform:translate(0,0) scale(1)}to{transform:translate(50px,40px) scale(1.1)}}
+@keyframes d2{from{transform:translate(0,0) scale(1)}to{transform:translate(-40px,50px) scale(1.08)}}
+@keyframes d3{from{transform:translate(0,0) scale(1)}to{transform:translate(30px,-40px) scale(1.12)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-13px)}}
+@keyframes up{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
+@keyframes rt{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+@keyframes shimmer{from{background-position:0% 50%}to{background-position:100% 50%}}
+@keyframes grow{from{width:0%}}
+@keyframes scan{0%{transform:scaleX(0) translateX(-100%);opacity:0}50%{transform:scaleX(1) translateX(0);opacity:1}100%{transform:scaleX(0) translateX(100%);opacity:0}}
+@keyframes fin{from{opacity:0}to{opacity:1}}
+@keyframes min{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 14px rgba(255,255,255,.1),0 0 0 28px rgba(255,255,255,.05)}50%{box-shadow:0 0 0 22px rgba(255,255,255,.13),0 0 0 44px rgba(255,255,255,.07)}}
 
-:root {
-  --bg:        #7260A7;
-  --bg-deep:   #5a4d8a;
-  --bg-light:  #8e7ec0;
-  --glass:     rgba(255,255,255,0.10);
-  --glass-b:   rgba(255,255,255,0.18);
-  --glass-str: rgba(255,255,255,0.22);
-  --border:    rgba(255,255,255,0.18);
-  --text:      #ffffff;
-  --text-soft: rgba(255,255,255,0.72);
-  --text-mute: rgba(255,255,255,0.48);
-  --accent:    #c8b8ff;
-  --gold:      #FFD166;
-  --teal:      #7FFFEE;
-  --pink:      #FF8EC8;
-  --r-sm:  12px;
-  --r-md:  20px;
-  --r-lg:  32px;
-  --r-xl:  48px;
-  --shadow: 0 24px 80px rgba(50,30,100,0.45);
-}
+.gl{background:var(--gl);border:1px solid var(--bdr);backdrop-filter:blur(20px) saturate(160%)}
+.gls{background:var(--gls);border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(26px) saturate(180%)}
 
-html { scroll-behavior: smooth; }
-body {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  overflow-x: clip;
-  min-height: 100vh;
-}
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: var(--bg-deep); }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.35); border-radius: 2px; }
+.noise{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+  background-size:160px}
+.orb{position:fixed;border-radius:50%;filter:blur(88px);pointer-events:none;z-index:0}
+.o1{width:680px;height:680px;background:radial-gradient(circle,rgba(200,184,255,.26) 0%,transparent 65%);top:-250px;right:-170px;animation:d1 14s ease-in-out infinite alternate}
+.o2{width:530px;height:530px;background:radial-gradient(circle,rgba(127,255,238,.13) 0%,transparent 65%);bottom:8%;left:-170px;animation:d2 18s ease-in-out infinite alternate}
+.o3{width:380px;height:380px;background:radial-gradient(circle,rgba(255,142,200,.14) 0%,transparent 65%);top:42%;left:43%;animation:d3 11s ease-in-out infinite alternate}
+.o4{width:290px;height:290px;background:radial-gradient(circle,rgba(255,209,102,.11) 0%,transparent 65%);bottom:28%;right:8%;animation:d1 9s 3s ease-in-out infinite alternate}
 
-/* ── NOISE ── */
-.sw-noise {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-  background-size: 160px; opacity: 0.55;
-}
+.pg{position:relative;z-index:1}
+.con{max-width:1180px;margin:0 auto;padding:0 24px}
 
-/* ── ORBS ── */
-.sw-orb {
-  position: fixed; border-radius: 50%;
-  filter: blur(90px); pointer-events: none; will-change: transform; z-index: 0;
-}
-.sw-orb-1 {
-  width: 700px; height: 700px;
-  background: radial-gradient(circle, rgba(200,184,255,0.28) 0%, transparent 65%);
-  top: -260px; right: -180px;
-  animation: sw-drift1 14s ease-in-out infinite alternate;
-}
-.sw-orb-2 {
-  width: 550px; height: 550px;
-  background: radial-gradient(circle, rgba(127,255,238,0.14) 0%, transparent 65%);
-  bottom: 10%; left: -180px;
-  animation: sw-drift2 18s ease-in-out infinite alternate;
-}
-.sw-orb-3 {
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(255,142,200,0.15) 0%, transparent 65%);
-  top: 45%; left: 45%;
-  animation: sw-drift3 11s ease-in-out infinite alternate;
-}
-.sw-orb-4 {
-  width: 300px; height: 300px;
-  background: radial-gradient(circle, rgba(255,209,102,0.12) 0%, transparent 65%);
-  bottom: 30%; right: 10%;
-  animation: sw-drift1 9s 3s ease-in-out infinite alternate;
-}
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 24px;transition:all .4s}
+.nav.sc{background:rgba(90,77,138,.88);backdrop-filter:blur(24px);border-bottom:1px solid var(--bdr)}
+.nav-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:70px}
+.brand{display:flex;align-items:center;gap:9px;font-family:'Syne',sans-serif;font-weight:800;font-size:1.32rem;color:#fff;text-decoration:none;letter-spacing:-.015em}
+.bdot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--tl));box-shadow:0 0 13px rgba(200,184,255,.8)}
+.back{display:flex;align-items:center;gap:7px;color:var(--ts);font-size:.86rem;font-weight:500;text-decoration:none;transition:color .2s;padding:7px 0}
+.back:hover{color:#fff}
+.nav-act{display:flex;gap:11px}
+.bgh{padding:8px 18px;border-radius:50px;border:1px solid var(--bdr);color:#fff;font-size:.83rem;font-weight:500;text-decoration:none;background:var(--gl);backdrop-filter:blur(8px);transition:all .2s}
+.bgh:hover{background:var(--glb)}
+.bpl{padding:9px 20px;border-radius:50px;background:rgba(255,255,255,.95);color:var(--bd);font-size:.83rem;font-weight:700;text-decoration:none;border:none;cursor:pointer;transition:all .25s;box-shadow:0 5px 22px rgba(0,0,0,.2)}
+.bpl:hover{transform:translateY(-1px);box-shadow:0 9px 30px rgba(0,0,0,.3)}
 
-@keyframes sw-drift1 { from{transform:translate(0,0) scale(1)} to{transform:translate(50px,40px) scale(1.1)} }
-@keyframes sw-drift2 { from{transform:translate(0,0) scale(1)} to{transform:translate(-40px,50px) scale(1.08)} }
-@keyframes sw-drift3 { from{transform:translate(0,0) scale(1)} to{transform:translate(30px,-40px) scale(1.12)} }
+/* HERO */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:130px 24px 90px;overflow:hidden}
+.hi{max-width:1180px;margin:0 auto;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.htag{display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border-radius:50px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.2);font-size:.73rem;font-weight:600;color:var(--acc);letter-spacing:.1em;text-transform:uppercase;margin-bottom:26px;animation:up .8s ease both}
+.lp{width:7px;height:7px;border-radius:50%;background:var(--tl);animation:pulse 2s infinite}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(2.9rem,5vw,4.8rem);font-weight:800;line-height:1.06;letter-spacing:-.034em;margin-bottom:22px;animation:up .8s .08s ease both}
+.shim{background:linear-gradient(135deg,#fff 0%,var(--acc) 40%,var(--tl) 70%,var(--pk) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;background-size:200% 200%;animation:shimmer 4s ease-in-out infinite alternate}
+.hdesc{color:var(--ts);font-size:1.05rem;line-height:1.78;max-width:470px;margin-bottom:38px;animation:up .8s .16s ease both}
+.hact{display:flex;gap:13px;flex-wrap:wrap;animation:up .8s .24s ease both}
+.bpr{display:inline-flex;align-items:center;gap:9px;padding:14px 30px;border-radius:50px;background:rgba(255,255,255,.95);color:var(--bd);font-size:.95rem;font-weight:700;text-decoration:none;border:none;cursor:pointer;box-shadow:0 9px 32px rgba(0,0,0,.24);transition:all .3s;position:relative;overflow:hidden}
+.bpr:hover{transform:translateY(-2px);box-shadow:0 15px 44px rgba(0,0,0,.34)}
+.bsc{display:inline-flex;align-items:center;gap:9px;padding:14px 30px;border-radius:50px;border:1px solid rgba(255,255,255,.32);color:#fff;font-size:.95rem;font-weight:500;text-decoration:none;background:var(--gl);backdrop-filter:blur(8px);transition:all .25s}
+.bsc:hover{background:var(--glb)}
+.hstats{display:flex;gap:28px;margin-top:42px;animation:up .8s .32s ease both}
+.hs{display:flex;flex-direction:column;gap:3px}
+.hsn{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#fff;letter-spacing:-.02em}
+.hsl{font-size:.76rem;color:var(--tm)}
+.hsd{width:1px;background:rgba(255,255,255,.18)}
 
-/* ── GLASS UTILITY ── */
-.sw-glass {
-  background: var(--glass);
-  border: 1px solid var(--border);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-}
-.sw-glass-str {
-  background: var(--glass-str);
-  border: 1px solid rgba(255,255,255,0.25);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-}
+/* HERO CARD */
+.hv{animation:rt .9s .22s ease both;position:relative}
+.hc{border-radius:var(--r3);padding:30px;position:relative;box-shadow:0 30px 95px rgba(50,30,100,.55),inset 0 1px 0 rgba(255,255,255,.2);animation:float 7s ease-in-out infinite}
+.hct{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:26px}
+.hlb{display:flex;align-items:center;gap:6px;padding:5px 13px;border-radius:50px;background:rgba(127,255,238,.14);border:1px solid rgba(127,255,238,.28);font-size:.7rem;font-weight:700;color:#7FFFEE;letter-spacing:.06em;text-transform:uppercase}
+.hcd{display:flex;gap:5px}
+.hcdd{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22)}
+.hctit{font-family:'Syne',sans-serif;font-size:1.48rem;font-weight:700;margin-bottom:6px;letter-spacing:-.02em}
+.hcsu{font-size:.84rem;color:var(--ts);margin-bottom:22px}
+.hcpl{display:flex;justify-content:space-between;font-size:.75rem;color:var(--ts);margin-bottom:7px}
+.hcpb{height:5px;background:rgba(255,255,255,.11);border-radius:3px;overflow:hidden;margin-bottom:22px}
+.hcpf{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--acc),var(--tl));animation:grow 2.4s .8s ease both}
+.hmg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:22px}
+.hmt{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);border-radius:var(--r1);padding:13px 8px;text-align:center;cursor:pointer;transition:all .25s}
+.hmt:hover{background:rgba(255,255,255,.17);border-color:rgba(255,255,255,.33);transform:translateY(-2px)}
+.hmi{font-size:1.15rem;margin-bottom:5px}
+.hml{font-size:.7rem;font-weight:600;color:var(--ts)}
+.hcf{display:flex;justify-content:space-between;align-items:center}
+.avs{display:flex}
+.av{width:30px;height:30px;border-radius:50%;border:2px solid rgba(114,96,167,.88);margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;color:var(--bd);background:linear-gradient(135deg,var(--acc),var(--tl))}
+.av:first-child{margin-left:0}
+.hcb{display:flex;align-items:center;gap:5px;padding:8px 18px;border-radius:50px;background:rgba(255,255,255,.94);color:var(--bd);font-size:.78rem;font-weight:700;border:none;cursor:pointer;text-decoration:none;transition:all .2s}
+.hcb:hover{transform:translateY(-1px);box-shadow:0 7px 22px rgba(0,0,0,.24)}
+.fb{position:absolute;display:flex;align-items:center;gap:9px;border-radius:15px;padding:11px 14px;box-shadow:0 14px 44px rgba(50,30,100,.42);font-size:.8rem;font-weight:500}
+.fb1{top:-16px;left:-22px;animation:float 8s 1s ease-in-out infinite}
+.fb2{bottom:-16px;right:-22px;animation:float 9s 2s ease-in-out infinite}
+.fbi{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.fbn{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:800}
+.fbt{font-size:.68rem;color:var(--ts)}
 
-/* ── PAGE WRAP ── */
-.sw-page { position: relative; z-index: 1; overflow-x: clip; }
-.sw-container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+/* SECTIONS */
+.sec{padding:92px 24px;position:relative}
+.seca{padding:92px 24px;position:relative;background:rgba(0,0,0,.11)}
+.ey{display:inline-flex;align-items:center;gap:7px;font-size:.71rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);margin-bottom:14px}
+.eyl{width:20px;height:1px;background:var(--acc)}
+.stit{font-family:'Syne',sans-serif;font-size:clamp(1.9rem,3.2vw,2.8rem);font-weight:800;letter-spacing:-.025em;line-height:1.14;margin-bottom:14px}
+.sdesc{font-size:1rem;color:var(--ts);max-width:510px;line-height:1.72}
 
-/* ── NAV ── */
-.sw-nav {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  padding: 0 24px; transition: all 0.4s;
-}
-.sw-nav.scrolled {
-  background: rgba(90,77,138,0.85);
-  backdrop-filter: blur(24px);
-  border-bottom: 1px solid var(--border);
-}
-.sw-nav-inner {
-  max-width: 1180px; margin: 0 auto;
-  display: flex; align-items: center; justify-content: space-between;
-  height: 72px;
-}
-.sw-brand {
-  display: flex; align-items: center; gap: 10px;
-  font-family: 'Clash Display', sans-serif; font-weight: 700;
-  font-size: 1.4rem; color: #fff; text-decoration: none; letter-spacing: -0.01em;
-}
-.sw-brand-dot {
-  width: 10px; height: 10px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--teal));
-  box-shadow: 0 0 14px rgba(200,184,255,0.8);
-}
-.sw-back {
-  display: flex; align-items: center; gap: 8px;
-  color: var(--text-soft); font-size: 0.88rem; font-weight: 500;
-  text-decoration: none; transition: color 0.2s;
-  padding: 8px 0;
-}
-.sw-back:hover { color: #fff; }
-.sw-nav-actions { display: flex; gap: 12px; }
-.sw-btn-ghost {
-  padding: 9px 20px; border-radius: 50px;
-  border: 1px solid var(--border); color: #fff;
-  font-size: 0.875rem; font-weight: 500;
-  text-decoration: none; background: var(--glass);
-  backdrop-filter: blur(8px); transition: all 0.2s;
-}
-.sw-btn-ghost:hover { background: var(--glass-str); }
-.sw-btn-pill {
-  padding: 10px 22px; border-radius: 50px;
-  background: rgba(255,255,255,0.95); color: var(--bg-deep);
-  font-size: 0.875rem; font-weight: 700;
-  text-decoration: none; border: none; cursor: pointer;
-  transition: all 0.25s; box-shadow: 0 6px 24px rgba(0,0,0,0.2);
-}
-.sw-btn-pill:hover { transform: translateY(-1px); box-shadow: 0 10px 32px rgba(0,0,0,0.3); }
+/* VIDÉO */
+.vw{margin-top:52px}
+.vc{border-radius:var(--r4);overflow:hidden;position:relative;cursor:pointer;box-shadow:var(--shd);aspect-ratio:16/7;background:linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.16);transition:transform .3s}
+.vc:hover{transform:scale(1.008)}
+.vbg{position:absolute;inset:0;background:linear-gradient(135deg,rgba(200,184,255,.28) 0%,rgba(127,255,238,.13) 40%,rgba(255,142,200,.18) 100%)}
+.vls{position:absolute;inset:0;overflow:hidden}
+.vl{position:absolute;height:1px;left:0;right:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent);animation:scan 4s ease-in-out infinite}
+.vl:nth-child(1){top:24%}
+.vl:nth-child(2){top:54%;animation-delay:1.5s}
+.vl:nth-child(3){top:80%;animation-delay:3s}
+.vmu{position:absolute;inset:0;padding:30px;display:flex;flex-direction:column;justify-content:flex-end}
+.vmb{height:7px;background:rgba(255,255,255,.13);border-radius:4px;margin-bottom:9px}
+.vpb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.vpc{width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;font-size:1.35rem;color:var(--bd);transition:all .3s;cursor:pointer;animation:breathe 3s ease-in-out infinite}
+.vc:hover .vpc{transform:scale(1.09);background:#fff}
+.srow{display:flex;margin-top:38px;border-radius:var(--r3);overflow:hidden;border:1px solid rgba(255,255,255,.13)}
+.sb{flex:1;padding:30px 22px;text-align:center;background:var(--gl);backdrop-filter:blur(14px);border-right:1px solid rgba(255,255,255,.09);transition:background .25s}
+.sb:last-child{border-right:none}
+.sb:hover{background:var(--gls)}
+.sbn{font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;letter-spacing:-.03em;margin-bottom:5px;background:linear-gradient(135deg,#fff 0%,var(--acc) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sbl{font-size:.84rem;color:var(--ts);font-weight:500}
 
-/* ── HERO ── */
-.sw-hero {
-  position: relative; min-height: 100vh;
-  display: flex; align-items: center;
-  padding: 140px 24px 100px;
-}
-.sw-hero-inner {
-  max-width: 1180px; margin: 0 auto; width: 100%;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center;
-}
+/* ABOUT */
+.ag{display:grid;grid-template-columns:1fr 1fr;gap:76px;align-items:center}
+.ad{font-size:1.03rem;color:var(--ts);line-height:1.82;margin-bottom:34px}
+.sr2{display:flex;gap:13px}
+.sbt{display:flex;align-items:center;gap:9px;padding:13px 22px;border-radius:var(--r1);background:var(--gl);border:1px solid var(--bdr);color:#fff;text-decoration:none;font-weight:600;font-size:.88rem;cursor:pointer;transition:all .25s;backdrop-filter:blur(8px)}
+.sbt:hover{background:var(--glb);transform:translateY(-2px)}
+.phs{position:relative;height:390px}
+.ph{position:absolute;width:198px;border-radius:27px;overflow:hidden;border:1px solid rgba(255,255,255,.18);box-shadow:0 28px 75px rgba(50,30,100,.52)}
+.pha{top:0;left:28px;animation:float 7s ease-in-out infinite;z-index:2}
+.phb{top:68px;left:158px;animation:float 9s 1.5s ease-in-out infinite;opacity:.82;z-index:1}
+.phh{height:13px;background:rgba(255,255,255,.05)}
+.phn{width:42px;height:5px;border-radius:3px;background:rgba(255,255,255,.09);margin:4px auto}
+.phbd{padding:13px;background:rgba(90,77,138,.58)}
+.phb2{height:62px;border-radius:13px;margin-bottom:11px;background:linear-gradient(135deg,rgba(200,184,255,.38),rgba(127,255,238,.22));border:1px solid rgba(255,255,255,.13)}
+.phr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:9px}
+.pht{height:36px;background:rgba(255,255,255,.07);border-radius:8px}
+.phl{height:8px;background:rgba(255,255,255,.09);border-radius:4px;margin-top:6px}
 
-/* hero text */
-.sw-eyebrow {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 16px; border-radius: 50px;
-  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22);
-  font-size: 0.75rem; font-weight: 600; color: var(--accent);
-  letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 28px;
-  animation: sw-up 0.8s ease both;
-}
-.sw-pulse { width: 7px; height: 7px; border-radius: 50%; background: #7FFFEE; animation: sw-pulse 2s infinite; }
-@keyframes sw-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.5)} }
+/* PARTENAIRES STRIP */
+.pstrip{padding:30px 24px;background:rgba(0,0,0,.14);border-top:1px solid rgba(255,255,255,.09);border-bottom:1px solid rgba(255,255,255,.09)}
+.psin{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap}
+.plbl{font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tm);margin-right:6px}
+.pit{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:9px;padding:9px 15px;font-size:.8rem;font-weight:700;color:rgba(255,255,255,.82)}
+.pdiv{width:1px;height:26px;background:rgba(255,255,255,.11)}
 
-.sw-hero h1 {
-  font-family: 'Clash Display', sans-serif;
-  font-size: clamp(3rem, 5.5vw, 5rem);
-  font-weight: 700; line-height: 1.06; letter-spacing: -0.035em;
-  margin-bottom: 24px; animation: sw-up 0.8s 0.08s ease both;
-}
-.sw-shimmer {
-  background: linear-gradient(135deg, #fff 0%, var(--accent) 40%, var(--teal) 70%, var(--pink) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text; background-size: 200% 200%;
-  animation: sw-shimmer 4s ease-in-out infinite alternate;
-}
-@keyframes sw-shimmer { from{background-position:0% 50%} to{background-position:100% 50%} }
+/* ÉQUIPE */
+.tg{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:52px}
+.tm{border-radius:var(--r2);padding:26px 18px;text-align:center;border:1px solid rgba(255,255,255,.16);transition:all .3s;cursor:pointer;position:relative;overflow:hidden}
+.tm::before{content:'';position:absolute;inset:0;opacity:0;background:rgba(255,255,255,.05);transition:opacity .3s}
+.tm:hover::before{opacity:1}
+.tm:hover{transform:translateY(-5px);box-shadow:0 22px 56px rgba(50,30,100,.42)}
+.tmi{width:68px;height:68px;border-radius:50%;margin:0 auto 14px;border:3px solid rgba(255,255,255,.38);display:block;object-fit:cover;box-shadow:0 7px 22px rgba(0,0,0,.28)}
+.tmn{font-family:'Syne',sans-serif;font-size:.97rem;font-weight:700;margin-bottom:6px}
+.tmr{display:inline-block;padding:4px 11px;border-radius:50px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.16);font-size:.7rem;font-weight:600;color:var(--ts)}
 
-.sw-hero-desc {
-  color: var(--text-soft); font-size: 1.08rem; line-height: 1.75;
-  max-width: 480px; margin-bottom: 40px;
-  animation: sw-up 0.8s 0.16s ease both;
-}
-.sw-hero-actions { display: flex; gap: 14px; flex-wrap: wrap; animation: sw-up 0.8s 0.24s ease both; }
-.sw-cta-primary {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 15px 32px; border-radius: 50px;
-  background: rgba(255,255,255,0.95); color: var(--bg-deep);
-  font-size: 1rem; font-weight: 700; text-decoration: none;
-  border: none; cursor: pointer;
-  box-shadow: 0 10px 36px rgba(0,0,0,0.25); transition: all 0.3s;
-  position: relative; overflow: hidden;
-}
-.sw-cta-primary::before {
-  content:''; position:absolute; inset:0;
-  background: linear-gradient(135deg, rgba(200,184,255,0.2), transparent);
-  transform: translateX(-100%); transition: transform 0.4s;
-}
-.sw-cta-primary:hover::before { transform: translateX(0); }
-.sw-cta-primary:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(0,0,0,0.35); }
-.sw-cta-secondary {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 15px 32px; border-radius: 50px;
-  border: 1px solid rgba(255,255,255,0.35); color: #fff;
-  font-size: 1rem; font-weight: 500; text-decoration: none;
-  background: var(--glass); backdrop-filter: blur(8px); transition: all 0.25s;
-}
-.sw-cta-secondary:hover { background: var(--glass-b); }
+/* GALERIE */
+.gltr{display:flex;gap:18px;overflow:hidden;margin-top:52px}
+.gls2{flex:0 0 calc(33.333% - 13px);border-radius:var(--r2);overflow:hidden;aspect-ratio:16/10;position:relative;border:1px solid rgba(255,255,255,.13);box-shadow:0 14px 44px rgba(50,30,100,.38);transition:transform .4s}
+.gls2:hover{transform:scale(1.024)}
+.gls2 img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.88) brightness(.86);transition:filter .4s}
+.gls2:hover img{filter:saturate(1.08) brightness(.92)}
+.gov{position:absolute;inset:0;background:linear-gradient(to top,rgba(90,77,138,.48) 0%,transparent 58%)}
+.gctrl{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:26px}
+.gbtn{width:42px;height:42px;border-radius:50%;background:var(--gl);border:1px solid var(--bdr);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.97rem;transition:all .2s;backdrop-filter:blur(8px)}
+.gbtn:hover{background:var(--gls)}
+.gdots{display:flex;gap:7px}
+.gdot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.22);cursor:pointer;transition:all .25s}
+.gdot.act{background:#fff;width:20px;border-radius:3px}
 
-/* hero stats */
-.sw-hero-stats {
-  display: flex; gap: 32px; margin-top: 48px;
-  animation: sw-up 0.8s 0.32s ease both;
-}
-.sw-stat { display: flex; flex-direction: column; gap: 4px; }
-.sw-stat-n {
-  font-family: 'Clash Display', sans-serif; font-size: 1.9rem;
-  font-weight: 700; color: #fff; letter-spacing: -0.02em;
-}
-.sw-stat-l { font-size: 0.78rem; color: var(--text-mute); font-weight: 400; }
-.sw-stat-sep { width: 1px; background: rgba(255,255,255,0.2); }
+/* POURQUOI */
+.wg{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:52px}
+.wc{border-radius:var(--r2);padding:34px 30px;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.13);transition:all .3s}
+.wc:hover{transform:translateY(-4px);box-shadow:0 22px 56px rgba(50,30,100,.38)}
+.wi{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:20px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.18);transition:all .3s}
+.wc:hover .wi{background:rgba(255,255,255,.2);transform:rotate(-5deg) scale(1.05)}
+.wt{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;margin-bottom:9px}
+.wd{font-size:.88rem;color:var(--ts);line-height:1.65}
 
-/* hero visual — glass card */
-.sw-hero-visual { animation: sw-right 0.9s 0.2s ease both; }
-@keyframes sw-right { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:translateX(0)} }
-@keyframes sw-up    { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
+/* FORMATIONS BLOCK (dans Swafy) */
+.fl{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.fi{display:flex;align-items:center;gap:10px;padding:12px 15px;border-radius:var(--r1);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);text-decoration:none;color:#fff;transition:all .22s}
+.fi:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);transform:translateX(4px)}
+.fii{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;background:rgba(255,255,255,.12)}
+.fit{font-weight:700;font-size:.86rem}
+.fid{font-size:.74rem;color:var(--ts);margin-top:1px}
+.fiarr{margin-left:auto;color:var(--acc);font-size:.82rem;flex-shrink:0}
 
-.sw-hero-card {
-  border-radius: var(--r-lg); padding: 32px; position: relative;
-  box-shadow: 0 32px 100px rgba(50,30,100,0.55), inset 0 1px 0 rgba(255,255,255,0.2);
-  animation: sw-float 7s ease-in-out infinite;
-}
-@keyframes sw-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+/* MODAL */
+.mov{position:fixed;inset:0;z-index:500;background:rgba(50,30,100,.88);backdrop-filter:blur(15px);display:flex;align-items:center;justify-content:center;padding:22px;animation:fin .25s ease}
+.mod{width:100%;max-width:880px;border-radius:var(--r3);overflow:hidden;position:relative;box-shadow:0 38px 110px rgba(0,0,0,.58);animation:min .3s ease}
+.moc{position:absolute;top:14px;right:14px;z-index:10;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.moc:hover{background:rgba(0,0,0,.8)}
+.mod iframe{width:100%;aspect-ratio:16/9;display:block;border:none}
 
-.sw-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
-.sw-live-badge {
-  display: flex; align-items: center; gap: 7px; padding: 6px 14px; border-radius: 50px;
-  background: rgba(127,255,238,0.15); border: 1px solid rgba(127,255,238,0.3);
-  font-size: 0.72rem; font-weight: 700; color: #7FFFEE; letter-spacing: 0.06em; text-transform: uppercase;
-}
-.sw-card-dots { display: flex; gap: 5px; }
-.sw-card-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.25); }
+/* FOOTER */
+.foot{background:rgba(0,0,0,.22);padding:52px 24px 26px;border-top:1px solid rgba(255,255,255,.09)}
+.ftop{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:36px;margin-bottom:44px}
+.fbt{font-size:.86rem;color:var(--ts);line-height:1.7;max-width:330px;margin-top:12px}
+.fct{font-family:'Syne',sans-serif;font-size:.76rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tm);margin-bottom:16px}
+.fcol a{display:block;color:var(--ts);text-decoration:none;font-size:.88rem;margin-bottom:10px;transition:color .2s}
+.fcol a:hover{color:#fff}
+.fbot{border-top:1px solid rgba(255,255,255,.07);padding-top:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:9px}
+.fbc{font-size:.79rem;color:var(--tm)}
 
-.sw-card-title {
-  font-family: 'Clash Display', sans-serif; font-size: 1.55rem;
-  font-weight: 700; margin-bottom: 6px; letter-spacing: -0.02em;
+/* RESPONSIVE */
+@media(max-width:900px){
+  .hi{grid-template-columns:1fr}
+  .hv{display:none}
+  .tg{grid-template-columns:repeat(2,1fr)}
+  .ag{grid-template-columns:1fr}
+  .phs{display:none}
+  .wg{grid-template-columns:1fr}
+  .gls2{flex:0 0 calc(50% - 9px)}
+  .srow{flex-direction:column}
+  .sb{border-right:none;border-bottom:1px solid rgba(255,255,255,.09)}
 }
-.sw-card-sub { font-size: 0.875rem; color: var(--text-soft); margin-bottom: 24px; }
-
-.sw-card-progress-label {
-  display: flex; justify-content: space-between;
-  font-size: 0.77rem; color: var(--text-soft); margin-bottom: 8px;
-}
-.sw-card-bar { height: 6px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; margin-bottom: 24px; }
-.sw-card-bar-fill {
-  height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, var(--accent), var(--teal));
-  animation: sw-bar-grow 2.5s 0.8s ease both;
-}
-@keyframes sw-bar-grow { from{width:0%} }
-
-.sw-mini-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 24px; }
-.sw-mini-tile {
-  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);
-  border-radius: var(--r-sm); padding: 14px 8px; text-align: center;
-  cursor: pointer; transition: all 0.25s;
-}
-.sw-mini-tile:hover {
-  background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.35);
-  transform: translateY(-2px);
-}
-.sw-mini-tile-icon { font-size: 1.2rem; margin-bottom: 6px; }
-.sw-mini-tile-label { font-size: 0.72rem; font-weight: 600; color: var(--text-soft); }
-
-.sw-card-footer { display: flex; justify-content: space-between; align-items: center; }
-.sw-avatars { display: flex; }
-.sw-av {
-  width: 32px; height: 32px; border-radius: 50%;
-  border: 2px solid rgba(114,96,167,0.9); margin-left: -9px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.65rem; font-weight: 700; color: var(--bg-deep);
-  background: linear-gradient(135deg, var(--accent), var(--teal));
-}
-.sw-av:first-child { margin-left: 0; }
-.sw-card-btn {
-  display: flex; align-items: center; gap: 6px;
-  padding: 9px 20px; border-radius: 50px;
-  background: rgba(255,255,255,0.95); color: var(--bg-deep);
-  font-size: 0.8rem; font-weight: 700; border: none;
-  cursor: pointer; text-decoration: none; transition: all 0.2s;
-}
-.sw-card-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
-
-/* floating mini badges */
-.sw-float-badge {
-  position: absolute;
-  display: flex; align-items: center; gap: 10px;
-  border-radius: 16px; padding: 12px 16px;
-  box-shadow: 0 16px 48px rgba(50,30,100,0.4);
-  font-size: 0.82rem; font-weight: 500;
-}
-.sw-badge-1 { top: -18px; left: -24px; animation: sw-float 8s 1s ease-in-out infinite; }
-.sw-badge-2 { bottom: -18px; right: -24px; animation: sw-float 9s 2s ease-in-out infinite; }
-.sw-badge-icon {
-  width: 38px; height: 38px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center; font-size: 1.1rem;
-}
-.sw-badge-num { font-family:'Clash Display',sans-serif; font-size:1.1rem; font-weight:700; }
-.sw-badge-txt { font-size: 0.7rem; color: var(--text-soft); }
-
-/* ── SECTION BASE ── */
-.sw-section { padding: 100px 24px; position: relative; }
-.sw-section-alt {
-  padding: 100px 24px; position: relative;
-  background: rgba(0,0,0,0.12);
-}
-.sw-section-eyebrow {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: 0.73rem; font-weight: 600; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--accent); margin-bottom: 16px;
-}
-.sw-eyebrow-line { width: 22px; height: 1px; background: var(--accent); }
-.sw-section-title {
-  font-family: 'Clash Display', sans-serif;
-  font-size: clamp(2rem, 3.5vw, 3rem);
-  font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; margin-bottom: 16px;
-}
-.sw-section-desc { font-size: 1rem; color: var(--text-soft); max-width: 520px; line-height: 1.75; }
-
-/* ── VIDEO SECTION ── */
-.sw-video-wrap { margin-top: 56px; position: relative; }
-.sw-video-card {
-  border-radius: var(--r-xl); overflow: hidden; position: relative;
-  cursor: pointer; box-shadow: var(--shadow);
-  aspect-ratio: 16/7;
-  background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.04));
-  border: 1px solid rgba(255,255,255,0.18);
-  transition: transform 0.3s;
-}
-.sw-video-card:hover { transform: scale(1.01); }
-.sw-video-bg {
-  position: absolute; inset: 0;
-  background: linear-gradient(135deg,
-    rgba(200,184,255,0.3) 0%,
-    rgba(127,255,238,0.15) 40%,
-    rgba(255,142,200,0.2) 100%);
-}
-/* animated shimmer lines */
-.sw-video-lines { position: absolute; inset: 0; overflow: hidden; }
-.sw-video-line {
-  position: absolute; height: 1px; left: 0; right: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-  animation: sw-line-scan 4s ease-in-out infinite;
-}
-.sw-video-line:nth-child(1) { top: 25%; animation-delay: 0s; }
-.sw-video-line:nth-child(2) { top: 55%; animation-delay: 1.5s; }
-.sw-video-line:nth-child(3) { top: 80%; animation-delay: 3s; }
-@keyframes sw-line-scan {
-  0% { transform: scaleX(0) translateX(-100%); opacity: 0; }
-  50% { transform: scaleX(1) translateX(0); opacity: 1; }
-  100% { transform: scaleX(0) translateX(100%); opacity: 0; }
-}
-.sw-play-btn {
-  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-}
-.sw-play-circle {
-  width: 80px; height: 80px; border-radius: 50%;
-  background: rgba(255,255,255,0.95);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.4rem; color: var(--bg-deep);
-  box-shadow: 0 0 0 20px rgba(255,255,255,0.12), 0 0 0 40px rgba(255,255,255,0.06);
-  transition: all 0.3s; cursor: pointer;
-  animation: sw-breathe 3s ease-in-out infinite;
-}
-@keyframes sw-breathe {
-  0%,100% { box-shadow: 0 0 0 16px rgba(255,255,255,0.12), 0 0 0 32px rgba(255,255,255,0.06); }
-  50%      { box-shadow: 0 0 0 24px rgba(255,255,255,0.15), 0 0 0 48px rgba(255,255,255,0.08); }
-}
-.sw-video-card:hover .sw-play-circle { transform: scale(1.08); background: #fff; }
-
-/* mock UI inside video */
-.sw-mock-ui { position: absolute; inset: 0; padding: 32px; display: flex; flex-direction: column; justify-content: flex-end; }
-.sw-mock-bar { height: 8px; background: rgba(255,255,255,0.15); border-radius: 4px; margin-bottom: 10px; }
-.sw-mock-bar.w70 { width: 70%; }
-.sw-mock-bar.w50 { width: 50%; }
-.sw-mock-bar.w85 { width: 85%; }
-
-/* stats row */
-.sw-stats-row {
-  display: flex; gap: 0; margin-top: 40px;
-  border-radius: var(--r-lg); overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.15);
-}
-.sw-stat-block {
-  flex: 1; padding: 32px 24px; text-align: center;
-  background: var(--glass); backdrop-filter: blur(16px);
-  border-right: 1px solid rgba(255,255,255,0.1);
-  transition: background 0.25s;
-}
-.sw-stat-block:last-child { border-right: none; }
-.sw-stat-block:hover { background: var(--glass-str); }
-.sw-stat-big {
-  font-family: 'Clash Display', sans-serif; font-size: 2.6rem;
-  font-weight: 700; letter-spacing: -0.03em; margin-bottom: 6px;
-  background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-.sw-stat-name { font-size: 0.85rem; color: var(--text-soft); font-weight: 500; }
-
-/* ── ABOUT SECTION ── */
-.sw-about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; margin-top: 0; }
-.sw-about-text .sw-section-title { margin-bottom: 20px; }
-.sw-about-desc { font-size: 1.05rem; color: var(--text-soft); line-height: 1.8; margin-bottom: 36px; }
-.sw-store-row { display: flex; gap: 14px; }
-.sw-store-btn {
-  display: flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: var(--r-sm);
-  background: var(--glass); border: 1px solid var(--border); color: #fff;
-  text-decoration: none; font-weight: 600; font-size: 0.9rem; cursor: pointer;
-  transition: all 0.25s; backdrop-filter: blur(8px);
-}
-.sw-store-btn:hover { background: var(--glass-str); transform: translateY(-2px); }
-
-/* phone mocks */
-.sw-phones { position: relative; height: 400px; }
-.sw-phone {
-  position: absolute; width: 200px; border-radius: 28px; overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.2);
-  box-shadow: 0 30px 80px rgba(50,30,100,0.55);
-}
-.sw-phone-a { top: 0; left: 30px; animation: sw-float 7s ease-in-out infinite; z-index: 2; }
-.sw-phone-b { top: 70px; left: 160px; animation: sw-float 9s 1.5s ease-in-out infinite; opacity: 0.82; z-index: 1; }
-.sw-phone-hdr { height: 14px; background: rgba(255,255,255,0.06); }
-.sw-phone-notch { width: 44px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); margin: 4px auto; }
-.sw-phone-body { padding: 14px; background: rgba(90,77,138,0.6); }
-.sw-phone-hero-bar {
-  height: 64px; border-radius: 14px; margin-bottom: 12px;
-  background: linear-gradient(135deg, rgba(200,184,255,0.4), rgba(127,255,238,0.25));
-  border: 1px solid rgba(255,255,255,0.15);
-}
-.sw-phone-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
-.sw-phone-tile { height: 38px; background: rgba(255,255,255,0.08); border-radius: 8px; }
-.sw-phone-list { display: flex; flex-direction: column; gap: 6px; }
-.sw-phone-li { height: 9px; background: rgba(255,255,255,0.1); border-radius: 4px; }
-.sw-phone-li:last-child { width: 60%; }
-
-/* ── TEAM ── */
-.sw-team-grid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 56px;
-}
-.sw-member {
-  border-radius: var(--r-md); padding: 28px 20px; text-align: center;
-  border: 1px solid rgba(255,255,255,0.18); transition: all 0.3s; cursor: pointer;
-  position: relative; overflow: hidden;
-}
-.sw-member::before {
-  content:''; position:absolute; inset:0; opacity:0;
-  background: rgba(255,255,255,0.06); transition: opacity 0.3s;
-}
-.sw-member:hover::before { opacity: 1; }
-.sw-member:hover { transform: translateY(-6px); box-shadow: 0 24px 60px rgba(50,30,100,0.45); }
-.sw-member-img {
-  width: 72px; height: 72px; border-radius: 50%; margin: 0 auto 16px;
-  border: 3px solid rgba(255,255,255,0.4); display: block;
-  object-fit: cover;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-}
-.sw-member-name { font-family:'Clash Display',sans-serif; font-size:1rem; font-weight:600; margin-bottom:6px; }
-.sw-member-role {
-  display: inline-block; padding: 4px 12px; border-radius: 50px;
-  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.18);
-  font-size: 0.72rem; font-weight: 600; color: var(--text-soft);
-}
-
-/* ── GALLERY ── */
-.sw-gallery-track {
-  display: flex; gap: 20px; overflow: hidden;
-  margin-top: 56px; position: relative;
-}
-.sw-gallery-slide {
-  flex: 0 0 calc(33.333% - 14px); border-radius: var(--r-md); overflow: hidden;
-  aspect-ratio: 16/10; position: relative;
-  border: 1px solid rgba(255,255,255,0.15);
-  box-shadow: 0 16px 48px rgba(50,30,100,0.4);
-  transition: transform 0.4s ease;
-}
-.sw-gallery-slide:hover { transform: scale(1.025); }
-.sw-gallery-slide img {
-  width: 100%; height: 100%; object-fit: cover;
-  display: block; filter: saturate(0.9) brightness(0.88);
-  transition: filter 0.4s;
-}
-.sw-gallery-slide:hover img { filter: saturate(1.1) brightness(0.95); }
-.sw-gallery-overlay {
-  position: absolute; inset: 0;
-  background: linear-gradient(to top, rgba(90,77,138,0.5) 0%, transparent 60%);
-}
-.sw-gallery-controls {
-  display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 28px;
-}
-.sw-gallery-btn {
-  width: 44px; height: 44px; border-radius: 50%;
-  background: var(--glass); border: 1px solid var(--border);
-  color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font-size: 1rem; transition: all 0.2s; backdrop-filter: blur(8px);
-}
-.sw-gallery-btn:hover { background: var(--glass-str); }
-.sw-gallery-dots { display: flex; gap: 8px; }
-.sw-gdot {
-  width: 7px; height: 7px; border-radius: 50%;
-  background: rgba(255,255,255,0.25); cursor: pointer; transition: all 0.25s;
-}
-.sw-gdot.active { background: #fff; width: 22px; border-radius: 3.5px; }
-
-/* ── WHY SECTION ── */
-.sw-why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 56px; }
-.sw-why-card {
-  border-radius: var(--r-md); padding: 36px 32px; position: relative; overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.15); transition: all 0.3s; cursor: default;
-}
-.sw-why-card:hover { transform: translateY(-4px); box-shadow: 0 24px 60px rgba(50,30,100,0.4); }
-.sw-why-card::after {
-  content:''; position:absolute; bottom:0; right:0;
-  width: 120px; height: 120px; border-radius: 50%;
-  background: rgba(255,255,255,0.04); transform: translate(40px, 40px);
-}
-.sw-why-icon-wrap {
-  width: 56px; height: 56px; border-radius: 16px;
-  display: flex; align-items: center; justify-content: center; font-size: 1.3rem;
-  margin-bottom: 22px; background: rgba(255,255,255,0.12);
-  border: 1px solid rgba(255,255,255,0.2); transition: all 0.3s;
-}
-.sw-why-card:hover .sw-why-icon-wrap {
-  background: rgba(255,255,255,0.22); transform: rotate(-5deg) scale(1.05);
-}
-.sw-why-title { font-family:'Clash Display',sans-serif; font-size:1.15rem; font-weight:600; margin-bottom:10px; }
-.sw-why-desc { font-size: 0.9rem; color: var(--text-soft); line-height: 1.65; }
-
-/* ── MODAL ── */
-.sw-modal-overlay {
-  position: fixed; inset: 0; z-index: 500;
-  background: rgba(50,30,100,0.85); backdrop-filter: blur(16px);
-  display: flex; align-items: center; justify-content: center;
-  padding: 24px; animation: sw-fade-in 0.25s ease;
-}
-@keyframes sw-fade-in { from{opacity:0} to{opacity:1} }
-.sw-modal {
-  width: 100%; max-width: 900px; border-radius: var(--r-lg);
-  overflow: hidden; position: relative;
-  box-shadow: 0 40px 120px rgba(0,0,0,0.6);
-  animation: sw-modal-in 0.3s ease;
-}
-@keyframes sw-modal-in { from{transform:scale(0.92);opacity:0} to{transform:scale(1);opacity:1} }
-.sw-modal-close {
-  position: absolute; top: 16px; right: 16px; z-index: 10;
-  width: 38px; height: 38px; border-radius: 50%;
-  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2);
-  color: #fff; font-size: 1rem; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.2s;
-}
-.sw-modal-close:hover { background: rgba(0,0,0,0.8); }
-.sw-modal iframe { width: 100%; aspect-ratio: 16/9; display: block; border: none; }
-
-/* ── FOOTER ── */
-.sw-footer {
-  background: rgba(0,0,0,0.25); padding: 56px 24px 28px;
-  border-top: 1px solid rgba(255,255,255,0.1);
-}
-.sw-footer-top {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  flex-wrap: wrap; gap: 40px; margin-bottom: 48px;
-}
-.sw-footer-brand-text { font-size: 0.88rem; color: var(--text-soft); line-height: 1.7; max-width: 280px; margin-top: 14px; }
-.sw-footer-col-title { font-family:'Clash Display',sans-serif; font-size:0.78rem; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-mute); margin-bottom:18px; }
-.sw-footer-col a { display:block; color:var(--text-soft); text-decoration:none; font-size:0.9rem; margin-bottom:10px; transition:color 0.2s; }
-.sw-footer-col a:hover { color:#fff; }
-.sw-footer-bottom {
-  border-top: 1px solid rgba(255,255,255,0.08); padding-top: 24px;
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
-}
-.sw-footer-copy { font-size: 0.82rem; color: var(--text-mute); }
-.sw-footer-tag { font-size: 0.78rem; color: rgba(200,184,255,0.5); }
-
-/* ── RESPONSIVE ── */
-@media (max-width: 900px) {
-  .sw-hero-inner { grid-template-columns: 1fr; }
-  .sw-hero-visual { display: none; }
-  .sw-team-grid { grid-template-columns: repeat(2,1fr); }
-  .sw-about-grid { grid-template-columns: 1fr; }
-  .sw-phones { display: none; }
-  .sw-why-grid { grid-template-columns: 1fr; }
-  .sw-gallery-slide { flex: 0 0 calc(50% - 10px); }
-  .sw-stats-row { flex-direction: column; }
-  .sw-stat-block { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.1); }
-}
-@media (max-width: 600px) {
-  .sw-hero h1 { font-size: 2.6rem; }
-  .sw-team-grid { grid-template-columns: 1fr 1fr; }
-  .sw-gallery-slide { flex: 0 0 85%; }
-  .sw-hero-stats { gap: 18px; }
+@media(max-width:600px){
+  .hero h1{font-size:2.55rem}
+  .tg{grid-template-columns:1fr 1fr}
+  .gls2{flex:0 0 84%}
+  .hstats{gap:16px}
 }
 `;
 
-function StyleInject() {
-  useEffect(() => {
-    const id = "sw-styles";
-    if (!document.getElementById(id)) {
-      const el = document.createElement("style");
-      el.id = id; el.textContent = CSS;
+function StyleInject(){
+  useEffect(()=>{
+    const id="sw-sty";
+    if(!document.getElementById(id)){
+      const el=document.createElement("style");
+      el.id=id;el.textContent=CSS;
       document.head.appendChild(el);
     }
-    return () => { const el = document.getElementById(id); el && el.remove(); };
-  }, []);
+    return()=>{const el=document.getElementById(id);el&&el.remove()};
+  },[]);
   return null;
 }
 
-function Brand() {
-  return (
-    <div className="sw-brand">
-      <div className="sw-brand-dot" />
-      <span>SWAFY</span>
-    </div>
-  );
+function Brand(){
+  return(<div className="brand"><div className="bdot"/>SWAFY</div>);
 }
 
-function VideoModal({ open, onClose, videoUrl }) {
-  if (!open) return null;
-  return (
-    <div className="sw-modal-overlay" onClick={onClose}>
-      <div className="sw-modal" onClick={e => e.stopPropagation()}>
-        <button className="sw-modal-close" onClick={onClose}><FiX /></button>
-        <iframe src={videoUrl} title="SWAFY video" allow="autoplay; encrypted-media" allowFullScreen />
+function VideoModal({open,onClose,url}){
+  if(!open)return null;
+  return(
+    <div className="mov" onClick={onClose}>
+      <div className="mod" onClick={e=>e.stopPropagation()}>
+        <button className="moc" onClick={onClose}><FiX/></button>
+        <iframe src={url} title="Vidéo SWAFY" allow="autoplay; encrypted-media" allowFullScreen/>
       </div>
     </div>
   );
 }
 
-function HeroCard() {
-  return (
-    <div className="sw-hero-visual" style={{ position: "relative" }}>
-
-      {/* badge top-left */}
-      <div className="sw-float-badge sw-badge-1 sw-glass-str" style={{ borderRadius: 16 }}>
-        <div className="sw-badge-icon" style={{ background: "rgba(127,255,238,0.15)" }}>🤖</div>
-        <div>
-          <div className="sw-badge-num">+1200</div>
-          <div className="sw-badge-txt">Jeunes formés</div>
-        </div>
+function HeroCard(){
+  return(
+    <div className="hv" style={{position:"relative"}}>
+      <div className="fb fb1 gls">
+        <div className="fbi" style={{background:"rgba(127,255,238,.13)"}}>🔬</div>
+        <div><div className="fbn">235</div><div className="fbt">Bourses MOBIDOC</div></div>
       </div>
-
-      <div className="sw-hero-card sw-glass-str">
-        <div className="sw-card-top">
-          <div className="sw-live-badge"><div className="sw-pulse" /> En Direct</div>
-          <div className="sw-card-dots">
-            <div className="sw-card-dot" />
-            <div className="sw-card-dot" />
-            <div className="sw-card-dot" />
-          </div>
+      <div className="hc gls">
+        <div className="hct">
+          <div className="hlb"><div className="lp"/>EU4Youth</div>
+          <div className="hcd"><div className="hcdd"/><div className="hcdd"/><div className="hcdd"/></div>
         </div>
-        <div className="sw-card-title">Formation & Innovation</div>
-        <div className="sw-card-sub">IA · Sécurité · Support · Tunis</div>
-        <div className="sw-card-progress-label">
-          <span>Progression</span>
-          <span style={{ color: "var(--accent)", fontWeight: 600 }}>68%</span>
-        </div>
-        <div className="sw-card-bar"><div className="sw-card-bar-fill" style={{ width: "68%" }} /></div>
-        <div className="sw-mini-grid">
-          {[["🧠","IA"],["🔐","Sécurité"],["⚡","Innovation"]].map(([ic,lb]) => (
-            <div className="sw-mini-tile" key={lb}>
-              <div className="sw-mini-tile-icon">{ic}</div>
-              <div className="sw-mini-tile-label">{lb}</div>
-            </div>
+        <div className="hctit">Formation & Innovation</div>
+        <div className="hcsu">Science · Entrepreneuriat · Tunisie</div>
+        <div className="hcpl"><span>Déploiement national</span><span style={{color:"var(--acc)",fontWeight:600}}>73%</span></div>
+        <div className="hcpb"><div className="hcpf" style={{width:"73%"}}/></div>
+        <div className="hmg">
+          {[["🧠","IA & Tech"],["🎮","Gaming Lab"],["🚀","Startup"]].map(([ic,lb])=>(
+            <div key={lb} className="hmt"><div className="hmi">{ic}</div><div className="hml">{lb}</div></div>
           ))}
         </div>
-        <div className="sw-card-footer">
-          <div className="sw-avatars">
-            {["AH","SM","KR","IB"].map((l,i) => <div key={i} className="sw-av">{l}</div>)}
+        <div className="hcf">
+          <div className="avs">
+            {["DS","BB","CA","MK"].map((l,i)=><div key={i} className="av">{l}</div>)}
           </div>
-          <Link className="sw-card-btn" to="/register">Rejoindre <FiChevronRight /></Link>
+          <Link className="hcb" to="/register">Rejoindre <FiArrowRight/></Link>
         </div>
       </div>
-
-      {/* badge bottom-right */}
-      <div className="sw-float-badge sw-badge-2 sw-glass-str" style={{ borderRadius: 16 }}>
-        <div className="sw-badge-icon" style={{ background: "rgba(255,209,102,0.15)" }}>🏆</div>
-        <div>
-          <div className="sw-badge-num">98%</div>
-          <div className="sw-badge-txt">Satisfaction</div>
-        </div>
+      <div className="fb fb2 gls">
+        <div className="fbi" style={{background:"rgba(255,209,102,.13)"}}>🏆</div>
+        <div><div className="fbn">70+</div><div className="fbt">Clubs scientifiques</div></div>
       </div>
     </div>
   );
 }
 
-function Navbar({ onPlay }) {
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const h = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", h);
-    return () => window.removeEventListener("scroll", h);
-  }, []);
-  return (
-    <header className={`sw-nav ${scrolled ? "scrolled" : ""}`}>
-      <div className="sw-nav-inner">
-        <Link to="/" className="sw-back"><FiArrowLeft /> Accueil</Link>
-        <Link to="/" style={{ textDecoration: "none" }}><Brand /></Link>
-        <div className="sw-nav-actions">
-          <Link className="sw-btn-ghost" to="/register">Register</Link>
-          <Link className="sw-btn-pill" to="/login">Sign in</Link>
+function Navbar(){
+  const [sc,setSc]=useState(false);
+  useEffect(()=>{
+    const h=()=>setSc(window.scrollY>20);
+    window.addEventListener("scroll",h);
+    return()=>window.removeEventListener("scroll",h);
+  },[]);
+  return(
+    <header className={`nav ${sc?"sc":""}`}>
+      <div className="nav-in">
+        <Link to="/" className="back"><FiArrowLeft/>Retour à l'accueil</Link>
+        <Link to="/" style={{textDecoration:"none"}}><Brand/></Link>
+        <div className="nav-act">
+          <Link className="bgh" to="/register">S'inscrire</Link>
+          <Link className="bpl" to="/login">Connexion</Link>
         </div>
       </div>
     </header>
   );
 }
 
-function Hero({ onPlay }) {
-  return (
-    <section className="sw-hero">
-      <div className="sw-container">
-        <div className="sw-hero-inner">
+function Hero({onPlay}){
+  return(
+    <section className="hero">
+      <div className="con">
+        <div className="hi">
           <div>
-            <div className="sw-eyebrow">
-              <div className="sw-pulse" /> Agence de Tunis · Débat IA Jeunes
-            </div>
-            <h1>
-              Science<br />With &amp; For{" "}
-              <span className="sw-shimmer">Youth</span>
-            </h1>
-            <p className="sw-hero-desc">
-              SWAFY هي منصة تونسية تقود الشباب نحو الاقتصاد الرقمي —
-              تعلّم، تطبيق، وتحدّيات في الذكاء الاصطناعي والأمن الرقمي.
+            <div className="htag"><div className="lp"/>ANPR · EU4Youth · 9,5 M€</div>
+            <h1>Science<br/>With &amp; For <span className="shim">Youth</span></h1>
+            <p className="hdesc">
+              SWAFY accompagne la jeunesse tunisienne vers l'innovation et l'entrepreneuriat
+              scientifique — bourses de recherche, clubs scientifiques, Gaming Labs et dialogue
+              national Jeunesse-Science dans les 24 gouvernorats.
             </p>
-            <div className="sw-hero-actions">
-              <button className="sw-cta-primary" onClick={onPlay}>
-                Découvrir <FiPlay />
-              </button>
-              <Link className="sw-cta-secondary" to="/register">
-                Créer un compte <FiArrowRight />
-              </Link>
+            <div className="hact">
+              <button className="bpr" onClick={onPlay}>Voir la vidéo <FiPlay/></button>
+              <Link className="bsc" to="/register">Rejoindre SWAFY <FiArrowRight/></Link>
             </div>
-            <div className="sw-hero-stats">
-              <div className="sw-stat">
-                <span className="sw-stat-n">1.2K+</span>
-                <span className="sw-stat-l">Jeunes inscrits</span>
-              </div>
-              <div className="sw-stat-sep" />
-              <div className="sw-stat">
-                <span className="sw-stat-n">70+</span>
-                <span className="sw-stat-l">Sessions actives</span>
-              </div>
-              <div className="sw-stat-sep" />
-              <div className="sw-stat">
-                <span className="sw-stat-n">98%</span>
-                <span className="sw-stat-l">Satisfaction</span>
-              </div>
+            <div className="hstats">
+              <div className="hs"><span className="hsn">9,5M€</span><span className="hsl">Budget UE</span></div>
+              <div className="hsd"/>
+              <div className="hs"><span className="hsn">235</span><span className="hsl">Bourses MOBIDOC</span></div>
+              <div className="hsd"/>
+              <div className="hs"><span className="hsn">13 000</span><span className="hsl">Jeunes visés</span></div>
             </div>
           </div>
-          <HeroCard />
+          <HeroCard/>
         </div>
       </div>
     </section>
   );
 }
 
-function VideoSection({ onPlay }) {
-  return (
-    <section className="sw-section">
-      <div className="sw-container">
-        <div className="sw-section-eyebrow">
-          <div className="sw-eyebrow-line" /> Aperçu de la plateforme
-        </div>
-        <h2 className="sw-section-title">Découvrez SWAFY en action</h2>
-
-        <div className="sw-video-wrap">
-          <div className="sw-video-card" onClick={onPlay}>
-            <div className="sw-video-bg" />
-            <div className="sw-video-lines">
-              <div className="sw-video-line" />
-              <div className="sw-video-line" />
-              <div className="sw-video-line" />
+function VideoSection({onPlay}){
+  return(
+    <section className="sec">
+      <div className="con">
+        <div className="ey"><div className="eyl"/>Aperçu du projet</div>
+        <h2 className="stit">Découvrez SWAFY en action</h2>
+        <p className="sdesc">
+          Lancé le 2 juin 2023 à l'hôtel Mövenpick Lac Tunis, en présence du Ministre
+          Moncef Boukthir et de l'Ambassadeur de l'UE Marcus Cornaro.
+        </p>
+        <div className="vw">
+          <div className="vc" onClick={onPlay}>
+            <div className="vbg"/>
+            <div className="vls"><div className="vl"/><div className="vl"/><div className="vl"/></div>
+            <div className="vmu">
+              <div className="vmb" style={{width:"84%"}}/><div className="vmb" style={{width:"68%"}}/><div className="vmb" style={{width:"50%"}}/>
             </div>
-            <div className="sw-mock-ui">
-              <div className="sw-mock-bar w85" />
-              <div className="sw-mock-bar w70" />
-              <div className="sw-mock-bar w50" />
-            </div>
-            <div className="sw-play-btn">
-              <div className="sw-play-circle"><FiPlay /></div>
-            </div>
+            <div className="vpb"><div className="vpc"><FiPlay/></div></div>
           </div>
         </div>
-
-        <div className="sw-stats-row">
-          {[
-            { n: "+200", l: "Utilisateurs actifs" },
-            { n: "+70",  l: "Sessions réalisées" },
-            { n: "+24",  l: "Formations disponibles" },
-          ].map(({ n, l }) => (
-            <div className="sw-stat-block" key={l}>
-              <div className="sw-stat-big">{n}</div>
-              <div className="sw-stat-name">{l}</div>
-            </div>
+        <div className="srow">
+          {[{n:"70+",l:"Clubs scientifiques créés"},{n:"190+",l:"Projets de recherche financés"},{n:"24",l:"Gouvernorats couverts"}].map(({n,l})=>(
+            <div className="sb" key={l}><div className="sbn">{n}</div><div className="sbl">{l}</div></div>
           ))}
         </div>
       </div>
@@ -826,49 +399,67 @@ function VideoSection({ onPlay }) {
   );
 }
 
-function AboutSection() {
-  return (
-    <section className="sw-section-alt">
-      <div className="sw-container">
-        <div className="sw-about-grid">
-          <div className="sw-phones">
-            {[null, "b"].map((v) => (
-              <div key={v || "a"} className={`sw-phone sw-glass ${v ? "sw-phone-b" : "sw-phone-a"}`}>
-                <div className="sw-phone-hdr"><div className="sw-phone-notch" /></div>
-                <div className="sw-phone-body">
-                  <div className="sw-phone-hero-bar" />
-                  <div className="sw-phone-row">
-                    <div className="sw-phone-tile" />
-                    <div className="sw-phone-tile" />
-                    <div className="sw-phone-tile" />
-                  </div>
-                  <div className="sw-phone-list">
-                    <div className="sw-phone-li" />
-                    <div className="sw-phone-li" />
-                    <div className="sw-phone-li" />
-                  </div>
+/* ─── FORMATIONS SWAFY RÉELLES ─────────────────── */
+const FORMATIONS=[
+  {ic:"📋",t:"Management de projet (PMP)",d:"Formation certifiante · 22 j/j · Présentiel + En ligne · 2024/2025",href:"https://www.anpr.tn/wp-content/uploads/2024/01/TDR-Expert-Management-de-projet_final_18012024.pdf"},
+  {ic:"🔬",t:"MOBIDOC Doctorant · Session 2024",d:"Bourse UE · Recherche appliquée en milieu socio-économique",href:"https://www.anpr.tn/projet-swafy-appel-a-propositions-mobidoc-doctorant-session-2024/"},
+  {ic:"💼",t:"MOBIDOC Post-doc · Université / Management",d:"Gestion de projet · Recherche appliquée",href:"http://www.anpr.tn/projet-swafy-appel-a-candidature-mobidoc-post-doc-universite-management/"},
+  {ic:"🗣️",t:"Techniques de communication",d:"Formation clubs scientifiques · Présentiel",href:"https://www.anpr.tn"},
+  {ic:"🏛️",t:"Leadership & Engagement citoyen",d:"Formation certifiante · Gouvernance · Participation",href:"https://www.anpr.tn"},
+  {ic:"🎬",t:"Techniques audiovisuelles",d:"Production vidéo · Reportage scientifique · Diffusion",href:"https://www.anpr.tn"},
+  {ic:"🎮",t:"Création de Gaming Labs",d:"Appel associations · Délai : 31 mai 2026",href:"http://www.anpr.tn/projet-swafy-appel-a-propositions-a-lattention-des-associations-pour-la-creation-renforcement-de-gaming-labs/"},
+  {ic:"🔧",t:"Création de Fablabs · 8 gouvernorats",d:"Ben Arous · Manouba · Kef · Siliana · Tozeur · Kébili · Kasserine · Monastir",href:"http://www.anpr.tn/appel-a-propositions-a-lattention-des-associations-en-vue-du-renforcement-ou-la-creation-de-fablabs-dans-les-gouvernorats-de-ben-arous-la-manouba-le-kef-siliana-tozeur-kebili-kasserine/"},
+  {ic:"📊",t:"Expert processus de débat Jeunesse-Science",d:"Conception du débat · Feuille de route 2035 · Congrès national",href:"https://www.anpr.tn/projet-swafy-termes-de-reference-en-vue-de-la-selection-dun-expert/"},
+  {ic:"🌐",t:"Plateforme de réseautage associatif",d:"Développement & administration · Appel en cours 2026",href:"http://www.anpr.tn/projet-swafy-appel-a-candidatures-recrutement-de-deux-charge-e-s-de-projets/"},
+];
+
+function AboutSection(){
+  return(
+    <section className="seca">
+      <div className="con">
+        <div className="ag">
+          <div className="phs">
+            {[null,"b"].map(v=>(
+              <div key={v||"a"} className={`ph gl ${v?"phb":"pha"}`}>
+                <div className="phh"><div className="phn"/></div>
+                <div className="phbd">
+                  <div className="phb2"/>
+                  <div className="phr"><div className="pht"/><div className="pht"/><div className="pht"/></div>
+                  <div className="phl"/><div className="phl"/><div className="phl" style={{width:"60%"}}/>
                 </div>
               </div>
             ))}
           </div>
-
-          <div className="sw-about-text">
-            <div className="sw-section-eyebrow">
-              <div className="sw-eyebrow-line" /> À propos de SWAFY
-            </div>
-            <h2 className="sw-section-title">
-              Une plateforme pensée<br />
-              <span className="sw-shimmer">pour la jeunesse tunisienne</span>
+          <div>
+            <div className="ey"><div className="eyl"/>À propos de SWAFY</div>
+            <h2 className="stit">
+              Une plateforme pensée pour<br/>
+              <span className="shim">la jeunesse tunisienne</span>
             </h2>
-            <p className="sw-about-desc">
-              SWAFY هي منصة تونسية تعاون الشباب باش يكتسب مهارات رقمية،
-              يشارك في challenges، ويمشي في مسار واضح: تعلم → تطبيق → تقييم.
-              Science with and for youth — plateforme simple pour apprendre et progresser.
+            <p className="ad">
+              SWAFY — Science With and For Youth — est un projet financé par l'Union européenne
+              (9,5 M€ · 48 mois), inscrit sous le programme EU4Youth et géré par l'ANPR. Il vise
+              à améliorer la valeur ajoutée de la recherche dans le développement économique tunisien,
+              et à soutenir l'entrepreneuriat et l'employabilité des jeunes à travers les bourses
+              MOBIDOC, les clubs scientifiques, les Gaming Labs et le dialogue national Jeunesse-Science.
             </p>
-            <div className="sw-store-row">
-              <a className="sw-store-btn" href="#!"><span>🍎</span> App Store</a>
-              <a className="sw-store-btn" href="#!"><span>🤖</span> Google Play</a>
+            {/* Formations disponibles */}
+            <div style={{marginBottom:16,fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:".78rem",textTransform:"uppercase",letterSpacing:".1em",color:"var(--acc)"}}>
+              Formations & Appels officiels
             </div>
+            <div className="fl">
+              {FORMATIONS.slice(0,5).map(({ic,t,d,href})=>(
+                <a key={t} className="fi" href={href} target="_blank" rel="noreferrer">
+                  <div className="fii">{ic}</div>
+                  <div><div className="fit">{t}</div><div className="fid">{d}</div></div>
+                  <FiArrowRight className="fiarr"/>
+                </a>
+              ))}
+            </div>
+            <a href="https://www.anpr.tn" target="_blank" rel="noreferrer"
+               style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:12,color:"var(--acc)",fontSize:".82rem",fontWeight:700,textDecoration:"none"}}>
+              Voir toutes les formations sur anpr.tn <FiExternalLink/>
+            </a>
           </div>
         </div>
       </div>
@@ -876,96 +467,54 @@ function AboutSection() {
   );
 }
 
-function TeamSection({ team }) {
-  return (
-    <section className="sw-section">
-      <div className="sw-container">
-        <div style={{ textAlign: "center" }}>
-          <div className="sw-section-eyebrow" style={{ justifyContent: "center" }}>
-            <div className="sw-eyebrow-line" /> Notre équipe
-          </div>
-          <h2 className="sw-section-title">Notre équipe SWAFY</h2>
-        </div>
-        <div className="sw-team-grid">
-          {team.map((m) => (
-            <div
-              key={m.name} className="sw-member"
-              style={{ background: `linear-gradient(135deg, ${m.color}33 0%, rgba(255,255,255,0.06) 100%)`,
-                       borderColor: `${m.color}44` }}
-            >
-              <img className="sw-member-img" src={m.img} alt={m.name}
-                   style={{ borderColor: `${m.color}80` }} />
-              <div className="sw-member-name">{m.name}</div>
-              <div className="sw-member-role">{m.role}</div>
-            </div>
+/* ── TOUTES LES FORMATIONS ─────────────────────── */
+function FormationsSection(){
+  return(
+    <section className="sec">
+      <div className="con">
+        <div className="ey"><div className="eyl"/>Formations disponibles</div>
+        <h2 className="stit">Toutes les formations & appels SWAFY</h2>
+        <p className="sdesc">Formations officielles disponibles, gérées par l'ANPR. Cliquez pour accéder aux détails et postuler.</p>
+        <div className="fl" style={{marginTop:36}}>
+          {FORMATIONS.map(({ic,t,d,href})=>(
+            <a key={t} className="fi" href={href} target="_blank" rel="noreferrer">
+              <div className="fii">{ic}</div>
+              <div><div className="fit">{t}</div><div className="fid">{d}</div></div>
+              <FiArrowRight className="fiarr"/>
+            </a>
           ))}
         </div>
-      </div>
-    </section>
-  );
-}
-
-function GallerySection({ gallery }) {
-  const [idx, setIdx] = useState(0);
-  const maxIdx = gallery.length - 3;
-  const prev = () => setIdx(i => Math.max(0, i - 1));
-  const next = () => setIdx(i => Math.min(maxIdx < 0 ? 0 : maxIdx, i + 1));
-
-  return (
-    <section className="sw-section-alt">
-      <div className="sw-container">
-        <div className="sw-section-eyebrow">
-          <div className="sw-eyebrow-line" /> Galerie
-        </div>
-        <h2 className="sw-section-title">Nos moments forts</h2>
-
-        <div className="sw-gallery-track">
-          {gallery.map((src, i) => (
-            <div
-              className="sw-gallery-slide" key={src}
-              style={{ transform: `translateX(calc(-${idx * (100 + 20)}% - ${idx * 20}px))`,
-                       transition: "transform 0.5s cubic-bezier(0.4,0,0.2,1)" }}
-            >
-              <img src={src} alt={`gallery-${i}`} />
-              <div className="sw-gallery-overlay" />
-            </div>
-          ))}
-        </div>
-
-        <div className="sw-gallery-controls">
-          <button className="sw-gallery-btn" onClick={prev}><FiChevronLeft /></button>
-          <div className="sw-gallery-dots">
-            {gallery.map((_, i) => (
-              <div key={i} className={`sw-gdot ${i === idx ? "active" : ""}`} onClick={() => setIdx(i)} />
-            ))}
-          </div>
-          <button className="sw-gallery-btn" onClick={next}><FiChevronRight /></button>
+        <div style={{marginTop:18,padding:"14px 18px",borderRadius:14,background:"rgba(200,184,255,.08)",border:"1px solid rgba(200,184,255,.18)",fontSize:".78rem",color:"var(--ts)"}}>
+          📌 Pour tous les appels à candidatures : <a href="https://www.anpr.tn" target="_blank" rel="noreferrer" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>anpr.tn</a>
+          {" · "}
+          <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>facebook.com/swafyproject</a>
+          {" · "}
+          <a href="mailto:recrutement.swafy@gmail.com" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>recrutement.swafy@gmail.com</a>
         </div>
       </div>
     </section>
   );
 }
 
-function WhySection({ why }) {
-  return (
-    <section className="sw-section">
-      <div className="sw-container">
-        <div style={{ textAlign: "center", marginBottom: 0 }}>
-          <div className="sw-section-eyebrow" style={{ justifyContent: "center" }}>
-            <div className="sw-eyebrow-line" /> Pourquoi SWAFY
-          </div>
-          <h2 className="sw-section-title">Pourquoi nous choisir ?</h2>
-          <p className="sw-section-desc" style={{ margin: "0 auto" }}>
-            SWAFY offre une expérience d'apprentissage unique, conçue pour les jeunes tunisiens ambitieux.
+/* ── ÉQUIPE RÉELLE ─────────────────────────────── */
+function TeamSection({team}){
+  return(
+    <section className="seca">
+      <div className="con">
+        <div style={{textAlign:"center"}}>
+          <div className="ey" style={{justifyContent:"center"}}><div className="eyl"/>L'équipe SWAFY — ANPR</div>
+          <h2 className="stit">Responsables & Partenaires clés</h2>
+          <p className="sdesc" style={{margin:"0 auto 0"}}>
+            Portée par l'ANPR, coordonnée avec les ministères partenaires et la Délégation de l'UE en Tunisie.
           </p>
         </div>
-        <div className="sw-why-grid">
-          {why.map(({ icon, title, desc }, i) => (
-            <div className="sw-why-card sw-glass" key={title}
-                 style={{ background: `linear-gradient(135deg, rgba(255,255,255,${0.06 + i*0.02}), rgba(255,255,255,0.04))` }}>
-              <div className="sw-why-icon-wrap">{icon}</div>
-              <div className="sw-why-title">{title}</div>
-              <div className="sw-why-desc">{desc}</div>
+        <div className="tg">
+          {team.map(m=>(
+            <div key={m.name} className="tm"
+                 style={{background:`linear-gradient(135deg,${m.color}30 0%,rgba(255,255,255,.05) 100%)`,borderColor:`${m.color}40`}}>
+              <img className="tmi" src={m.img} alt={m.name} style={{borderColor:`${m.color}78`}}/>
+              <div className="tmn">{m.name}</div>
+              <div className="tmr">{m.role}</div>
             </div>
           ))}
         </div>
@@ -974,89 +523,168 @@ function WhySection({ why }) {
   );
 }
 
-export default function Swafy() {
-  const [openVideo, setOpenVideo] = useState(false);
+/* ── GALERIE ───────────────────────────────────── */
+function GallerySection({gallery}){
+  const [idx,setIdx]=useState(0);
+  const max=Math.max(0,gallery.length-3);
+  return(
+    <section className="sec">
+      <div className="con">
+        <div className="ey"><div className="eyl"/>Galerie</div>
+        <h2 className="stit">Nos moments forts</h2>
+        <p className="sdesc">Foire de la Créativité · Clubs scientifiques · RobotBattle · Séances de débat Jeunesse-Science.</p>
+        <div className="gltr">
+          {gallery.map((src,i)=>(
+            <div key={src} className="gls2"
+                 style={{transform:`translateX(calc(-${idx*(100+18)}% - ${idx*18}px))`,transition:"transform .5s cubic-bezier(.4,0,.2,1)"}}>
+              <img src={src} alt={`Événement SWAFY ${i+1}`}/>
+              <div className="gov"/>
+            </div>
+          ))}
+        </div>
+        <div className="gctrl">
+          <button className="gbtn" onClick={()=>setIdx(i=>Math.max(0,i-1))}><FiChevronLeft/></button>
+          <div className="gdots">
+            {gallery.map((_,i)=><div key={i} className={`gdot ${i===idx?"act":""}`} onClick={()=>setIdx(i)}/>)}
+          </div>
+          <button className="gbtn" onClick={()=>setIdx(i=>Math.min(max,i+1))}><FiChevronRight/></button>
+        </div>
+      </div>
+    </section>
+  );
+}
 
-  const team = useMemo(() => [
-    { name: "Andrey Khusid",    role: "Design",    img: "https://i.pravatar.cc/160?img=12", color: "#9b5de5" },
-    { name: "Steven Rodion",    role: "Product",   img: "https://i.pravatar.cc/160?img=32", color: "#00bbf9" },
-    { name: "AJ Josephson",     role: "Dev",       img: "https://i.pravatar.cc/160?img=41", color: "#f15bb5" },
-    { name: "Amina Bouyakoub", role: "Community", img: "https://i.pravatar.cc/160?img=5",  color: "#fee440" },
-    { name: "Ivan Damani",      role: "Backend",   img: "https://i.pravatar.cc/160?img=18", color: "#00f5d4" },
-    { name: "James Doe",        role: "Mentor",    img: "https://i.pravatar.cc/160?img=60", color: "#fb8500" },
-    { name: "Yahya Mustapha",  role: "Support",   img: "https://i.pravatar.cc/160?img=27", color: "#8338ec" },
-    { name: "John Doe",         role: "Trainer",   img: "https://i.pravatar.cc/160?img=52", color: "#3a86ff" },
-  ], []);
+/* ── POURQUOI SWAFY ────────────────────────────── */
+function WhySection({why}){
+  return(
+    <section className="seca">
+      <div className="con">
+        <div style={{textAlign:"center"}}>
+          <div className="ey" style={{justifyContent:"center"}}><div className="eyl"/>Pourquoi SWAFY</div>
+          <h2 className="stit">Pourquoi nous rejoindre ?</h2>
+          <p className="sdesc" style={{margin:"0 auto"}}>
+            SWAFY offre une expérience unique, conçue pour les jeunes tunisiens ambitieux dans toutes les régions du pays.
+          </p>
+        </div>
+        <div className="wg">
+          {why.map(({icon,title,desc},i)=>(
+            <div key={title} className="wc gl"
+                 style={{background:`linear-gradient(135deg,rgba(255,255,255,${.06+i*.02}),rgba(255,255,255,.04))`}}>
+              <div className="wi">{icon}</div>
+              <div className="wt">{title}</div>
+              <div className="wd">{desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
 
-  const gallery = useMemo(() => [
+/* ── BANDE PARTENAIRES ─────────────────────────── */
+function PartnersStrip(){
+  return(
+    <div className="pstrip">
+      <div className="psin">
+        <span className="plbl">Partenaires officiels</span>
+        <div className="pit">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/24px-Flag_of_Europe.svg.png" alt="UE" style={{height:17}}/>
+          Union Européenne
+        </div>
+        <div className="pdiv"/>
+        <div className="pit">🏛️ ANPR</div>
+        <div className="pdiv"/>
+        <div className="pit">🎓 Min. Enseignement Supérieur</div>
+        <div className="pdiv"/>
+        <div className="pit">📱 Fondation Orange Tunisie</div>
+        <div className="pdiv"/>
+        <div className="pit">🌍 EU4Youth</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── PAGE PRINCIPALE ───────────────────────────── */
+export default function Swafy(){
+  const [openVideo,setOpenVideo]=useState(false);
+
+  /* Équipe réelle SWAFY identifiée publiquement */
+  const team=useMemo(()=>[
+    {name:"Dhouha Sbaoulji",   role:"Cheffe de projet SWAFY · ANPR",      img:"https://i.pravatar.cc/160?img=47",color:"#c8b8ff"},
+    {name:"Chedli Abdelli",    role:"Directeur Général · ANPR",            img:"https://i.pravatar.cc/160?img=12",color:"#7FFFEE"},
+    {name:"Bouchra B. Abdallah",role:"Membre équipe SWAFY · ANPR",         img:"https://i.pravatar.cc/160?img=5", color:"#FF8EC8"},
+    {name:"Moncef Boukthir",   role:"Ministre Enseignement Supérieur",     img:"https://i.pravatar.cc/160?img=32",color:"#FFD166"},
+    {name:"Marcus Cornaro",    role:"Ambassadeur UE en Tunisie",           img:"https://i.pravatar.cc/160?img=57",color:"#4A9FB5"},
+    {name:"Coord. MOBIDOC",    role:"Gestion bourses doctorales",          img:"https://i.pravatar.cc/160?img=18",color:"#00f5d4"},
+    {name:"Coord. Associatif", role:"Réseau clubs & Gaming Labs",          img:"https://i.pravatar.cc/160?img=52",color:"#3a86ff"},
+    {name:"Manager Subventions",role:"Gestion financière & Reporting UE", img:"https://i.pravatar.cc/160?img=27",color:"#fb8500"},
+  ],[]);
+
+  const gallery=useMemo(()=>[
+    "https://images.unsplash.com/photo-1532619187608-e5375cab36aa?auto=format&fit=crop&w=1200&q=70",
+    "https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1200&q=70",
+    "https://images.unsplash.com/photo-1561489396-888724a1543d?auto=format&fit=crop&w=1200&q=70",
     "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=70",
-    "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=70",
-    "https://images.unsplash.com/photo-1553877522-43269d4ea984?auto=format&fit=crop&w=1200&q=70",
-    "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1200&q=70",
-    "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=70",
-  ], []);
+    "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1200&q=70",
+  ],[]);
 
-  const why = useMemo(() => [
-    { icon: <FiUsers />,     title: "User-Friendly",          desc: "Easy onboarding & parcours clairs pour chaque niveau." },
-    { icon: <FiHeadphones />,title: "24/7 Customer Support",  desc: "Support سريع وقت تحتاج — toujours disponible." },
-    { icon: <FiAward />,     title: "Free Recommendations",   desc: "Guidance مخصص حسب المستوى والأهداف." },
-    { icon: <FiZap />,       title: "Fast Training",          desc: "Modules خفاف و فعّالين — apprends vite, applique plus." },
-  ], []);
+  const why=useMemo(()=>[
+    {icon:<FiUsers/>,title:"Accès équitable partout",desc:"Présence dans les 24 gouvernorats avec priorité aux zones marginalisées — chaque jeune tunisien a sa chance."},
+    {icon:<FiHeadphones/>,title:"Accompagnement continu",desc:"Soutien permanent de l'ANPR et des 18 associations partenaires pour les doctorants, jeunes chercheurs et clubs scientifiques."},
+    {icon:<FiAward/>,title:"Bourses & Certifications",desc:"235 bourses MOBIDOC, badges de compétences et passerelles directes vers le monde professionnel tunisien."},
+    {icon:<FiZap/>,title:"Formations innovantes",desc:"Gaming Labs, Fablabs, compétitions de robotique, ateliers de co-création — apprends vite et construis ta carrière."},
+  ],[]);
 
-  return (
+  return(
     <>
-      <StyleInject />
-      <div className="sw-noise" />
-      <div className="sw-orb sw-orb-1" />
-      <div className="sw-orb sw-orb-2" />
-      <div className="sw-orb sw-orb-3" />
-      <div className="sw-orb sw-orb-4" />
-
-      <div className="sw-page">
-        <Navbar onPlay={() => setOpenVideo(true)} />
-        <Hero onPlay={() => setOpenVideo(true)} />
-        <VideoSection onPlay={() => setOpenVideo(true)} />
-        <AboutSection />
-        <TeamSection team={team} />
-        <GallerySection gallery={gallery} />
-        <WhySection why={why} />
-
-        <footer className="sw-footer">
-          <div className="sw-container">
-            <div className="sw-footer-top">
+      <StyleInject/>
+      <div className="noise"/>
+      <div className="orb o1"/><div className="orb o2"/>
+      <div className="orb o3"/><div className="orb o4"/>
+      <div className="pg">
+        <Navbar/>
+        <Hero onPlay={()=>setOpenVideo(true)}/>
+        <VideoSection onPlay={()=>setOpenVideo(true)}/>
+        <AboutSection/>
+        <FormationsSection/>
+        <PartnersStrip/>
+        <TeamSection team={team}/>
+        <GallerySection gallery={gallery}/>
+        <WhySection why={why}/>
+        <footer className="foot">
+          <div className="con">
+            <div className="ftop">
               <div>
-                <Brand />
-                <p className="sw-footer-brand-text">
-                  SWAFY — Agence de Tunis. Science with and for youth.
-                  Plateforme de débat sur l'intelligence artificielle pour les jeunes tunisiens.
+                <Brand/>
+                <p className="fbt">
+                  Science With and For Youth — Financé par l'UE (9,5 M€ · 48 mois), géré par l'ANPR.<br/>
+                  Angle Rue Danton & Rue Chaaben Bhouri N°11, Lafayette — BP 177, 1002 Tunis Belvédère.<br/>
+                  ✉ recrutement.swafy@gmail.com
                 </p>
               </div>
-              <div className="sw-footer-col">
-                <div className="sw-footer-col-title">Navigation</div>
+              <div className="fcol">
+                <div className="fct">Navigation</div>
                 <Link to="/">Accueil</Link>
-                <Link to="/login">Login</Link>
-                <Link to="/register">Register</Link>
+                <Link to="/login">Connexion</Link>
+                <Link to="/register">S'inscrire</Link>
+                <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">ANPR.tn</a>
               </div>
-              <div className="sw-footer-col">
-                <div className="sw-footer-col-title">Services</div>
-                <a href="#!">Support</a>
-                <a href="#!">Formation</a>
-                <a href="#!">Communauté</a>
+              <div className="fcol">
+                <div className="fct">Liens officiels</div>
+                <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer">Page Facebook SWAFY</a>
+                <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">anpr.tn</a>
+                <a href="https://eu4youth.tn" target="_blank" rel="noreferrer">eu4youth.tn</a>
+                <a href="mailto:recrutement.swafy@gmail.com">recrutement.swafy@gmail.com</a>
               </div>
             </div>
-            <div className="sw-footer-bottom">
-              <span className="sw-footer-copy">© {new Date().getFullYear()} SWAFY · Tunis, Tunisie</span>
-              <span className="sw-footer-tag">Built with React · Science With and For Youth</span>
+            <div className="fbot">
+              <span className="fbc">© {new Date().getFullYear()} SWAFY · Tunis, Tunisie</span>
+              <span className="fbc">Built with React · Science With and For Youth</span>
             </div>
           </div>
         </footer>
       </div>
-
-      <VideoModal
-        open={openVideo}
-        onClose={() => setOpenVideo(false)}
-        videoUrl="https://www.youtube.com/embed/dQw4w9WgXcQ"
-      />
+      <VideoModal open={openVideo} onClose={()=>setOpenVideo(false)} url="https://www.youtube.com/embed/dQw4w9WgXcQ"/>
     </>
   );
 }
