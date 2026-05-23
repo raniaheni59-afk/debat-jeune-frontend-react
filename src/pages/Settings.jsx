@@ -1,742 +1,690 @@
-import React, { useState, useEffect, createContext, useContext } from "react";
-import { useNavigate } from "react-router-dom";
-import API from "../services/api";
+import { useMemo, useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import {
+  FiArrowLeft, FiPlay, FiUsers, FiHeadphones,
+  FiAward, FiZap, FiX, FiChevronLeft, FiChevronRight, FiArrowRight, FiExternalLink,
+} from "react-icons/fi";
 
-// ── Language Context (export pour utiliser dans toute l'app) ──
-export const LangContext = createContext();
-export const useLang = () => useContext(LangContext);
+/* ════════════════════════════════════════════════
+   CSS — page Swafy (fond violet glassmorphism)
+════════════════════════════════════════════════ */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#7260A7;--bd:#5a4d8a;--bl:#8e7ec0;
+  --gl:rgba(255,255,255,.10);--glb:rgba(255,255,255,.18);--gls:rgba(255,255,255,.22);
+  --bdr:rgba(255,255,255,.18);
+  --txt:#fff;--ts:rgba(255,255,255,.72);--tm:rgba(255,255,255,.46);
+  --acc:#c8b8ff;--tl:#7FFFEE;--pk:#FF8EC8;--gd:#FFD166;
+  --r1:12px;--r2:20px;--r3:32px;--r4:48px;
+  --shd:0 24px 80px rgba(50,30,100,.45);
+}
+html{scroll-behavior:smooth}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--txt);overflow-x:hidden;min-height:100vh}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.32);border-radius:2px}
 
-const TRANSLATIONS = {
-  fr: {
-    settings: "Paramètres", account: "Compte", notifications: "Notifications",
-    privacy: "Confidentialité", security: "Sécurité", language: "Langue", help: "Aide",
-    basicInfo: "Informations de base", accountInfo: "Informations du compte",
-    firstName: "Prénom", lastName: "Nom", email: "Email", phone: "Téléphone",
-    bio: "Bio", save: "Enregistrer les modifications", cancel: "Annuler",
-    saving: "Sauvegarde...", uploadPhoto: "Changer la photo", status: "Statut",
-    memberSince: "Membre depuis", active: "Actif", password: "Mot de passe",
-    logout: "Déconnexion", dashboard: "Tableau de bord", successMsg: "✅ Profil mis à jour !",
-    errorMsg: "❌ Erreur lors de la mise à jour", chooseLanguage: "Choisir la langue",
-    langDesc: "La langue sera appliquée sur tout le site",
-    currentPassword: "Mot de passe actuel", newPassword: "Nouveau mot de passe",
-    confirmPassword: "Confirmer le mot de passe", changePassword: "Changer le mot de passe",
-    passwordMatch: "❌ Les mots de passe ne correspondent pas",
-    passwordSuccess: "✅ Mot de passe changé avec succès !",
-    twoFactor: "Authentification à deux facteurs",
-    twoFactorDesc: "Ajoutez une couche de sécurité supplémentaire à votre compte",
-    activeSessions: "Sessions actives", revokeAll: "Révoquer toutes les sessions",
-    sessionDesc: "Gérez les appareils connectés à votre compte",
-    notifPubs: "Nouvelles publications", notifComments: "Commentaires",
-    notifMentions: "Mentions", notifDebats: "Débats", notifEmail: "Notifications par email",
-    notifPush: "Notifications push", enabled: "Activé", disabled: "Désactivé",
-    profileVisible: "Profil visible par", everyone: "Tout le monde", friendsOnly: "Amis seulement",
-    onlyMe: "Moi seulement", showEmail: "Afficher l'email", showPhone: "Afficher le téléphone",
-    faq: "Questions fréquentes", contact: "Contacter le support", reportBug: "Signaler un bug",
-    terms: "Conditions d'utilisation", privacyPolicy: "Politique de confidentialité",
-    faq1: "Comment modifier mon profil ?", faq1ans: "Allez dans Paramètres → Compte et modifiez vos informations.",
-    faq2: "Comment changer mon mot de passe ?", faq2ans: "Allez dans Paramètres → Sécurité → Changer le mot de passe.",
-    faq3: "Comment supprimer mon compte ?", faq3ans: "Contactez notre support pour supprimer votre compte.",
-    faq4: "Comment signaler un contenu inapproprié ?", faq4ans: "Cliquez sur les 3 points d'une publication et sélectionnez 'Signaler'.",
-    dangerZone: "Zone de danger", deleteAccount: "Supprimer mon compte",
-    deleteDesc: "Cette action est irréversible. Toutes vos données seront supprimées.",
-  },
-  ar: {
-    settings: "الإعدادات", account: "الحساب", notifications: "الإشعارات",
-    privacy: "الخصوصية", security: "الأمان", language: "اللغة", help: "المساعدة",
-    basicInfo: "المعلومات الأساسية", accountInfo: "معلومات الحساب",
-    firstName: "الاسم الأول", lastName: "اسم العائلة", email: "البريد الإلكتروني",
-    phone: "الهاتف", bio: "نبذة شخصية", save: "حفظ التغييرات", cancel: "إلغاء",
-    saving: "جاري الحفظ...", uploadPhoto: "تغيير الصورة", status: "الحالة",
-    memberSince: "عضو منذ", active: "نشط", password: "كلمة المرور",
-    logout: "تسجيل الخروج", dashboard: "لوحة التحكم", successMsg: "✅ تم تحديث الملف الشخصي !",
-    errorMsg: "❌ خطأ في التحديث", chooseLanguage: "اختيار اللغة",
-    langDesc: "سيتم تطبيق اللغة على كامل الموقع",
-    currentPassword: "كلمة المرور الحالية", newPassword: "كلمة المرور الجديدة",
-    confirmPassword: "تأكيد كلمة المرور", changePassword: "تغيير كلمة المرور",
-    passwordMatch: "❌ كلمتا المرور غير متطابقتان",
-    passwordSuccess: "✅ تم تغيير كلمة المرور بنجاح !",
-    twoFactor: "المصادقة الثنائية",
-    twoFactorDesc: "أضف طبقة أمان إضافية لحسابك",
-    activeSessions: "الجلسات النشطة", revokeAll: "إلغاء كل الجلسات",
-    sessionDesc: "إدارة الأجهزة المتصلة بحسابك",
-    notifPubs: "المنشورات الجديدة", notifComments: "التعليقات",
-    notifMentions: "الإشارات", notifDebats: "النقاشات", notifEmail: "إشعارات البريد",
-    notifPush: "الإشعارات الفورية", enabled: "مفعّل", disabled: "معطّل",
-    profileVisible: "الملف الشخصي مرئي لـ", everyone: "الجميع", friendsOnly: "الأصدقاء فقط",
-    onlyMe: "أنا فقط", showEmail: "إظهار البريد الإلكتروني", showPhone: "إظهار الهاتف",
-    faq: "الأسئلة الشائعة", contact: "التواصل مع الدعم", reportBug: "الإبلاغ عن خطأ",
-    terms: "شروط الاستخدام", privacyPolicy: "سياسة الخصوصية",
-    faq1: "كيف أعدّل ملفي الشخصي؟", faq1ans: "اذهب إلى الإعدادات ← الحساب وعدّل معلوماتك.",
-    faq2: "كيف أغيّر كلمة المرور؟", faq2ans: "اذهب إلى الإعدادات ← الأمان ← تغيير كلمة المرور.",
-    faq3: "كيف أحذف حسابي؟", faq3ans: "تواصل مع الدعم لحذف حسابك.",
-    faq4: "كيف أبلّغ عن محتوى غير لائق؟", faq4ans: "انقر على النقاط الثلاث في المنشور واختر 'إبلاغ'.",
-    dangerZone: "منطقة الخطر", deleteAccount: "حذف حسابي",
-    deleteDesc: "هذا الإجراء لا يمكن التراجع عنه. سيتم حذف جميع بياناتك.",
-  },
-  en: {
-    settings: "Settings", account: "Account", notifications: "Notifications",
-    privacy: "Privacy", security: "Security", language: "Language", help: "Help",
-    basicInfo: "Basic Info", accountInfo: "Account Info",
-    firstName: "First Name", lastName: "Last Name", email: "Email", phone: "Phone",
-    bio: "Bio", save: "Save Changes", cancel: "Cancel",
-    saving: "Saving...", uploadPhoto: "Change Photo", status: "Status",
-    memberSince: "Member since", active: "Active", password: "Password",
-    logout: "Logout", dashboard: "Dashboard", successMsg: "✅ Profile updated!",
-    errorMsg: "❌ Error updating profile", chooseLanguage: "Choose Language",
-    langDesc: "The language will be applied across the entire site",
-    currentPassword: "Current Password", newPassword: "New Password",
-    confirmPassword: "Confirm Password", changePassword: "Change Password",
-    passwordMatch: "❌ Passwords do not match",
-    passwordSuccess: "✅ Password changed successfully!",
-    twoFactor: "Two-Factor Authentication",
-    twoFactorDesc: "Add an extra layer of security to your account",
-    activeSessions: "Active Sessions", revokeAll: "Revoke All Sessions",
-    sessionDesc: "Manage devices connected to your account",
-    notifPubs: "New Publications", notifComments: "Comments",
-    notifMentions: "Mentions", notifDebats: "Debates", notifEmail: "Email Notifications",
-    notifPush: "Push Notifications", enabled: "Enabled", disabled: "Disabled",
-    profileVisible: "Profile visible to", everyone: "Everyone", friendsOnly: "Friends only",
-    onlyMe: "Only me", showEmail: "Show email", showPhone: "Show phone",
-    faq: "FAQ", contact: "Contact Support", reportBug: "Report a Bug",
-    terms: "Terms of Service", privacyPolicy: "Privacy Policy",
-    faq1: "How to edit my profile?", faq1ans: "Go to Settings → Account and update your info.",
-    faq2: "How to change my password?", faq2ans: "Go to Settings → Security → Change Password.",
-    faq3: "How to delete my account?", faq3ans: "Contact our support to delete your account.",
-    faq4: "How to report inappropriate content?", faq4ans: "Click the 3 dots on a post and select 'Report'.",
-    dangerZone: "Danger Zone", deleteAccount: "Delete My Account",
-    deleteDesc: "This action is irreversible. All your data will be deleted.",
-  }
-};
+@keyframes d1{from{transform:translate(0,0) scale(1)}to{transform:translate(50px,40px) scale(1.1)}}
+@keyframes d2{from{transform:translate(0,0) scale(1)}to{transform:translate(-40px,50px) scale(1.08)}}
+@keyframes d3{from{transform:translate(0,0) scale(1)}to{transform:translate(30px,-40px) scale(1.12)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-13px)}}
+@keyframes up{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:translateY(0)}}
+@keyframes rt{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:translateX(0)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+@keyframes shimmer{from{background-position:0% 50%}to{background-position:100% 50%}}
+@keyframes grow{from{width:0%}}
+@keyframes scan{0%{transform:scaleX(0) translateX(-100%);opacity:0}50%{transform:scaleX(1) translateX(0);opacity:1}100%{transform:scaleX(0) translateX(100%);opacity:0}}
+@keyframes fin{from{opacity:0}to{opacity:1}}
+@keyframes min{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 14px rgba(255,255,255,.1),0 0 0 28px rgba(255,255,255,.05)}50%{box-shadow:0 0 0 22px rgba(255,255,255,.13),0 0 0 44px rgba(255,255,255,.07)}}
 
-const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
+.gl{background:var(--gl);border:1px solid var(--bdr);backdrop-filter:blur(20px) saturate(160%)}
+.gls{background:var(--gls);border:1px solid rgba(255,255,255,.24);backdrop-filter:blur(26px) saturate(180%)}
 
-const getAvatar = (photo, sexe) => {
-  if (photo) return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;
-  return sexe === "femme"
-    ? "https://randomuser.me/api/portraits/women/44.jpg"
-    : "https://randomuser.me/api/portraits/men/44.jpg";
-};
+.noise{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+  background-size:160px}
+.orb{position:fixed;border-radius:50%;filter:blur(88px);pointer-events:none;z-index:0}
+.o1{width:680px;height:680px;background:radial-gradient(circle,rgba(200,184,255,.26) 0%,transparent 65%);top:-250px;right:-170px;animation:d1 14s ease-in-out infinite alternate}
+.o2{width:530px;height:530px;background:radial-gradient(circle,rgba(127,255,238,.13) 0%,transparent 65%);bottom:8%;left:-170px;animation:d2 18s ease-in-out infinite alternate}
+.o3{width:380px;height:380px;background:radial-gradient(circle,rgba(255,142,200,.14) 0%,transparent 65%);top:42%;left:43%;animation:d3 11s ease-in-out infinite alternate}
+.o4{width:290px;height:290px;background:radial-gradient(circle,rgba(255,209,102,.11) 0%,transparent 65%);bottom:28%;right:8%;animation:d1 9s 3s ease-in-out infinite alternate}
 
-// ── Toast notification ──
-const Toast = ({ msg, onClose }) => {
-  useEffect(() => { const t = setTimeout(onClose, 3000); return () => clearTimeout(t); }, []);
-  return (
-    <div style={{
-      position: "fixed", bottom: 30, right: 30, zIndex: 9999,
-      background: msg.includes("❌") ? "#ff4444" : "#22c55e",
-      color: "#fff", padding: "14px 24px", borderRadius: 12,
-      fontWeight: 600, fontSize: 15, boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-      animation: "slideUp 0.3s ease"
-    }}>
-      {msg}
+.pg{position:relative;z-index:1}
+.con{max-width:1180px;margin:0 auto;padding:0 24px}
+
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 24px;transition:all .4s}
+.nav.sc{background:rgba(90,77,138,.88);backdrop-filter:blur(24px);border-bottom:1px solid var(--bdr)}
+.nav-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:70px}
+.brand{display:flex;align-items:center;gap:9px;font-family:'Syne',sans-serif;font-weight:800;font-size:1.32rem;color:#fff;text-decoration:none;letter-spacing:-.015em}
+.bdot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--acc),var(--tl));box-shadow:0 0 13px rgba(200,184,255,.8)}
+.back{display:flex;align-items:center;gap:7px;color:var(--ts);font-size:.86rem;font-weight:500;text-decoration:none;transition:color .2s;padding:7px 0}
+.back:hover{color:#fff}
+.nav-act{display:flex;gap:11px}
+.bgh{padding:8px 18px;border-radius:50px;border:1px solid var(--bdr);color:#fff;font-size:.83rem;font-weight:500;text-decoration:none;background:var(--gl);backdrop-filter:blur(8px);transition:all .2s}
+.bgh:hover{background:var(--glb)}
+.bpl{padding:9px 20px;border-radius:50px;background:rgba(255,255,255,.95);color:var(--bd);font-size:.83rem;font-weight:700;text-decoration:none;border:none;cursor:pointer;transition:all .25s;box-shadow:0 5px 22px rgba(0,0,0,.2)}
+.bpl:hover{transform:translateY(-1px);box-shadow:0 9px 30px rgba(0,0,0,.3)}
+
+/* HERO */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:130px 24px 90px;overflow:hidden}
+.hi{max-width:1180px;margin:0 auto;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.htag{display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border-radius:50px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.2);font-size:.73rem;font-weight:600;color:var(--acc);letter-spacing:.1em;text-transform:uppercase;margin-bottom:26px;animation:up .8s ease both}
+.lp{width:7px;height:7px;border-radius:50%;background:var(--tl);animation:pulse 2s infinite}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(2.9rem,5vw,4.8rem);font-weight:800;line-height:1.06;letter-spacing:-.034em;margin-bottom:22px;animation:up .8s .08s ease both}
+.shim{background:linear-gradient(135deg,#fff 0%,var(--acc) 40%,var(--tl) 70%,var(--pk) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;background-size:200% 200%;animation:shimmer 4s ease-in-out infinite alternate}
+.hdesc{color:var(--ts);font-size:1.05rem;line-height:1.78;max-width:470px;margin-bottom:38px;animation:up .8s .16s ease both}
+.hact{display:flex;gap:13px;flex-wrap:wrap;animation:up .8s .24s ease both}
+.bpr{display:inline-flex;align-items:center;gap:9px;padding:14px 30px;border-radius:50px;background:rgba(255,255,255,.95);color:var(--bd);font-size:.95rem;font-weight:700;text-decoration:none;border:none;cursor:pointer;box-shadow:0 9px 32px rgba(0,0,0,.24);transition:all .3s;position:relative;overflow:hidden}
+.bpr:hover{transform:translateY(-2px);box-shadow:0 15px 44px rgba(0,0,0,.34)}
+.bsc{display:inline-flex;align-items:center;gap:9px;padding:14px 30px;border-radius:50px;border:1px solid rgba(255,255,255,.32);color:#fff;font-size:.95rem;font-weight:500;text-decoration:none;background:var(--gl);backdrop-filter:blur(8px);transition:all .25s}
+.bsc:hover{background:var(--glb)}
+.hstats{display:flex;gap:28px;margin-top:42px;animation:up .8s .32s ease both}
+.hs{display:flex;flex-direction:column;gap:3px}
+.hsn{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:800;color:#fff;letter-spacing:-.02em}
+.hsl{font-size:.76rem;color:var(--tm)}
+.hsd{width:1px;background:rgba(255,255,255,.18)}
+
+/* HERO CARD */
+.hv{animation:rt .9s .22s ease both;position:relative}
+.hc{border-radius:var(--r3);padding:30px;position:relative;box-shadow:0 30px 95px rgba(50,30,100,.55),inset 0 1px 0 rgba(255,255,255,.2);animation:float 7s ease-in-out infinite}
+.hct{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:26px}
+.hlb{display:flex;align-items:center;gap:6px;padding:5px 13px;border-radius:50px;background:rgba(127,255,238,.14);border:1px solid rgba(127,255,238,.28);font-size:.7rem;font-weight:700;color:#7FFFEE;letter-spacing:.06em;text-transform:uppercase}
+.hcd{display:flex;gap:5px}
+.hcdd{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22)}
+.hctit{font-family:'Syne',sans-serif;font-size:1.48rem;font-weight:700;margin-bottom:6px;letter-spacing:-.02em}
+.hcsu{font-size:.84rem;color:var(--ts);margin-bottom:22px}
+.hcpl{display:flex;justify-content:space-between;font-size:.75rem;color:var(--ts);margin-bottom:7px}
+.hcpb{height:5px;background:rgba(255,255,255,.11);border-radius:3px;overflow:hidden;margin-bottom:22px}
+.hcpf{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--acc),var(--tl));animation:grow 2.4s .8s ease both}
+.hmg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:22px}
+.hmt{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.13);border-radius:var(--r1);padding:13px 8px;text-align:center;cursor:pointer;transition:all .25s}
+.hmt:hover{background:rgba(255,255,255,.17);border-color:rgba(255,255,255,.33);transform:translateY(-2px)}
+.hmi{font-size:1.15rem;margin-bottom:5px}
+.hml{font-size:.7rem;font-weight:600;color:var(--ts)}
+.hcf{display:flex;justify-content:space-between;align-items:center}
+.avs{display:flex}
+.av{width:30px;height:30px;border-radius:50%;border:2px solid rgba(114,96,167,.88);margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;color:var(--bd);background:linear-gradient(135deg,var(--acc),var(--tl))}
+.av:first-child{margin-left:0}
+.hcb{display:flex;align-items:center;gap:5px;padding:8px 18px;border-radius:50px;background:rgba(255,255,255,.94);color:var(--bd);font-size:.78rem;font-weight:700;border:none;cursor:pointer;text-decoration:none;transition:all .2s}
+.hcb:hover{transform:translateY(-1px);box-shadow:0 7px 22px rgba(0,0,0,.24)}
+.fb{position:absolute;display:flex;align-items:center;gap:9px;border-radius:15px;padding:11px 14px;box-shadow:0 14px 44px rgba(50,30,100,.42);font-size:.8rem;font-weight:500}
+.fb1{top:-16px;left:-22px;animation:float 8s 1s ease-in-out infinite}
+.fb2{bottom:-16px;right:-22px;animation:float 9s 2s ease-in-out infinite}
+.fbi{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.fbn{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:800}
+.fbt{font-size:.68rem;color:var(--ts)}
+
+/* SECTIONS */
+.sec{padding:92px 24px;position:relative}
+.seca{padding:92px 24px;position:relative;background:rgba(0,0,0,.11)}
+.ey{display:inline-flex;align-items:center;gap:7px;font-size:.71rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);margin-bottom:14px}
+.eyl{width:20px;height:1px;background:var(--acc)}
+.stit{font-family:'Syne',sans-serif;font-size:clamp(1.9rem,3.2vw,2.8rem);font-weight:800;letter-spacing:-.025em;line-height:1.14;margin-bottom:14px}
+.sdesc{font-size:1rem;color:var(--ts);max-width:510px;line-height:1.72}
+
+/* VIDÉO */
+.vw{margin-top:52px}
+.vc{border-radius:var(--r4);overflow:hidden;position:relative;cursor:pointer;box-shadow:var(--shd);aspect-ratio:16/7;background:linear-gradient(135deg,rgba(255,255,255,.07),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.16);transition:transform .3s}
+.vc:hover{transform:scale(1.008)}
+.vbg{position:absolute;inset:0;background:linear-gradient(135deg,rgba(200,184,255,.28) 0%,rgba(127,255,238,.13) 40%,rgba(255,142,200,.18) 100%)}
+.vls{position:absolute;inset:0;overflow:hidden}
+.vl{position:absolute;height:1px;left:0;right:0;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent);animation:scan 4s ease-in-out infinite}
+.vl:nth-child(1){top:24%}
+.vl:nth-child(2){top:54%;animation-delay:1.5s}
+.vl:nth-child(3){top:80%;animation-delay:3s}
+.vmu{position:absolute;inset:0;padding:30px;display:flex;flex-direction:column;justify-content:flex-end}
+.vmb{height:7px;background:rgba(255,255,255,.13);border-radius:4px;margin-bottom:9px}
+.vpb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.vpc{width:78px;height:78px;border-radius:50%;background:rgba(255,255,255,.94);display:flex;align-items:center;justify-content:center;font-size:1.35rem;color:var(--bd);transition:all .3s;cursor:pointer;animation:breathe 3s ease-in-out infinite}
+.vc:hover .vpc{transform:scale(1.09);background:#fff}
+.srow{display:flex;margin-top:38px;border-radius:var(--r3);overflow:hidden;border:1px solid rgba(255,255,255,.13)}
+.sb{flex:1;padding:30px 22px;text-align:center;background:var(--gl);backdrop-filter:blur(14px);border-right:1px solid rgba(255,255,255,.09);transition:background .25s}
+.sb:last-child{border-right:none}
+.sb:hover{background:var(--gls)}
+.sbn{font-family:'Syne',sans-serif;font-size:2.5rem;font-weight:800;letter-spacing:-.03em;margin-bottom:5px;background:linear-gradient(135deg,#fff 0%,var(--acc) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sbl{font-size:.84rem;color:var(--ts);font-weight:500}
+
+/* ABOUT */
+.ag{display:grid;grid-template-columns:1fr 1fr;gap:76px;align-items:center}
+.ad{font-size:1.03rem;color:var(--ts);line-height:1.82;margin-bottom:34px}
+.sr2{display:flex;gap:13px}
+.sbt{display:flex;align-items:center;gap:9px;padding:13px 22px;border-radius:var(--r1);background:var(--gl);border:1px solid var(--bdr);color:#fff;text-decoration:none;font-weight:600;font-size:.88rem;cursor:pointer;transition:all .25s;backdrop-filter:blur(8px)}
+.sbt:hover{background:var(--glb);transform:translateY(-2px)}
+.phs{position:relative;height:390px}
+.ph{position:absolute;width:198px;border-radius:27px;overflow:hidden;border:1px solid rgba(255,255,255,.18);box-shadow:0 28px 75px rgba(50,30,100,.52)}
+.pha{top:0;left:28px;animation:float 7s ease-in-out infinite;z-index:2}
+.phb{top:68px;left:158px;animation:float 9s 1.5s ease-in-out infinite;opacity:.82;z-index:1}
+.phh{height:13px;background:rgba(255,255,255,.05)}
+.phn{width:42px;height:5px;border-radius:3px;background:rgba(255,255,255,.09);margin:4px auto}
+.phbd{padding:13px;background:rgba(90,77,138,.58)}
+.phb2{height:62px;border-radius:13px;margin-bottom:11px;background:linear-gradient(135deg,rgba(200,184,255,.38),rgba(127,255,238,.22));border:1px solid rgba(255,255,255,.13)}
+.phr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:9px}
+.pht{height:36px;background:rgba(255,255,255,.07);border-radius:8px}
+.phl{height:8px;background:rgba(255,255,255,.09);border-radius:4px;margin-top:6px}
+
+/* PARTENAIRES STRIP */
+.pstrip{padding:30px 24px;background:rgba(0,0,0,.14);border-top:1px solid rgba(255,255,255,.09);border-bottom:1px solid rgba(255,255,255,.09)}
+.psin{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:28px;flex-wrap:wrap}
+.plbl{font-size:.68rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tm);margin-right:6px}
+.pit{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:9px;padding:9px 15px;font-size:.8rem;font-weight:700;color:rgba(255,255,255,.82)}
+.pdiv{width:1px;height:26px;background:rgba(255,255,255,.11)}
+
+/* ÉQUIPE */
+.tg{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:52px}
+.tm{border-radius:var(--r2);padding:26px 18px;text-align:center;border:1px solid rgba(255,255,255,.16);transition:all .3s;cursor:pointer;position:relative;overflow:hidden}
+.tm::before{content:'';position:absolute;inset:0;opacity:0;background:rgba(255,255,255,.05);transition:opacity .3s}
+.tm:hover::before{opacity:1}
+.tm:hover{transform:translateY(-5px);box-shadow:0 22px 56px rgba(50,30,100,.42)}
+.tmi{width:68px;height:68px;border-radius:50%;margin:0 auto 14px;border:3px solid rgba(255,255,255,.38);display:block;object-fit:cover;box-shadow:0 7px 22px rgba(0,0,0,.28)}
+.tmn{font-family:'Syne',sans-serif;font-size:.97rem;font-weight:700;margin-bottom:6px}
+.tmr{display:inline-block;padding:4px 11px;border-radius:50px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.16);font-size:.7rem;font-weight:600;color:var(--ts)}
+
+/* GALERIE */
+.gltr{display:flex;gap:18px;overflow:hidden;margin-top:52px}
+.gls2{flex:0 0 calc(33.333% - 13px);border-radius:var(--r2);overflow:hidden;aspect-ratio:16/10;position:relative;border:1px solid rgba(255,255,255,.13);box-shadow:0 14px 44px rgba(50,30,100,.38);transition:transform .4s}
+.gls2:hover{transform:scale(1.024)}
+.gls2 img{width:100%;height:100%;object-fit:cover;display:block;filter:saturate(.88) brightness(.86);transition:filter .4s}
+.gls2:hover img{filter:saturate(1.08) brightness(.92)}
+.gov{position:absolute;inset:0;background:linear-gradient(to top,rgba(90,77,138,.48) 0%,transparent 58%)}
+.gctrl{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:26px}
+.gbtn{width:42px;height:42px;border-radius:50%;background:var(--gl);border:1px solid var(--bdr);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.97rem;transition:all .2s;backdrop-filter:blur(8px)}
+.gbtn:hover{background:var(--gls)}
+.gdots{display:flex;gap:7px}
+.gdot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.22);cursor:pointer;transition:all .25s}
+.gdot.act{background:#fff;width:20px;border-radius:3px}
+
+/* POURQUOI */
+.wg{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:52px}
+.wc{border-radius:var(--r2);padding:34px 30px;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.13);transition:all .3s}
+.wc:hover{transform:translateY(-4px);box-shadow:0 22px 56px rgba(50,30,100,.38)}
+.wi{width:52px;height:52px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:1.25rem;margin-bottom:20px;background:rgba(255,255,255,.11);border:1px solid rgba(255,255,255,.18);transition:all .3s}
+.wc:hover .wi{background:rgba(255,255,255,.2);transform:rotate(-5deg) scale(1.05)}
+.wt{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:700;margin-bottom:9px}
+.wd{font-size:.88rem;color:var(--ts);line-height:1.65}
+
+/* FORMATIONS BLOCK (dans Swafy) */
+.fl{display:flex;flex-direction:column;gap:10px;margin-top:22px}
+.fi{display:flex;align-items:center;gap:10px;padding:12px 15px;border-radius:var(--r1);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);text-decoration:none;color:#fff;transition:all .22s}
+.fi:hover{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);transform:translateX(4px)}
+.fii{width:32px;height:32px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.9rem;background:rgba(255,255,255,.12)}
+.fit{font-weight:700;font-size:.86rem}
+.fid{font-size:.74rem;color:var(--ts);margin-top:1px}
+.fiarr{margin-left:auto;color:var(--acc);font-size:.82rem;flex-shrink:0}
+
+/* MODAL */
+.mov{position:fixed;inset:0;z-index:500;background:rgba(50,30,100,.88);backdrop-filter:blur(15px);display:flex;align-items:center;justify-content:center;padding:22px;animation:fin .25s ease}
+.mod{width:100%;max-width:880px;border-radius:var(--r3);overflow:hidden;position:relative;box-shadow:0 38px 110px rgba(0,0,0,.58);animation:min .3s ease}
+.moc{position:absolute;top:14px;right:14px;z-index:10;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.18);color:#fff;font-size:.95rem;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.moc:hover{background:rgba(0,0,0,.8)}
+.mod iframe{width:100%;aspect-ratio:16/9;display:block;border:none}
+
+/* FOOTER */
+.foot{background:rgba(0,0,0,.22);padding:52px 24px 26px;border-top:1px solid rgba(255,255,255,.09)}
+.ftop{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:36px;margin-bottom:44px}
+.fbt{font-size:.86rem;color:var(--ts);line-height:1.7;max-width:330px;margin-top:12px}
+.fct{font-family:'Syne',sans-serif;font-size:.76rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tm);margin-bottom:16px}
+.fcol a{display:block;color:var(--ts);text-decoration:none;font-size:.88rem;margin-bottom:10px;transition:color .2s}
+.fcol a:hover{color:#fff}
+.fbot{border-top:1px solid rgba(255,255,255,.07);padding-top:22px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:9px}
+.fbc{font-size:.79rem;color:var(--tm)}
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  .hi{grid-template-columns:1fr}
+  .hv{display:none}
+  .tg{grid-template-columns:repeat(2,1fr)}
+  .ag{grid-template-columns:1fr}
+  .phs{display:none}
+  .wg{grid-template-columns:1fr}
+  .gls2{flex:0 0 calc(50% - 9px)}
+  .srow{flex-direction:column}
+  .sb{border-right:none;border-bottom:1px solid rgba(255,255,255,.09)}
+}
+@media(max-width:600px){
+  .hero h1{font-size:2.55rem}
+  .tg{grid-template-columns:1fr 1fr}
+  .gls2{flex:0 0 84%}
+  .hstats{gap:16px}
+}
+`;
+
+function StyleInject(){
+  useEffect(()=>{
+    const id="sw-sty";
+    if(!document.getElementById(id)){
+      const el=document.createElement("style");
+      el.id=id;el.textContent=CSS;
+      document.head.appendChild(el);
+    }
+    return()=>{const el=document.getElementById(id);el&&el.remove()};
+  },[]);
+  return null;
+}
+
+function Brand(){
+  return(<div className="brand"><div className="bdot"/>SWAFY</div>);
+}
+
+function VideoModal({open,onClose,url}){
+  if(!open)return null;
+  return(
+    <div className="mov" onClick={onClose}>
+      <div className="mod" onClick={e=>e.stopPropagation()}>
+        <button className="moc" onClick={onClose}><FiX/></button>
+        <iframe src={url} title="Vidéo SWAFY" allow="autoplay; encrypted-media" allowFullScreen/>
+      </div>
     </div>
   );
-};
+}
 
-// ── Toggle Switch ──
-const Toggle = ({ value, onChange }) => (
-  <div onClick={onChange} style={{
-    width: 48, height: 26, borderRadius: 13, cursor: "pointer", transition: "all 0.3s",
-    background: value ? "#a78bfa" : "rgba(255,255,255,0.15)", position: "relative", flexShrink: 0
-  }}>
-    <div style={{
-      width: 20, height: 20, borderRadius: "50%", background: "#fff",
-      position: "absolute", top: 3, left: value ? 25 : 3, transition: "left 0.3s",
-      boxShadow: "0 2px 6px rgba(0,0,0,0.3)"
-    }} />
-  </div>
-);
-
-const Settings = () => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("account");
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState(null);
-  const [openFaq, setOpenFaq] = useState(null);
-
-  // Language
-  const [lang, setLang] = useState(() => localStorage.getItem("swafy_lang") || "fr");
-  const t = TRANSLATIONS[lang];
-  const isRTL = lang === "ar";
-
-  // Profile form
-  const [formData, setFormData] = useState({
-    nom_user: "", prenom_user: "", email_user: "",
-    telephone_user: "", bio_user: "", photo_user: null,
-    sexe: "homme", newPhoto: null, photoFile: null
-  });
-
-  // Security
-  const [secData, setSecData] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
-  const [twoFactor, setTwoFactor] = useState(false);
-
-  // Notifications
-  const [notifs, setNotifs] = useState({
-    publications: true, comments: true, mentions: true,
-    debats: false, email: true, push: false
-  });
-
-  // Privacy
-  const [privacy, setPrivacy] = useState({
-    profileVisible: "everyone", showEmail: false, showPhone: false
-  });
-
-  useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      const u = JSON.parse(userStr);
-      setFormData({
-        nom_user: u.nom_user || "", prenom_user: u.prenom_user || "",
-        email_user: u.email_user || "", telephone_user: u.telephone_user || "",
-        bio_user: u.bio_user || "", photo_user: u.photo_user || null,
-        sexe: u.sexe || "homme", newPhoto: null, photoFile: null
-      });
-    }
-    // Load saved preferences
-    const savedNotifs = localStorage.getItem("swafy_notifs");
-    if (savedNotifs) setNotifs(JSON.parse(savedNotifs));
-    const savedPrivacy = localStorage.getItem("swafy_privacy");
-    if (savedPrivacy) setPrivacy(JSON.parse(savedPrivacy));
-    const saved2fa = localStorage.getItem("swafy_2fa");
-    if (saved2fa) setTwoFactor(saved2fa === "true");
-  }, []);
-
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) setFormData({ ...formData, newPhoto: URL.createObjectURL(file), photoFile: file });
-  };
-
-  const handleSave = async () => {
-    try {
-      setSaving(true);
-      const data = new FormData();
-      data.append("nom_user", formData.nom_user);
-      data.append("prenom_user", formData.prenom_user);
-      data.append("email_user", formData.email_user);
-      data.append("telephone_user", formData.telephone_user);
-      data.append("bio_user", formData.bio_user);
-      if (formData.photoFile) data.append("photo", formData.photoFile);
-
-      const res = await API.put("/profile/update", data, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-
-      // Update localStorage
-      const current = JSON.parse(localStorage.getItem("user") || "{}");
-      const updated = { ...current, ...formData, photo_user: res.data?.photo_user || current.photo_user };
-      localStorage.setItem("user", JSON.stringify(updated));
-      setFormData({ ...formData, newPhoto: null, photoFile: null });
-      setToast(t.successMsg);
-
-      // Force update dans toutes les pages via storage event
-      window.dispatchEvent(new Event("storage"));
-    } catch (err) {
-      setToast(t.errorMsg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handlePasswordChange = async () => {
-    if (secData.newPassword !== secData.confirmPassword) {
-      setToast(t.passwordMatch); return;
-    }
-    try {
-      setSaving(true);
-      await API.put("/profile/change-password", {
-        currentPassword: secData.currentPassword,
-        newPassword: secData.newPassword
-      });
-      setSecData({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      setToast(t.passwordSuccess);
-    } catch {
-      setToast(t.errorMsg);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleLangChange = (newLang) => {
-    setLang(newLang);
-    localStorage.setItem("swafy_lang", newLang);
-    window.dispatchEvent(new CustomEvent("langChange", { detail: newLang }));
-  };
-
-  const handleNotifChange = (key) => {
-    const updated = { ...notifs, [key]: !notifs[key] };
-    setNotifs(updated);
-    localStorage.setItem("swafy_notifs", JSON.stringify(updated));
-  };
-
-  const handlePrivacyChange = (key, value) => {
-    const updated = { ...privacy, [key]: value };
-    setPrivacy(updated);
-    localStorage.setItem("swafy_privacy", JSON.stringify(updated));
-  };
-
-  const menuItems = [
-    { id: "account", label: t.account, icon: "👤" },
-    { id: "notifications", label: t.notifications, icon: "🔔" },
-    { id: "privacy", label: t.privacy, icon: "🔒" },
-    { id: "security", label: t.security, icon: "🛡️" },
-    { id: "language", label: t.language, icon: "🌍" },
-    { id: "help", label: t.help, icon: "❓" },
-  ];
-
-  const inputStyle = {
-    width: "100%", padding: "12px 16px", borderRadius: 10, border: "1.5px solid rgba(255,255,255,0.15)",
-    background: "rgba(255,255,255,0.07)", color: "#fff", fontSize: 14, outline: "none",
-    transition: "border 0.2s", boxSizing: "border-box",
-    fontFamily: isRTL ? "'Cairo', sans-serif" : "'Sora', sans-serif"
-  };
-
-  const cardStyle = {
-    background: "rgba(255,255,255,0.05)", backdropFilter: "blur(20px)",
-    border: "1px solid rgba(255,255,255,0.1)", borderRadius: 16,
-    padding: "28px 32px", marginBottom: 20
-  };
-
-  const rowStyle = {
-    display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "14px 0", borderBottom: "1px solid rgba(255,255,255,0.07)"
-  };
-
-  // ── RENDER TABS ──
-  const renderTab = () => {
-    switch (activeTab) {
-
-      // ── ACCOUNT ──
-      case "account": return (
-        <>
-          <div style={cardStyle}>
-            <h2 style={{ color: "#a78bfa", marginBottom: 24, fontSize: 18 }}>{t.basicInfo}</h2>
-
-            {/* Photo */}
-            <div style={{ display: "flex", alignItems: "center", gap: 20, marginBottom: 28 }}>
-              <div style={{ position: "relative" }}>
-                <img
-                  src={formData.newPhoto || getAvatar(formData.photo_user, formData.sexe)}
-                  alt="avatar"
-                  style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", border: "3px solid #a78bfa" }}
-                />
-                <label htmlFor="photo-input" style={{
-                  position: "absolute", bottom: 0, right: 0, background: "#a78bfa",
-                  borderRadius: "50%", width: 26, height: 26, display: "flex",
-                  alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 13
-                }}>✏️
-                  <input id="photo-input" type="file" accept="image/*" onChange={handlePhotoChange} hidden />
-                </label>
-              </div>
-              <div>
-                <div style={{ color: "#fff", fontWeight: 600, fontSize: 16 }}>
-                  {formData.prenom_user} {formData.nom_user}
-                </div>
-                <label htmlFor="photo-input" style={{ color: "#a78bfa", fontSize: 13, cursor: "pointer" }}>
-                  {t.uploadPhoto}
-                </label>
-              </div>
-            </div>
-
-            {/* Form Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-              {[
-                { label: t.firstName, name: "prenom_user", placeholder: "Rania" },
-                { label: t.lastName, name: "nom_user", placeholder: "Heni" },
-              ].map(f => (
-                <div key={f.name}>
-                  <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginBottom: 6, display: "block" }}>{f.label}</label>
-                  <input style={inputStyle} name={f.name} value={formData[f.name]} onChange={handleChange} placeholder={f.placeholder} />
-                </div>
-              ))}
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginBottom: 6, display: "block" }}>{t.email}</label>
-                <input style={inputStyle} name="email_user" type="email" value={formData.email_user} onChange={handleChange} placeholder="rania@swafy.tn" />
-              </div>
-              <div>
-                <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginBottom: 6, display: "block" }}>{t.phone}</label>
-                <input style={inputStyle} name="telephone_user" value={formData.telephone_user} onChange={handleChange} placeholder="+216 XX XXX XXX" />
-              </div>
-              <div style={{ gridColumn: "1/-1" }}>
-                <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginBottom: 6, display: "block" }}>{t.bio}</label>
-                <textarea style={{ ...inputStyle, resize: "vertical", minHeight: 80 }} name="bio_user" value={formData.bio_user} onChange={handleChange} placeholder="..." />
-              </div>
-            </div>
-          </div>
-
-          <div style={cardStyle}>
-            <h2 style={{ color: "#a78bfa", marginBottom: 20, fontSize: 18 }}>{t.accountInfo}</h2>
-            <div style={rowStyle}>
-              <span style={{ color: "rgba(255,255,255,0.6)" }}>{t.status}</span>
-              <span style={{ color: "#22c55e", fontWeight: 600 }}>● {t.active}</span>
-            </div>
-            <div style={rowStyle}>
-              <span style={{ color: "rgba(255,255,255,0.6)" }}>{t.memberSince}</span>
-              <span style={{ color: "#fff" }}>{new Date().toLocaleDateString(lang === "ar" ? "ar-TN" : lang === "en" ? "en-US" : "fr-FR")}</span>
-            </div>
-            <div style={{ ...rowStyle, cursor: "pointer", borderBottom: "none" }} onClick={() => setActiveTab("security")}>
-              <span style={{ color: "rgba(255,255,255,0.6)" }}>{t.password}</span>
-              <span style={{ color: "#a78bfa" }}>•••••••• →</span>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: 12 }}>
-            <button onClick={handleSave} disabled={saving} style={{
-              flex: 1, padding: "14px", borderRadius: 12, border: "none", cursor: "pointer",
-              background: "linear-gradient(135deg, #a78bfa, #7c3aed)", color: "#fff",
-              fontWeight: 700, fontSize: 15, opacity: saving ? 0.7 : 1
-            }}>{saving ? t.saving : t.save}</button>
-            <button onClick={() => {
-              const u = JSON.parse(localStorage.getItem("user") || "{}");
-              setFormData({ ...formData, ...u, newPhoto: null, photoFile: null });
-            }} style={{
-              padding: "14px 24px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.2)",
-              background: "transparent", color: "#fff", fontWeight: 600, cursor: "pointer"
-            }}>{t.cancel}</button>
-          </div>
-        </>
-      );
-
-      // ── SECURITY ──
-      case "security": return (
-        <>
-          <div style={cardStyle}>
-            <h2 style={{ color: "#a78bfa", marginBottom: 24, fontSize: 18 }}>{t.changePassword}</h2>
-            {[
-              { label: t.currentPassword, key: "currentPassword" },
-              { label: t.newPassword, key: "newPassword" },
-              { label: t.confirmPassword, key: "confirmPassword" },
-            ].map(f => (
-              <div key={f.key} style={{ marginBottom: 16 }}>
-                <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, marginBottom: 6, display: "block" }}>{f.label}</label>
-                <input style={inputStyle} type="password" value={secData[f.key]}
-                  onChange={e => setSecData({ ...secData, [f.key]: e.target.value })} placeholder="••••••••" />
-              </div>
-            ))}
-            <button onClick={handlePasswordChange} disabled={saving} style={{
-              width: "100%", padding: 14, borderRadius: 12, border: "none", cursor: "pointer",
-              background: "linear-gradient(135deg, #a78bfa, #7c3aed)", color: "#fff", fontWeight: 700
-            }}>{saving ? t.saving : t.changePassword}</button>
-          </div>
-
-          <div style={cardStyle}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <h3 style={{ color: "#fff", marginBottom: 6, fontSize: 16 }}>{t.twoFactor}</h3>
-                <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, margin: 0 }}>{t.twoFactorDesc}</p>
-              </div>
-              <Toggle value={twoFactor} onChange={() => {
-                const v = !twoFactor; setTwoFactor(v);
-                localStorage.setItem("swafy_2fa", String(v));
-              }} />
-            </div>
-          </div>
-
-          <div style={cardStyle}>
-            <h3 style={{ color: "#fff", marginBottom: 8, fontSize: 16 }}>{t.activeSessions}</h3>
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 20 }}>{t.sessionDesc}</p>
-            {[
-              { device: "Chrome — Tunis, TN", time: "Maintenant", current: true },
-              { device: "Firefox — Tunis, TN", time: "Il y a 2h", current: false },
-              { device: "Mobile Safari — iOS", time: "Hier", current: false },
-            ].map((s, i) => (
-              <div key={i} style={{ ...rowStyle, borderBottom: i < 2 ? "1px solid rgba(255,255,255,0.07)" : "none" }}>
-                <div>
-                  <div style={{ color: "#fff", fontSize: 14 }}>{s.device}</div>
-                  <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{s.time}</div>
-                </div>
-                {s.current
-                  ? <span style={{ color: "#22c55e", fontSize: 12, fontWeight: 600 }}>● Actuel</span>
-                  : <button style={{ background: "rgba(239,68,68,0.2)", color: "#ef4444", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 8, padding: "4px 12px", cursor: "pointer", fontSize: 12 }}>Révoquer</button>
-                }
-              </div>
-            ))}
-            <button style={{
-              width: "100%", marginTop: 16, padding: "12px", borderRadius: 10,
-              border: "1px solid rgba(239,68,68,0.4)", background: "rgba(239,68,68,0.1)",
-              color: "#ef4444", fontWeight: 600, cursor: "pointer"
-            }}>{t.revokeAll}</button>
-          </div>
-
-          <div style={{ ...cardStyle, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.05)" }}>
-            <h3 style={{ color: "#ef4444", marginBottom: 8 }}>{t.dangerZone}</h3>
-            <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 16 }}>{t.deleteDesc}</p>
-            <button style={{
-              padding: "12px 24px", borderRadius: 10, border: "1px solid #ef4444",
-              background: "transparent", color: "#ef4444", fontWeight: 600, cursor: "pointer"
-            }}>{t.deleteAccount}</button>
-          </div>
-        </>
-      );
-
-      // ── NOTIFICATIONS ──
-      case "notifications": return (
-        <div style={cardStyle}>
-          <h2 style={{ color: "#a78bfa", marginBottom: 24, fontSize: 18 }}>{t.notifications}</h2>
-          {[
-            { key: "publications", label: t.notifPubs, icon: "📝" },
-            { key: "comments", label: t.notifComments, icon: "💬" },
-            { key: "mentions", label: t.notifMentions, icon: "🔖" },
-            { key: "debats", label: t.notifDebats, icon: "🎤" },
-            { key: "email", label: t.notifEmail, icon: "📧" },
-            { key: "push", label: t.notifPush, icon: "📲" },
-          ].map((item, i, arr) => (
-            <div key={item.key} style={{ ...rowStyle, borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.07)" : "none" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 20 }}>{item.icon}</span>
-                <div>
-                  <div style={{ color: "#fff", fontSize: 14 }}>{item.label}</div>
-                  <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 12 }}>{notifs[item.key] ? t.enabled : t.disabled}</div>
-                </div>
-              </div>
-              <Toggle value={notifs[item.key]} onChange={() => handleNotifChange(item.key)} />
-            </div>
-          ))}
-        </div>
-      );
-
-      // ── PRIVACY ──
-      case "privacy": return (
-        <div style={cardStyle}>
-          <h2 style={{ color: "#a78bfa", marginBottom: 24, fontSize: 18 }}>{t.privacy}</h2>
-
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ color: "rgba(255,255,255,0.6)", fontSize: 13, marginBottom: 12, display: "block" }}>{t.profileVisible}</label>
-            <div style={{ display: "flex", gap: 10 }}>
-              {[
-                { val: "everyone", label: t.everyone },
-                { val: "friends", label: t.friendsOnly },
-                { val: "me", label: t.onlyMe },
-              ].map(opt => (
-                <button key={opt.val} onClick={() => handlePrivacyChange("profileVisible", opt.val)} style={{
-                  flex: 1, padding: "10px 8px", borderRadius: 10, border: "1.5px solid",
-                  borderColor: privacy.profileVisible === opt.val ? "#a78bfa" : "rgba(255,255,255,0.15)",
-                  background: privacy.profileVisible === opt.val ? "rgba(167,139,250,0.15)" : "transparent",
-                  color: privacy.profileVisible === opt.val ? "#a78bfa" : "rgba(255,255,255,0.6)",
-                  cursor: "pointer", fontSize: 13, fontWeight: 600
-                }}>{opt.label}</button>
-              ))}
-            </div>
-          </div>
-
-          {[
-            { key: "showEmail", label: t.showEmail, icon: "📧" },
-            { key: "showPhone", label: t.showPhone, icon: "📱" },
-          ].map((item, i) => (
-            <div key={item.key} style={{ ...rowStyle, borderBottom: i === 0 ? "1px solid rgba(255,255,255,0.07)" : "none" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={{ fontSize: 20 }}>{item.icon}</span>
-                <span style={{ color: "#fff", fontSize: 14 }}>{item.label}</span>
-              </div>
-              <Toggle value={privacy[item.key]} onChange={() => handlePrivacyChange(item.key, !privacy[item.key])} />
-            </div>
-          ))}
-        </div>
-      );
-
-      // ── LANGUAGE ──
-      case "language": return (
-        <div style={cardStyle}>
-          <h2 style={{ color: "#a78bfa", marginBottom: 8, fontSize: 18 }}>{t.chooseLanguage}</h2>
-          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, marginBottom: 28 }}>{t.langDesc}</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {[
-              { code: "fr", label: "Français", flag: "🇫🇷", native: "Français" },
-              { code: "ar", label: "العربية", flag: "🇹🇳", native: "العربية" },
-              { code: "en", label: "English", flag: "🇬🇧", native: "English" },
-            ].map(l => (
-              <button key={l.code} onClick={() => handleLangChange(l.code)} style={{
-                display: "flex", alignItems: "center", gap: 16, padding: "18px 20px",
-                borderRadius: 14, border: "2px solid",
-                borderColor: lang === l.code ? "#a78bfa" : "rgba(255,255,255,0.1)",
-                background: lang === l.code ? "rgba(167,139,250,0.15)" : "rgba(255,255,255,0.03)",
-                cursor: "pointer", textAlign: "left", transition: "all 0.2s"
-              }}>
-                <span style={{ fontSize: 28 }}>{l.flag}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: lang === l.code ? "#a78bfa" : "#fff", fontWeight: 700, fontSize: 16 }}>{l.native}</div>
-                  <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 13 }}>{l.label}</div>
-                </div>
-                {lang === l.code && <span style={{ color: "#a78bfa", fontSize: 20 }}>✓</span>}
-              </button>
-            ))}
-          </div>
-        </div>
-      );
-
-      // ── HELP ──
-      case "help": return (
-        <>
-          <div style={cardStyle}>
-            <h2 style={{ color: "#a78bfa", marginBottom: 24, fontSize: 18 }}>{t.faq}</h2>
-            {[
-              { q: t.faq1, a: t.faq1ans },
-              { q: t.faq2, a: t.faq2ans },
-              { q: t.faq3, a: t.faq3ans },
-              { q: t.faq4, a: t.faq4ans },
-            ].map((item, i) => (
-              <div key={i} style={{ borderBottom: i < 3 ? "1px solid rgba(255,255,255,0.07)" : "none" }}>
-                <div onClick={() => setOpenFaq(openFaq === i ? null : i)} style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "16px 0", cursor: "pointer"
-                }}>
-                  <span style={{ color: "#fff", fontSize: 14, fontWeight: 500 }}>{item.q}</span>
-                  <span style={{ color: "#a78bfa", fontSize: 18, transition: "transform 0.3s", transform: openFaq === i ? "rotate(45deg)" : "none" }}>+</span>
-                </div>
-                {openFaq === i && (
-                  <div style={{ padding: "0 0 16px", color: "rgba(255,255,255,0.6)", fontSize: 13, lineHeight: 1.7 }}>
-                    {item.a}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div style={cardStyle}>
-            {[
-              { label: t.contact, icon: "💬", color: "#60a5fa" },
-              { label: t.reportBug, icon: "🐛", color: "#f59e0b" },
-              { label: t.terms, icon: "📄", color: "rgba(255,255,255,0.6)" },
-              { label: t.privacyPolicy, icon: "🔐", color: "rgba(255,255,255,0.6)" },
-            ].map((item, i, arr) => (
-              <div key={i} style={{ ...rowStyle, cursor: "pointer", borderBottom: i < arr.length - 1 ? "1px solid rgba(255,255,255,0.07)" : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontSize: 20 }}>{item.icon}</span>
-                  <span style={{ color: item.color, fontSize: 14, fontWeight: 500 }}>{item.label}</span>
-                </div>
-                <span style={{ color: "rgba(255,255,255,0.3)" }}>→</span>
-              </div>
-            ))}
-          </div>
-        </>
-      );
-
-      default: return (
-        <div style={{ ...cardStyle, textAlign: "center", padding: "60px 32px" }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🚧</div>
-          <p style={{ color: "rgba(255,255,255,0.5)" }}>Coming soon...</p>
-        </div>
-      );
-    }
-  };
-
-  return (
-    <LangContext.Provider value={{ lang, t, isRTL }}>
-      <div dir={isRTL ? "rtl" : "ltr"} style={{
-        minHeight: "100vh", background: "linear-gradient(135deg, #0f0c29, #302b63, #24243e)",
-        fontFamily: isRTL ? "'Cairo', sans-serif" : "'Sora', sans-serif",
-        position: "relative", overflow: "hidden"
-      }}>
-        {/* Google Fonts */}
-        <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet" />
-
-        <style>{`
-          @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-          input:focus, textarea:focus { border-color: #a78bfa !important; box-shadow: 0 0 0 3px rgba(167,139,250,0.15); }
-          ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; }
-          ::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.4); border-radius: 3px; }
-        `}</style>
-
-        {/* Orbs */}
-        {[
-          { w: 400, h: 400, top: -100, left: -100, color: "rgba(124,58,237,0.15)" },
-          { w: 300, h: 300, top: "40%", right: -80, color: "rgba(167,139,250,0.1)" },
-          { w: 250, h: 250, bottom: -80, left: "30%", color: "rgba(99,102,241,0.12)" },
-        ].map((o, i) => (
-          <div key={i} style={{
-            position: "fixed", width: o.w, height: o.h, borderRadius: "50%",
-            background: o.color, filter: "blur(80px)", pointerEvents: "none", zIndex: 0,
-            top: o.top, left: o.left, right: o.right, bottom: o.bottom
-          }} />
-        ))}
-
-        <div style={{
-          position: "relative", zIndex: 1, display: "flex", minHeight: "100vh",
-          maxWidth: 1100, margin: "0 auto", padding: "32px 20px", gap: 24
-        }}>
-
-          {/* ── SIDEBAR ── */}
-          <aside style={{
-            width: 240, flexShrink: 0, background: "rgba(255,255,255,0.04)",
-            backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 20, padding: "24px 16px", height: "fit-content",
-            position: "sticky", top: 32
-          }}>
-            {/* Brand */}
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 28, padding: "0 8px" }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 12, background: "linear-gradient(135deg, #a78bfa, #7c3aed)",
-                display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontWeight: 800, fontSize: 18
-              }}>S</div>
-              <div>
-                <div style={{ color: "#fff", fontWeight: 700, fontSize: 14 }}>Swafy</div>
-                <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11 }}>Débat Jeune</div>
-              </div>
-            </div>
-
-            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, padding: "0 8px", marginBottom: 12, textTransform: "uppercase" }}>
-              {t.settings}
-            </div>
-
-            <nav style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {menuItems.map(item => (
-                <button key={item.id} onClick={() => setActiveTab(item.id)} style={{
-                  display: "flex", alignItems: "center", gap: 12, padding: "11px 12px",
-                  borderRadius: 12, border: "none", cursor: "pointer", textAlign: isRTL ? "right" : "left",
-                  background: activeTab === item.id ? "rgba(167,139,250,0.2)" : "transparent",
-                  color: activeTab === item.id ? "#a78bfa" : "rgba(255,255,255,0.6)",
-                  fontWeight: activeTab === item.id ? 600 : 400,
-                  transition: "all 0.2s",
-                  fontFamily: isRTL ? "'Cairo', sans-serif" : "'Sora', sans-serif"
-                }}>
-                  <span style={{ fontSize: 18 }}>{item.icon}</span>
-                  <span style={{ fontSize: 14 }}>{item.label}</span>
-                  {activeTab === item.id && <span style={{ marginLeft: "auto", fontSize: 10 }}>●</span>}
-                </button>
-              ))}
-            </nav>
-
-            <div style={{ borderTop: "1px solid rgba(255,255,255,0.08)", marginTop: 20, paddingTop: 16 }}>
-              <button onClick={() => navigate("/jeune")} style={{
-                display: "flex", alignItems: "center", gap: 10, width: "100%",
-                padding: "10px 12px", borderRadius: 12, border: "none", cursor: "pointer",
-                background: "transparent", color: "rgba(255,255,255,0.5)", fontSize: 13,
-                fontFamily: isRTL ? "'Cairo', sans-serif" : "'Sora', sans-serif"
-              }}>
-                <span>←</span> {t.dashboard}
-              </button>
-              <button onClick={() => {
-                localStorage.removeItem("token");
-                localStorage.removeItem("user");
-                navigate("/login");
-              }} style={{
-                display: "flex", alignItems: "center", gap: 10, width: "100%",
-                padding: "10px 12px", borderRadius: 12, border: "none", cursor: "pointer",
-                background: "transparent", color: "#ef4444", fontSize: 13, fontWeight: 600,
-                fontFamily: isRTL ? "'Cairo', sans-serif" : "'Sora', sans-serif"
-              }}>
-                <span>↩</span> {t.logout}
-              </button>
-            </div>
-          </aside>
-
-          {/* ── MAIN ── */}
-          <main style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ marginBottom: 28 }}>
-              <h1 style={{ color: "#fff", fontSize: 26, fontWeight: 800, margin: 0 }}>{t.settings}</h1>
-              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, marginTop: 4 }}>
-                {menuItems.find(m => m.id === activeTab)?.label}
-              </p>
-            </div>
-            {renderTab()}
-          </main>
-        </div>
-
-        {toast && <Toast msg={toast} onClose={() => setToast(null)} />}
+function HeroCard(){
+  return(
+    <div className="hv" style={{position:"relative"}}>
+      <div className="fb fb1 gls">
+        <div className="fbi" style={{background:"rgba(127,255,238,.13)"}}>🔬</div>
+        <div><div className="fbn">235</div><div className="fbt">Bourses MOBIDOC</div></div>
       </div>
-    </LangContext.Provider>
+      <div className="hc gls">
+        <div className="hct">
+          <div className="hlb"><div className="lp"/>EU4Youth</div>
+          <div className="hcd"><div className="hcdd"/><div className="hcdd"/><div className="hcdd"/></div>
+        </div>
+        <div className="hctit">Formation & Innovation</div>
+        <div className="hcsu">Science · Entrepreneuriat · Tunisie</div>
+        <div className="hcpl"><span>Déploiement national</span><span style={{color:"var(--acc)",fontWeight:600}}>73%</span></div>
+        <div className="hcpb"><div className="hcpf" style={{width:"73%"}}/></div>
+        <div className="hmg">
+          {[["🧠","IA & Tech"],["🎮","Gaming Lab"],["🚀","Startup"]].map(([ic,lb])=>(
+            <div key={lb} className="hmt"><div className="hmi">{ic}</div><div className="hml">{lb}</div></div>
+          ))}
+        </div>
+        <div className="hcf">
+          <div className="avs">
+            {["DS","BB","CA","MK"].map((l,i)=><div key={i} className="av">{l}</div>)}
+          </div>
+          <Link className="hcb" to="/register">Rejoindre <FiArrowRight/></Link>
+        </div>
+      </div>
+      <div className="fb fb2 gls">
+        <div className="fbi" style={{background:"rgba(255,209,102,.13)"}}>🏆</div>
+        <div><div className="fbn">70+</div><div className="fbt">Clubs scientifiques</div></div>
+      </div>
+    </div>
   );
-};
+}
 
-export default Settings;
+function Navbar(){
+  const [sc,setSc]=useState(false);
+  useEffect(()=>{
+    const h=()=>setSc(window.scrollY>20);
+    window.addEventListener("scroll",h);
+    return()=>window.removeEventListener("scroll",h);
+  },[]);
+  return(
+    <header className={`nav ${sc?"sc":""}`}>
+      <div className="nav-in">
+        <Link to="/" className="back"><FiArrowLeft/>Retour à l'accueil</Link>
+        <Link to="/" style={{textDecoration:"none"}}><Brand/></Link>
+        <div className="nav-act">
+          <Link className="bgh" to="/register">S'inscrire</Link>
+          <Link className="bpl" to="/login">Connexion</Link>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function Hero({onPlay}){
+  return(
+    <section className="hero">
+      <div className="con">
+        <div className="hi">
+          <div>
+            <div className="htag"><div className="lp"/>ANPR · EU4Youth · 9,5 M€</div>
+            <h1>Science<br/>With &amp; For <span className="shim">Youth</span></h1>
+            <p className="hdesc">
+              SWAFY accompagne la jeunesse tunisienne vers l'innovation et l'entrepreneuriat
+              scientifique — bourses de recherche, clubs scientifiques, Gaming Labs et dialogue
+              national Jeunesse-Science dans les 24 gouvernorats.
+            </p>
+            <div className="hact">
+              <button className="bpr" onClick={onPlay}>Voir la vidéo <FiPlay/></button>
+              <Link className="bsc" to="/register">Rejoindre SWAFY <FiArrowRight/></Link>
+            </div>
+            <div className="hstats">
+              <div className="hs"><span className="hsn">9,5M€</span><span className="hsl">Budget UE</span></div>
+              <div className="hsd"/>
+              <div className="hs"><span className="hsn">235</span><span className="hsl">Bourses MOBIDOC</span></div>
+              <div className="hsd"/>
+              <div className="hs"><span className="hsn">13 000</span><span className="hsl">Jeunes visés</span></div>
+            </div>
+          </div>
+          <HeroCard/>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function VideoSection({onPlay}){
+  return(
+    <section className="sec">
+      <div className="con">
+        <div className="ey"><div className="eyl"/>Aperçu du projet</div>
+        <h2 className="stit">Découvrez SWAFY en action</h2>
+        <p className="sdesc">
+          Lancé le 2 juin 2023 à l'hôtel Mövenpick Lac Tunis, en présence du Ministre
+          Moncef Boukthir et de l'Ambassadeur de l'UE Marcus Cornaro.
+        </p>
+        <div className="vw">
+          <div className="vc" onClick={onPlay}>
+            <div className="vbg"/>
+            <div className="vls"><div className="vl"/><div className="vl"/><div className="vl"/></div>
+            <div className="vmu">
+              <div className="vmb" style={{width:"84%"}}/><div className="vmb" style={{width:"68%"}}/><div className="vmb" style={{width:"50%"}}/>
+            </div>
+            <div className="vpb"><div className="vpc"><FiPlay/></div></div>
+          </div>
+        </div>
+        <div className="srow">
+          {[{n:"70+",l:"Clubs scientifiques créés"},{n:"190+",l:"Projets de recherche financés"},{n:"24",l:"Gouvernorats couverts"}].map(({n,l})=>(
+            <div className="sb" key={l}><div className="sbn">{n}</div><div className="sbl">{l}</div></div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── FORMATIONS SWAFY RÉELLES ─────────────────── */
+const FORMATIONS=[
+  {ic:"📋",t:"Management de projet (PMP)",d:"Formation certifiante · 22 j/j · Présentiel + En ligne · 2024/2025",href:"https://www.anpr.tn/wp-content/uploads/2024/01/TDR-Expert-Management-de-projet_final_18012024.pdf"},
+  {ic:"🔬",t:"MOBIDOC Doctorant · Session 2024",d:"Bourse UE · Recherche appliquée en milieu socio-économique",href:"https://www.anpr.tn/projet-swafy-appel-a-propositions-mobidoc-doctorant-session-2024/"},
+  {ic:"💼",t:"MOBIDOC Post-doc · Université / Management",d:"Gestion de projet · Recherche appliquée",href:"http://www.anpr.tn/projet-swafy-appel-a-candidature-mobidoc-post-doc-universite-management/"},
+  {ic:"🗣️",t:"Techniques de communication",d:"Formation clubs scientifiques · Présentiel",href:"https://www.anpr.tn"},
+  {ic:"🏛️",t:"Leadership & Engagement citoyen",d:"Formation certifiante · Gouvernance · Participation",href:"https://www.anpr.tn"},
+  {ic:"🎬",t:"Techniques audiovisuelles",d:"Production vidéo · Reportage scientifique · Diffusion",href:"https://www.anpr.tn"},
+  {ic:"🎮",t:"Création de Gaming Labs",d:"Appel associations · Délai : 31 mai 2026",href:"http://www.anpr.tn/projet-swafy-appel-a-propositions-a-lattention-des-associations-pour-la-creation-renforcement-de-gaming-labs/"},
+  {ic:"🔧",t:"Création de Fablabs · 8 gouvernorats",d:"Ben Arous · Manouba · Kef · Siliana · Tozeur · Kébili · Kasserine · Monastir",href:"http://www.anpr.tn/appel-a-propositions-a-lattention-des-associations-en-vue-du-renforcement-ou-la-creation-de-fablabs-dans-les-gouvernorats-de-ben-arous-la-manouba-le-kef-siliana-tozeur-kebili-kasserine/"},
+  {ic:"📊",t:"Expert processus de débat Jeunesse-Science",d:"Conception du débat · Feuille de route 2035 · Congrès national",href:"https://www.anpr.tn/projet-swafy-termes-de-reference-en-vue-de-la-selection-dun-expert/"},
+  {ic:"🌐",t:"Plateforme de réseautage associatif",d:"Développement & administration · Appel en cours 2026",href:"http://www.anpr.tn/projet-swafy-appel-a-candidatures-recrutement-de-deux-charge-e-s-de-projets/"},
+];
+
+function AboutSection(){
+  return(
+    <section className="seca">
+      <div className="con">
+        <div className="ag">
+          <div className="phs">
+            {[null,"b"].map(v=>(
+              <div key={v||"a"} className={`ph gl ${v?"phb":"pha"}`}>
+                <div className="phh"><div className="phn"/></div>
+                <div className="phbd">
+                  <div className="phb2"/>
+                  <div className="phr"><div className="pht"/><div className="pht"/><div className="pht"/></div>
+                  <div className="phl"/><div className="phl"/><div className="phl" style={{width:"60%"}}/>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div>
+            <div className="ey"><div className="eyl"/>À propos de SWAFY</div>
+            <h2 className="stit">
+              Une plateforme pensée pour<br/>
+              <span className="shim">la jeunesse tunisienne</span>
+            </h2>
+            <p className="ad">
+              SWAFY — Science With and For Youth — est un projet financé par l'Union européenne
+              (9,5 M€ · 48 mois), inscrit sous le programme EU4Youth et géré par l'ANPR. Il vise
+              à améliorer la valeur ajoutée de la recherche dans le développement économique tunisien,
+              et à soutenir l'entrepreneuriat et l'employabilité des jeunes à travers les bourses
+              MOBIDOC, les clubs scientifiques, les Gaming Labs et le dialogue national Jeunesse-Science.
+            </p>
+            {/* Formations disponibles */}
+            <div style={{marginBottom:16,fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:".78rem",textTransform:"uppercase",letterSpacing:".1em",color:"var(--acc)"}}>
+              Formations & Appels officiels
+            </div>
+            <div className="fl">
+              {FORMATIONS.slice(0,5).map(({ic,t,d,href})=>(
+                <a key={t} className="fi" href={href} target="_blank" rel="noreferrer">
+                  <div className="fii">{ic}</div>
+                  <div><div className="fit">{t}</div><div className="fid">{d}</div></div>
+                  <FiArrowRight className="fiarr"/>
+                </a>
+              ))}
+            </div>
+            <a href="https://www.anpr.tn" target="_blank" rel="noreferrer"
+               style={{display:"inline-flex",alignItems:"center",gap:6,marginTop:12,color:"var(--acc)",fontSize:".82rem",fontWeight:700,textDecoration:"none"}}>
+              Voir toutes les formations sur anpr.tn <FiExternalLink/>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── TOUTES LES FORMATIONS ─────────────────────── */
+function FormationsSection(){
+  return(
+    <section className="sec">
+      <div className="con">
+        <div className="ey"><div className="eyl"/>Formations disponibles</div>
+        <h2 className="stit">Toutes les formations & appels SWAFY</h2>
+        <p className="sdesc">Formations officielles disponibles, gérées par l'ANPR. Cliquez pour accéder aux détails et postuler.</p>
+        <div className="fl" style={{marginTop:36}}>
+          {FORMATIONS.map(({ic,t,d,href})=>(
+            <a key={t} className="fi" href={href} target="_blank" rel="noreferrer">
+              <div className="fii">{ic}</div>
+              <div><div className="fit">{t}</div><div className="fid">{d}</div></div>
+              <FiArrowRight className="fiarr"/>
+            </a>
+          ))}
+        </div>
+        <div style={{marginTop:18,padding:"14px 18px",borderRadius:14,background:"rgba(200,184,255,.08)",border:"1px solid rgba(200,184,255,.18)",fontSize:".78rem",color:"var(--ts)"}}>
+          📌 Pour tous les appels à candidatures : <a href="https://www.anpr.tn" target="_blank" rel="noreferrer" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>anpr.tn</a>
+          {" · "}
+          <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>facebook.com/swafyproject</a>
+          {" · "}
+          <a href="mailto:recrutement.swafy@gmail.com" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>recrutement.swafy@gmail.com</a>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── ÉQUIPE RÉELLE ─────────────────────────────── */
+function TeamSection({team}){
+  return(
+    <section className="seca">
+      <div className="con">
+        <div style={{textAlign:"center"}}>
+          <div className="ey" style={{justifyContent:"center"}}><div className="eyl"/>L'équipe SWAFY — ANPR</div>
+          <h2 className="stit">Responsables & Partenaires clés</h2>
+          <p className="sdesc" style={{margin:"0 auto 0"}}>
+            Portée par l'ANPR, coordonnée avec les ministères partenaires et la Délégation de l'UE en Tunisie.
+          </p>
+        </div>
+        <div className="tg">
+          {team.map(m=>(
+            <div key={m.name} className="tm"
+                 style={{background:`linear-gradient(135deg,${m.color}30 0%,rgba(255,255,255,.05) 100%)`,borderColor:`${m.color}40`}}>
+              <img className="tmi" src={m.img} alt={m.name} style={{borderColor:`${m.color}78`}}/>
+              <div className="tmn">{m.name}</div>
+              <div className="tmr">{m.role}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── GALERIE ───────────────────────────────────── */
+function GallerySection({gallery}){
+  const [idx,setIdx]=useState(0);
+  const max=Math.max(0,gallery.length-3);
+  return(
+    <section className="sec">
+      <div className="con">
+        <div className="ey"><div className="eyl"/>Galerie</div>
+        <h2 className="stit">Nos moments forts</h2>
+        <p className="sdesc">Foire de la Créativité · Clubs scientifiques · RobotBattle · Séances de débat Jeunesse-Science.</p>
+        <div className="gltr">
+          {gallery.map((src,i)=>(
+            <div key={src} className="gls2"
+                 style={{transform:`translateX(calc(-${idx*(100+18)}% - ${idx*18}px))`,transition:"transform .5s cubic-bezier(.4,0,.2,1)"}}>
+              <img src={src} alt={`Événement SWAFY ${i+1}`}/>
+              <div className="gov"/>
+            </div>
+          ))}
+        </div>
+        <div className="gctrl">
+          <button className="gbtn" onClick={()=>setIdx(i=>Math.max(0,i-1))}><FiChevronLeft/></button>
+          <div className="gdots">
+            {gallery.map((_,i)=><div key={i} className={`gdot ${i===idx?"act":""}`} onClick={()=>setIdx(i)}/>)}
+          </div>
+          <button className="gbtn" onClick={()=>setIdx(i=>Math.min(max,i+1))}><FiChevronRight/></button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── POURQUOI SWAFY ────────────────────────────── */
+function WhySection({why}){
+  return(
+    <section className="seca">
+      <div className="con">
+        <div style={{textAlign:"center"}}>
+          <div className="ey" style={{justifyContent:"center"}}><div className="eyl"/>Pourquoi SWAFY</div>
+          <h2 className="stit">Pourquoi nous rejoindre ?</h2>
+          <p className="sdesc" style={{margin:"0 auto"}}>
+            SWAFY offre une expérience unique, conçue pour les jeunes tunisiens ambitieux dans toutes les régions du pays.
+          </p>
+        </div>
+        <div className="wg">
+          {why.map(({icon,title,desc},i)=>(
+            <div key={title} className="wc gl"
+                 style={{background:`linear-gradient(135deg,rgba(255,255,255,${.06+i*.02}),rgba(255,255,255,.04))`}}>
+              <div className="wi">{icon}</div>
+              <div className="wt">{title}</div>
+              <div className="wd">{desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── BANDE PARTENAIRES ─────────────────────────── */
+function PartnersStrip(){
+  return(
+    <div className="pstrip">
+      <div className="psin">
+        <span className="plbl">Partenaires officiels</span>
+        <div className="pit">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/24px-Flag_of_Europe.svg.png" alt="UE" style={{height:17}}/>
+          Union Européenne
+        </div>
+        <div className="pdiv"/>
+        <div className="pit">🏛️ ANPR</div>
+        <div className="pdiv"/>
+        <div className="pit">🎓 Min. Enseignement Supérieur</div>
+        <div className="pdiv"/>
+        <div className="pit">📱 Fondation Orange Tunisie</div>
+        <div className="pdiv"/>
+        <div className="pit">🌍 EU4Youth</div>
+      </div>
+    </div>
+  );
+}
+
+/* ── PAGE PRINCIPALE ───────────────────────────── */
+export default function Swafy(){
+  const [openVideo,setOpenVideo]=useState(false);
+
+  /* Équipe réelle SWAFY identifiée publiquement */
+  const team=useMemo(()=>[
+    {name:"Dhouha Sbaoulji",   role:"Cheffe de projet SWAFY · ANPR",      img:"https://i.pravatar.cc/160?img=47",color:"#c8b8ff"},
+    {name:"Chedli Abdelli",    role:"Directeur Général · ANPR",            img:"https://i.pravatar.cc/160?img=12",color:"#7FFFEE"},
+    {name:"Bouchra B. Abdallah",role:"Membre équipe SWAFY · ANPR",         img:"https://i.pravatar.cc/160?img=5", color:"#FF8EC8"},
+    {name:"Moncef Boukthir",   role:"Ministre Enseignement Supérieur",     img:"https://i.pravatar.cc/160?img=32",color:"#FFD166"},
+    {name:"Marcus Cornaro",    role:"Ambassadeur UE en Tunisie",           img:"https://i.pravatar.cc/160?img=57",color:"#4A9FB5"},
+    {name:"Coord. MOBIDOC",    role:"Gestion bourses doctorales",          img:"https://i.pravatar.cc/160?img=18",color:"#00f5d4"},
+    {name:"Coord. Associatif", role:"Réseau clubs & Gaming Labs",          img:"https://i.pravatar.cc/160?img=52",color:"#3a86ff"},
+    {name:"Manager Subventions",role:"Gestion financière & Reporting UE", img:"https://i.pravatar.cc/160?img=27",color:"#fb8500"},
+  ],[]);
+
+  const gallery=useMemo(()=>[
+    "https://images.unsplash.com/photo-1532619187608-e5375cab36aa?auto=format&fit=crop&w=1200&q=70",
+    "https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1200&q=70",
+    "https://images.unsplash.com/photo-1561489396-888724a1543d?auto=format&fit=crop&w=1200&q=70",
+    "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=70",
+    "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1200&q=70",
+  ],[]);
+
+  const why=useMemo(()=>[
+    {icon:<FiUsers/>,title:"Accès équitable partout",desc:"Présence dans les 24 gouvernorats avec priorité aux zones marginalisées — chaque jeune tunisien a sa chance."},
+    {icon:<FiHeadphones/>,title:"Accompagnement continu",desc:"Soutien permanent de l'ANPR et des 18 associations partenaires pour les doctorants, jeunes chercheurs et clubs scientifiques."},
+    {icon:<FiAward/>,title:"Bourses & Certifications",desc:"235 bourses MOBIDOC, badges de compétences et passerelles directes vers le monde professionnel tunisien."},
+    {icon:<FiZap/>,title:"Formations innovantes",desc:"Gaming Labs, Fablabs, compétitions de robotique, ateliers de co-création — apprends vite et construis ta carrière."},
+  ],[]);
+
+  return(
+    <>
+      <StyleInject/>
+      <div className="noise"/>
+      <div className="orb o1"/><div className="orb o2"/>
+      <div className="orb o3"/><div className="orb o4"/>
+      <div className="pg">
+        <Navbar/>
+        <Hero onPlay={()=>setOpenVideo(true)}/>
+        <VideoSection onPlay={()=>setOpenVideo(true)}/>
+        <AboutSection/>
+        <FormationsSection/>
+        <PartnersStrip/>
+        <TeamSection team={team}/>
+        <GallerySection gallery={gallery}/>
+        <WhySection why={why}/>
+        <footer className="foot">
+          <div className="con">
+            <div className="ftop">
+              <div>
+                <Brand/>
+                <p className="fbt">
+                  Science With and For Youth — Financé par l'UE (9,5 M€ · 48 mois), géré par l'ANPR.<br/>
+                  Angle Rue Danton & Rue Chaaben Bhouri N°11, Lafayette — BP 177, 1002 Tunis Belvédère.<br/>
+                  ✉ recrutement.swafy@gmail.com
+                </p>
+              </div>
+              <div className="fcol">
+                <div className="fct">Navigation</div>
+                <Link to="/">Accueil</Link>
+                <Link to="/login">Connexion</Link>
+                <Link to="/register">S'inscrire</Link>
+                <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">ANPR.tn</a>
+              </div>
+              <div className="fcol">
+                <div className="fct">Liens officiels</div>
+                <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer">Page Facebook SWAFY</a>
+                <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">anpr.tn</a>
+                <a href="https://eu4youth.tn" target="_blank" rel="noreferrer">eu4youth.tn</a>
+                <a href="mailto:recrutement.swafy@gmail.com">recrutement.swafy@gmail.com</a>
+              </div>
+            </div>
+            <div className="fbot">
+              <span className="fbc">© {new Date().getFullYear()} SWAFY · Tunis, Tunisie</span>
+              <span className="fbc">Built with React · Science With and For Youth</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+      <VideoModal open={openVideo} onClose={()=>setOpenVideo(false)} url="https://www.youtube.com/embed/dQw4w9WgXcQ"/>
+    </>
+  );
+}

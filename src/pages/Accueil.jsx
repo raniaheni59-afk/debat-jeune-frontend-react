@@ -1,865 +1,425 @@
 import { Link } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  FiArrowRight,
-  FiClock,
-  FiCpu,
-  FiShield,
-  FiMessageCircle,
-  FiZap,
-  FiMenu,
-  FiX,
-  FiChevronRight,
-  FiStar,
-  FiUsers,
-  FiAward,
-  FiTrendingUp,
+  FiArrowRight, FiZap, FiMenu, FiX, FiUsers, FiAward,
+  FiTrendingUp, FiGlobe, FiBookOpen,
 } from "react-icons/fi";
 
+/* ════════════════════════════════════════════
+   CSS COMPLET — injecté une fois
+════════════════════════════════════════════ */
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --v:#7260A7;--v2:#5B4D8E;--c:#4A9FB5;--pk:#C084B8;--g:#10B981;
+  --txt:#1A1A2E;--mut:#5A5A6E;--bdr:rgba(114,96,167,.14);
+  --sur:#F7F5FF;--wh:#fff;
+  --r1:12px;--r2:20px;--r3:32px;
+}
+html{scroll-behavior:smooth}
+body{font-family:'Plus Jakarta Sans',sans-serif;background:#fff;color:var(--txt);overflow-x:hidden}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--v);border-radius:2px}
 
-/* ─── STYLES ─────────────────────────────────────────────── */
-const css = `
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap');
+/* ANIMATIONS */
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(40px,30px) scale(1.1)}}
+@keyframes up{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+@keyframes rt{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:translateX(0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}
+@keyframes grow{from{width:0%}}
+@keyframes panel{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* NOISE + ORBS */
+.noise{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.25;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");
+  background-size:180px}
+.orb{position:absolute;border-radius:50%;filter:blur(110px);pointer-events:none;opacity:.35}
+.o1{width:600px;height:600px;background:radial-gradient(circle,rgba(114,96,167,.18) 0%,transparent 70%);top:-180px;right:-80px;animation:drift 13s ease-in-out infinite alternate}
+.o2{width:480px;height:480px;background:radial-gradient(circle,rgba(74,159,181,.12) 0%,transparent 70%);bottom:-60px;left:-120px;animation:drift 17s ease-in-out infinite alternate-reverse}
 
-:root {
-  --violet: #7260A7;
-  --indigo: #5B4D8E;
-  --pink: #C084B8;
-  --cyan: #4A9FB5;
-  --amber: #E8A05D;
-  --bg: #FFFFFF;
-  --surface: #F8F9FB;
-  --glass: rgba(114, 96, 167, 0.05);
-  --glass-b: rgba(114, 96, 167, 0.12);
-  --text: #1A1A2E;
-  --muted: #5A5A6E;
-  --border: rgba(114, 96, 167, 0.15);
-  --r-sm: 12px;
-  --r-md: 20px;
-  --r-lg: 32px;
-}
+/* BARRE PARTENAIRES */
+.pbar{background:#fff;border-bottom:1px solid var(--bdr);padding:7px 24px;z-index:101;position:relative}
+.pbar-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.pbar-lbl{font-size:.68rem;color:var(--mut);font-style:italic}
+.pbar-logos{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.pbar-logos img{height:28px;object-fit:contain;opacity:.82;transition:opacity .2s}
+.pbar-logos img:hover{opacity:1}
+.pdiv{width:1px;height:22px;background:var(--bdr)}
+.pbar-eu{font-family:'Syne',sans-serif;font-weight:800;font-size:.8rem;color:#0052cc;letter-spacing:-.01em}
+.pbar-anpr{font-family:'Syne',sans-serif;font-weight:800;font-size:.82rem;color:var(--v)}
 
-html { scroll-behavior: smooth; }
+/* NAV */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 24px;transition:all .4s;background:rgba(255,255,255,.82);backdrop-filter:blur(18px)}
+.nav.sc{background:rgba(255,255,255,.97);border-bottom:1px solid var(--bdr);box-shadow:0 2px 18px rgba(114,96,167,.07)}
+.nav-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:70px}
+.brand{display:flex;align-items:center;gap:9px;font-family:'Syne',sans-serif;font-weight:800;font-size:1.35rem;letter-spacing:-.025em;color:var(--txt);text-decoration:none}
+.bdot{width:9px;height:9px;border-radius:50%;background:linear-gradient(135deg,var(--v),var(--v2));box-shadow:0 0 10px rgba(114,96,167,.5)}
+.nav-links{display:flex;gap:32px}
+.nav-links a{color:var(--mut);font-size:.86rem;font-weight:500;text-decoration:none;text-transform:uppercase;letter-spacing:.04em;transition:color .2s}
+.nav-links a:hover{color:var(--v)}
+.nav-act{display:flex;gap:10px;align-items:center}
+.btn-g{padding:8px 18px;border-radius:50px;border:1px solid var(--bdr);color:var(--txt);font-size:.84rem;font-weight:500;text-decoration:none;transition:all .2s;background:transparent}
+.btn-g:hover{border-color:var(--v);color:var(--v);background:rgba(114,96,167,.05)}
+.btn-p{padding:9px 20px;border-radius:50px;background:linear-gradient(135deg,var(--v),var(--v2));color:#fff;font-size:.84rem;font-weight:600;text-decoration:none;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(114,96,167,.28);transition:all .25s}
+.btn-p:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(114,96,167,.38)}
+.nav-tog{display:none;background:none;border:none;color:var(--txt);font-size:1.35rem;cursor:pointer;padding:5px}
 
-body {
-  font-family: 'Inter', sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  overflow-x: clip;
-}
+/* MOBILE MENU */
+.mob{position:fixed;inset:0;z-index:200;background:rgba(255,255,255,.98);backdrop-filter:blur(18px);padding:28px;transform:translateX(100%);transition:transform .3s;display:flex;flex-direction:column}
+.mob.open{transform:translateX(0)}
+.mob-close{align-self:flex-end;background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--txt);padding:6px}
+.mob-links{display:flex;flex-direction:column;gap:24px;margin:40px 0}
+.mob-links a{font-family:'Syne',sans-serif;font-size:1.7rem;font-weight:700;color:var(--txt);text-decoration:none}
+.mob-links a:hover{color:var(--v)}
+.mob-act{display:flex;flex-direction:column;gap:10px}
 
-/* ── SCROLLBAR ── */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #F0F0F5; }
-::-webkit-scrollbar-thumb { background: var(--violet); border-radius: 2px; }
+/* HERO */
+.hero{position:relative;min-height:100vh;display:flex;align-items:center;padding:110px 24px 80px;overflow:hidden;background:linear-gradient(180deg,#fff 0%,var(--sur) 100%)}
+.hero-in{max-width:1180px;margin:0 auto;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
+.htag{display:inline-flex;align-items:center;gap:7px;padding:5px 14px;border-radius:50px;border:1px solid rgba(114,96,167,.22);background:rgba(114,96,167,.07);font-size:.75rem;font-weight:600;color:var(--v);letter-spacing:.08em;text-transform:uppercase;margin-bottom:24px;animation:up .8s ease both}
+.lpulse{width:7px;height:7px;border-radius:50%;background:var(--g);animation:pulse 2s infinite}
+.hero h1{font-family:'Syne',sans-serif;font-size:clamp(2.7rem,4.8vw,4.4rem);font-weight:800;line-height:1.08;letter-spacing:-.03em;margin-bottom:22px;color:var(--txt);animation:up .8s .08s ease both}
+.grad{background:linear-gradient(135deg,var(--v) 0%,var(--c) 50%,var(--pk) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hdesc{color:var(--mut);font-size:1.05rem;line-height:1.78;max-width:470px;margin-bottom:36px;animation:up .8s .16s ease both}
+.hact{display:flex;gap:14px;flex-wrap:wrap;animation:up .8s .24s ease both}
+.btn-lg{display:inline-flex;align-items:center;gap:9px;padding:14px 30px;border-radius:50px;background:linear-gradient(135deg,var(--v),var(--v2));color:#fff;font-size:.97rem;font-weight:600;text-decoration:none;border:none;cursor:pointer;box-shadow:0 6px 22px rgba(114,96,167,.3);transition:all .3s;position:relative;overflow:hidden}
+.btn-lg:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(114,96,167,.42)}
+.btn-ol{display:inline-flex;align-items:center;gap:9px;padding:14px 30px;border-radius:50px;border:1.5px solid var(--bdr);color:var(--txt);font-size:.97rem;font-weight:500;text-decoration:none;background:#fff;transition:all .25s}
+.btn-ol:hover{border-color:var(--v);background:rgba(114,96,167,.04);transform:translateY(-1px)}
+.hstats{display:flex;gap:28px;margin-top:44px;animation:up .8s .32s ease both}
+.hs{display:flex;flex-direction:column;gap:3px}
+.hs-n{font-family:'Syne',sans-serif;font-size:1.75rem;font-weight:800;color:var(--txt)}
+.hs-l{font-size:.78rem;color:var(--mut)}
+.hsdiv{width:1px;background:var(--bdr)}
 
-/* ── NOISE OVERLAY ── */
-.noise {
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.02'/%3E%3C/svg%3E");
-  background-size: 180px;
-  opacity: 0.3;
-}
+/* HERO CARD */
+.hv{position:relative;display:flex;justify-content:center;align-items:center;animation:rt .9s .28s ease both}
+.hcard{background:rgba(255,255,255,.97);border:1px solid var(--bdr);border-radius:var(--r3);backdrop-filter:blur(18px);padding:30px;width:100%;max-width:430px;box-shadow:0 18px 55px rgba(114,96,167,.14),inset 0 1px 0 rgba(255,255,255,.8);animation:float 6.5s ease-in-out infinite}
+.ch{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px}
+.cbadge{padding:5px 12px;border-radius:50px;background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.22);font-size:.73rem;font-weight:600;color:#059669;display:flex;align-items:center;gap:6px}
+.ct{font-family:'Syne',sans-serif;font-size:1.45rem;font-weight:700;margin-bottom:7px;line-height:1.3;color:var(--txt)}
+.cs{font-size:.85rem;color:var(--mut);margin-bottom:22px}
+.cpl{display:flex;justify-content:space-between;font-size:.76rem;color:var(--mut);margin-bottom:7px}
+.cpb{height:6px;background:rgba(114,96,167,.1);border-radius:3px;overflow:hidden;margin-bottom:22px}
+.cpf{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--v),var(--c));animation:grow 2.2s 1s ease both}
+.cmg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-bottom:18px}
+.cm{background:rgba(114,96,167,.05);border:1px solid var(--bdr);border-radius:var(--r1);padding:13px 8px;text-align:center;font-size:.76rem;font-weight:500;color:var(--mut);transition:all .2s;cursor:pointer}
+.cm:hover{background:rgba(114,96,167,.11);border-color:var(--v);color:var(--txt)}
+.cmi{font-size:1.15rem;margin-bottom:5px}
+.cf{display:flex;justify-content:space-between;align-items:center}
+.avs{display:flex}
+.av{width:29px;height:29px;border-radius:50%;border:2px solid #fff;margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:700;background:linear-gradient(135deg,var(--v),var(--v2));color:#fff}
+.av:first-child{margin-left:0}
+.ccta{display:inline-flex;align-items:center;gap:6px;padding:8px 17px;border-radius:50px;background:linear-gradient(135deg,var(--v),var(--v2));color:#fff;font-size:.78rem;font-weight:600;border:none;cursor:pointer;text-decoration:none;transition:all .2s}
+.ccta:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(114,96,167,.35)}
+.fb{position:absolute;display:flex;align-items:center;gap:9px;background:rgba(255,255,255,.98);border:1px solid var(--bdr);border-radius:var(--r1);padding:11px 15px;backdrop-filter:blur(14px);box-shadow:0 10px 28px rgba(114,96,167,.18);font-size:.8rem;font-weight:500}
+.fb1{top:-18px;left:-26px;animation:float 7.5s 1s ease-in-out infinite}
+.fb2{bottom:-18px;right:-26px;animation:float 8.5s 2s ease-in-out infinite}
+.fbi{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.fbn{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:800;color:var(--txt)}
+.fbt{font-size:.69rem;color:var(--mut)}
 
-/* ── GLOW ORBS ── */
-.orb {
-  position: absolute; border-radius: 50%; filter: blur(120px);
-  pointer-events: none; will-change: transform; opacity: 0.4;
-}
-.orb-1 {
-  width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(114,96,167,0.15) 0%, transparent 70%);
-  top: -200px; right: -100px; animation: drift 12s ease-in-out infinite alternate;
-}
-.orb-2 {
-  width: 500px; height: 500px;
-  background: radial-gradient(circle, rgba(74,159,181,0.12) 0%, transparent 70%);
-  bottom: 0; left: -150px; animation: drift 15s ease-in-out infinite alternate-reverse;
-}
-.orb-3 {
-  width: 400px; height: 400px;
-  background: radial-gradient(circle, rgba(192,132,184,0.1) 0%, transparent 70%);
-  top: 40%; left: 40%; animation: drift 10s ease-in-out infinite alternate;
-}
+/* LIVE SECTION */
+.live-sec{padding:44px 24px;background:#fff}
+.lc{background:linear-gradient(135deg,rgba(114,96,167,.07),rgba(74,159,181,.04));border:1px solid rgba(114,96,167,.18);border-radius:var(--r3);padding:30px 36px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:18px;position:relative;overflow:hidden}
+.ll{display:flex;align-items:center;gap:15px}
+.ldw{width:38px;height:38px;border-radius:50%;background:rgba(16,185,129,.11);border:1px solid rgba(16,185,129,.24);display:flex;align-items:center;justify-content:center}
+.ld{width:11px;height:11px;border-radius:50%;background:var(--g);animation:pulse 2s infinite}
+.llbl{font-size:.73rem;text-transform:uppercase;letter-spacing:.1em;color:#059669;font-weight:600}
+.lt{font-family:'Syne',sans-serif;font-size:1.25rem;font-weight:700;color:var(--txt)}
+.lsub{font-size:.84rem;color:var(--mut);margin-top:3px}
+.lr{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.lpill{display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:50px;background:rgba(255,255,255,.85);border:1px solid var(--bdr);font-size:.82rem;color:var(--txt)}
+.lbtn{display:inline-flex;align-items:center;gap:7px;padding:11px 22px;border-radius:50px;background:linear-gradient(135deg,var(--v),var(--v2));color:#fff;font-weight:600;font-size:.84rem;border:none;cursor:pointer;box-shadow:0 5px 18px rgba(114,96,167,.24);transition:all .25s;text-decoration:none}
+.lbtn:hover{transform:translateY(-2px);box-shadow:0 9px 26px rgba(114,96,167,.35)}
 
-@keyframes drift {
-  from { transform: translate(0, 0) scale(1); }
-  to { transform: translate(40px, 30px) scale(1.08); }
-}
+/* SECTION */
+.sec{padding:90px 24px;background:#fff;position:relative}
+.sec-alt{padding:90px 24px;background:var(--sur);position:relative}
+.con{max-width:1180px;margin:0 auto}
+.ey{display:inline-flex;align-items:center;gap:7px;font-size:.73rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--v);margin-bottom:14px}
+.eyl{width:20px;height:1px;background:var(--v)}
+.stit{font-family:'Syne',sans-serif;font-size:clamp(1.9rem,3.2vw,2.8rem);font-weight:800;letter-spacing:-.025em;line-height:1.15;margin-bottom:14px;color:var(--txt)}
+.sdesc{font-size:1rem;color:var(--mut);max-width:510px;line-height:1.72}
 
-/* ── NAV ── */
-.nav-wrap {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  padding: 0 24px;
-  transition: all 0.4s ease;
-  background: rgba(255,255,255,0.8);
-  backdrop-filter: blur(20px);
-}
-.nav-wrap.scrolled {
-  background: rgba(255,255,255,0.95);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-  box-shadow: 0 2px 20px rgba(114,96,167,0.08);
-}
-.nav-inner {
-  max-width: 1180px; margin: 0 auto;
-  display: flex; align-items: center; justify-content: space-between;
-  height: 72px;
-}
-.brand {
-  display: flex; align-items: center; gap: 10px;
-  font-family: 'Syne', sans-serif; font-weight: 800;
-  font-size: 1.4rem; letter-spacing: -0.02em; color: var(--text);
-  text-decoration: none;
-}
-.brand-dot {
-  width: 10px; height: 10px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--violet), var(--indigo));
-  box-shadow: 0 0 12px rgba(114,96,167,0.5);
-}
-.nav-links {
-  display: flex; gap: 36px; align-items: center;
-}
-.nav-links a {
-  color: var(--muted); font-size: 0.88rem; font-weight: 500;
-  text-decoration: none; letter-spacing: 0.02em; text-transform: uppercase;
-  transition: color 0.2s;
-}
-.nav-links a:hover { color: var(--violet); }
-.nav-actions { display: flex; gap: 12px; align-items: center; }
-.btn-ghost {
-  padding: 9px 20px; border-radius: 50px; border: 1px solid var(--border);
-  color: var(--text); font-size: 0.875rem; font-weight: 500;
-  text-decoration: none; transition: all 0.2s; cursor: pointer;
-  background: transparent;
-}
-.btn-ghost:hover { border-color: var(--violet); color: var(--violet); background: rgba(114,96,167,0.05); }
-.btn-primary-sm {
-  padding: 10px 22px; border-radius: 50px;
-  background: linear-gradient(135deg, var(--violet), var(--indigo));
-  color: #fff; font-size: 0.875rem; font-weight: 600;
-  text-decoration: none; border: none; cursor: pointer;
-  box-shadow: 0 4px 16px rgba(114,96,167,0.25);
-  transition: all 0.25s;
-}
-.btn-primary-sm:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(114,96,167,0.35); }
-.nav-mobile-toggle {
-  display: none; background: none; border: none; color: var(--text);
-  font-size: 1.4rem; cursor: pointer; padding: 6px;
-}
+/* 5 THÉMATIQUES */
+.tgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-top:50px}
+.tc{background:#fff;border:1px solid var(--bdr);border-radius:var(--r2);padding:20px 16px;transition:all .3s;cursor:pointer;position:relative;overflow:hidden;box-shadow:0 2px 7px rgba(114,96,167,.05)}
+.tc::before{content:'';position:absolute;inset:0;opacity:0;background:linear-gradient(135deg,rgba(114,96,167,.07),rgba(74,159,181,.03));transition:opacity .3s}
+.tc:hover::before,.tc.act::before{opacity:1}
+.tc:hover,.tc.act{border-color:var(--v);transform:translateY(-4px);box-shadow:0 14px 36px rgba(114,96,167,.14)}
+.tic{width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;margin-bottom:14px;background:linear-gradient(135deg,rgba(114,96,167,.11),rgba(91,77,142,.07));border:1px solid rgba(114,96,167,.14);transition:all .3s;color:var(--v)}
+.tc:hover .tic,.tc.act .tic{background:linear-gradient(135deg,var(--v),var(--v2));border-color:transparent;box-shadow:0 7px 20px rgba(114,96,167,.3);color:#fff}
+.tn{font-family:'Syne',sans-serif;font-size:.92rem;font-weight:700;margin-bottom:5px;color:var(--txt)}
+.td{font-size:.76rem;color:var(--mut);line-height:1.5}
+.tarr{position:absolute;top:16px;right:16px;color:var(--mut);font-size:.88rem;transition:all .2s}
+.tc:hover .tarr,.tc.act .tarr{color:var(--v);transform:translate(2px,-2px)}
 
+/* PANEL DÉTAIL */
+.dp{margin-top:22px;border-radius:var(--r2);border:1px solid var(--bdr);background:linear-gradient(135deg,rgba(114,96,167,.03),rgba(74,159,181,.015));padding:30px 34px;display:grid;grid-template-columns:1fr 1fr;gap:30px;animation:panel .32s cubic-bezier(.4,0,.2,1) both}
+.dptag{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;border:1px solid;padding:4px 13px;border-radius:50px;margin-bottom:14px}
+.dptit{font-family:'Syne',sans-serif;font-size:1.5rem;font-weight:800;color:var(--txt);margin-bottom:11px;line-height:1.2}
+.dpb{font-size:.93rem;color:var(--mut);line-height:1.75;margin-bottom:18px}
+.dpk{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:20px}
+.kpi{display:flex;flex-direction:column;gap:2px}
+.kn{font-family:'Syne',sans-serif;font-size:1.45rem;font-weight:800}
+.kl{font-size:.73rem;color:var(--mut)}
 
-/* ── PARTNERS BAR (top) ── */
-.partners-bar {
-  background: #fff;
-  border-bottom: 1px solid var(--border);
-  padding: 10px 24px;
-  z-index: 101; position: relative;
-}
-.partners-bar-inner {
-  max-width: 1180px; margin: 0 auto;
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 12px;
-}
-.partners-bar-left {
-  font-size: 0.72rem; color: var(--muted); font-style: italic;
-  font-weight: 500;
-}
-.partners-logos {
-  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-}
-.partners-logos img {
-  height: 36px; object-fit: contain; opacity: 0.85;
-  transition: opacity 0.2s;
-}
-.partners-logos img:hover { opacity: 1; }
-.partner-divider { width: 1px; height: 28px; background: var(--border); }
+/* FORMATIONS (boutons avec liens) */
+.fmts{display:flex;flex-direction:column;gap:10px}
+.fmt{display:flex;align-items:center;gap:10px;padding:11px 14px;border-radius:var(--r1);background:#fff;border:1px solid var(--bdr);box-shadow:0 2px 7px rgba(114,96,167,.04);text-decoration:none;color:var(--txt);transition:all .22s}
+.fmt:hover{border-color:var(--v);background:rgba(114,96,167,.04);transform:translateX(4px)}
+.fmtic{width:30px;height:30px;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.88rem}
+.fmtt{font-weight:700;font-size:.86rem;color:var(--txt)}
+.fmtd{font-size:.74rem;color:var(--mut);margin-top:1px}
+.fmtarr{margin-left:auto;color:var(--v);font-size:.82rem;flex-shrink:0}
 
-/* ── FOOTER LOGOS ── */
-.footer-partners {
-  border-top: 1px solid rgba(114,96,167,0.12);
-  padding-top: 32px; margin-top: 32px;
-}
-.footer-partners-title {
-  font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
-  letter-spacing: 0.1em; color: var(--muted); margin-bottom: 20px; text-align: center;
-}
-.footer-logos-row {
-  display: flex; align-items: center; justify-content: center;
-  gap: 28px; flex-wrap: wrap;
-}
-.footer-logos-row img {
-  height: 40px; object-fit: contain; opacity: 0.65;
-  filter: grayscale(20%); transition: all 0.2s;
-}
-.footer-logos-row img:hover { opacity: 1; filter: grayscale(0%); }
-.footer-eu-funded {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(0,82,204,0.06); border: 1px solid rgba(0,82,204,0.15);
-  border-radius: 10px; padding: 10px 16px;
-  font-size: 0.78rem; color: #0052cc; font-weight: 600;
-}
+/* POINTS détail gauche */
+.dpts{display:flex;flex-direction:column;gap:12px}
+.dpt{display:flex;align-items:flex-start;gap:11px;padding:13px 15px;border-radius:var(--r1);background:#fff;border:1px solid var(--bdr);box-shadow:0 2px 7px rgba(114,96,167,.04)}
+.dptic{width:30px;height:30px;border-radius:7px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:.88rem}
+.dptt{font-weight:700;font-size:.86rem;color:var(--txt)}
+.dptd{font-size:.75rem;color:var(--mut);margin-top:2px}
 
-/* ── SWAFY LOGO in navbar ── */
-.brand-logo { height: 32px; object-fit: contain; }
+/* OBJECTIF */
+.og{display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center}
+.psk{position:relative;height:410px}
+.pc{position:absolute;width:215px;background:rgba(255,255,255,.98);border:1px solid var(--bdr);border-radius:27px;overflow:hidden;box-shadow:0 22px 55px rgba(114,96,167,.18)}
+.pa{top:0;left:0;z-index:2;animation:float 7s ease-in-out infinite}
+.pb{top:58px;left:126px;z-index:1;opacity:.83;animation:float 9.5s 1.5s ease-in-out infinite}
+.ph{padding:9px;background:rgba(114,96,167,.04)}
+.pn{width:40px;height:4px;border-radius:2px;background:rgba(114,96,167,.18);margin:0 auto}
+.pbd{padding:13px}
+.psc{background:linear-gradient(135deg,rgba(114,96,167,.07),rgba(74,159,181,.04));border:1px solid var(--bdr);border-radius:17px;padding:13px}
+.psbg{display:inline-block;font-size:9px;font-weight:700;padding:3px 7px;border-radius:20px;background:rgba(16,185,129,.14);color:#059669;margin-bottom:7px}
+.pst{font-family:'Syne',sans-serif;font-weight:700;font-size:.78rem;color:var(--txt);margin-bottom:3px}
+.pss{font-size:.68rem;color:var(--mut);margin-bottom:9px}
+.psb{width:fit-content;padding:5px 9px;border-radius:9px;background:var(--v);color:#fff;font-weight:700;font-size:.66rem}
+.ptiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-top:10px}
+.ptile{height:32px;border-radius:9px;background:rgba(114,96,167,.07);border:1px solid var(--bdr)}
+.pli{height:7px;border-radius:4px;background:rgba(114,96,167,.09);margin-top:7px}
+.odesc{font-size:1rem;color:var(--mut);line-height:1.8;margin-bottom:30px}
+.sr{display:flex;gap:11px;flex-wrap:wrap}
+.sb{display:flex;align-items:center;gap:9px;padding:11px 20px;border-radius:var(--r1);background:#1A1A2E;color:#fff;text-decoration:none;font-weight:700;font-size:.88rem;transition:all .25s}
+.sb:hover{transform:translateY(-2px);box-shadow:0 9px 25px rgba(26,26,46,.24)}
 
-/* ── HERO ── */
-.hero {
-  position: relative; min-height: 100vh;
-  display: flex; align-items: center;
-  padding: 120px 24px 80px;
-  overflow: visible;
-  background: linear-gradient(180deg, #FFFFFF 0%, #F8F9FB 100%);
-}
-.hero-container {
-  max-width: 1180px; margin: 0 auto; width: 100%;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center;
-}
-.hero-tag {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 6px 16px; border-radius: 50px;
-  border: 1px solid rgba(114,96,167,0.25);
-  background: rgba(114,96,167,0.08);
-  font-size: 0.78rem; font-weight: 600; color: var(--violet);
-  letter-spacing: 0.08em; text-transform: uppercase;
-  margin-bottom: 28px;
-  animation: fadeUp 0.8s ease both;
-}
-.live-pulse {
-  width: 7px; height: 7px; border-radius: 50%; background: #10B981;
-  animation: pulse 2s infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(1.4); }
-}
-.hero h1 {
-  font-family: 'Syne', sans-serif; font-size: clamp(2.8rem, 5vw, 4.5rem);
-  font-weight: 800; line-height: 1.08; letter-spacing: -0.03em;
-  margin-bottom: 24px; color: var(--text);
-  animation: fadeUp 0.8s 0.1s ease both;
-}
-.hero h1 .gradient-text {
-  background: linear-gradient(135deg, #7260A7 0%, #4A9FB5 50%, #C084B8 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.hero-desc {
-  color: var(--muted); font-size: 1.08rem; line-height: 1.75;
-  max-width: 480px; margin-bottom: 40px;
-  animation: fadeUp 0.8s 0.2s ease both;
-}
-.hero-actions {
-  display: flex; gap: 16px; flex-wrap: wrap;
-  animation: fadeUp 0.8s 0.3s ease both;
-}
-.btn-primary-lg {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 15px 32px; border-radius: 50px;
-  background: linear-gradient(135deg, var(--violet), var(--indigo));
-  color: #fff; font-size: 1rem; font-weight: 600;
-  text-decoration: none; border: none; cursor: pointer;
-  box-shadow: 0 6px 24px rgba(114,96,167,0.3);
-  transition: all 0.3s; position: relative; overflow: hidden;
-}
-.btn-primary-lg::before {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
-  transform: translateX(-100%); transition: transform 0.4s;
-}
-.btn-primary-lg:hover::before { transform: translateX(0); }
-.btn-primary-lg:hover { transform: translateY(-2px); box-shadow: 0 10px 32px rgba(114,96,167,0.4); }
-.btn-outline-lg {
-  display: inline-flex; align-items: center; gap: 10px;
-  padding: 15px 32px; border-radius: 50px;
-  border: 1.5px solid var(--border);
-  color: var(--text); font-size: 1rem; font-weight: 500;
-  text-decoration: none; transition: all 0.25s;
-  background: #FFFFFF;
-}
-.btn-outline-lg:hover { 
-  border-color: var(--violet); 
-  background: rgba(114,96,167,0.05);
-  transform: translateY(-1px);
-}
+/* ÉTAPES */
+.stgr{display:grid;grid-template-columns:1fr 1fr;gap:58px;align-items:center}
+.sti{display:flex;align-items:flex-start;gap:15px;margin-bottom:22px}
+.stn{width:34px;height:34px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,rgba(114,96,167,.11),rgba(91,77,142,.07));border:1px solid rgba(114,96,167,.18);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:.88rem;color:var(--v)}
+.sttit{font-weight:700;color:var(--txt);margin-bottom:4px}
+.std{font-size:.85rem;color:var(--mut);line-height:1.6}
+.prev{background:linear-gradient(135deg,rgba(114,96,167,.05),rgba(74,159,181,.03));border:1px solid var(--bdr);border-radius:var(--r3);padding:26px;box-shadow:0 10px 36px rgba(114,96,167,.07)}
+.prevt{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.prevds{display:flex;gap:5px}
+.prevd{width:7px;height:7px;border-radius:50%;background:rgba(114,96,167,.18)}
+.prevl{font-size:.7rem;font-weight:600;color:var(--mut);letter-spacing:.06em}
+.prevh{height:75px;border-radius:13px;background:linear-gradient(135deg,rgba(114,96,167,.11),rgba(74,159,181,.07));margin-bottom:13px}
+.prevb{height:5px;border-radius:3px;background:rgba(114,96,167,.09);margin-bottom:9px}
+.prevc{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.pmc{background:#fff;border:1px solid var(--bdr);border-radius:var(--r1);padding:13px 15px}
+.pmcl{font-size:.7rem;color:var(--mut);margin-bottom:3px}
+.pmcv{font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;color:var(--v)}
 
-/* ── HERO STATS ── */
-.hero-stats {
-  display: flex; gap: 32px; margin-top: 48px;
-  animation: fadeUp 0.8s 0.4s ease both;
-}
-.stat { display: flex; flex-direction: column; gap: 4px; }
-.stat-num {
-  font-family: 'Syne', sans-serif; font-size: 1.8rem;
-  font-weight: 800; color: var(--text);
-}
-.stat-label { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
-.stat-divider { width: 1px; background: var(--border); }
+/* FOOTER */
+.foot{background:linear-gradient(180deg,#1A1A2E 0%,#0D0D1E 100%);color:rgba(255,255,255,.85);padding:72px 24px 36px}
+.fg{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:44px}
+.fbn{font-family:'Syne',sans-serif;font-weight:800;font-size:1.25rem;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:9px}
+.fbt{font-size:.85rem;color:rgba(255,255,255,.5);line-height:1.7;max-width:290px}
+.fct{font-family:'Syne',sans-serif;font-weight:700;font-size:.82rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(255,255,255,.38);margin-bottom:18px}
+.foot a{display:block;color:rgba(255,255,255,.68);text-decoration:none;margin-bottom:11px;font-size:.88rem;transition:color .2s}
+.foot a:hover{color:#fff}
+.fbot{margin-top:44px;padding-top:22px;border-top:1px solid rgba(255,255,255,.09);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.fbc{font-size:.8rem;color:rgba(255,255,255,.38)}
+.fpart{border-top:1px solid rgba(114,96,167,.12);padding-top:28px;margin-top:28px}
+.fpartt{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--mut);margin-bottom:18px;text-align:center}
+.fpartr{display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap}
+.feu{display:flex;align-items:center;gap:9px;background:rgba(0,82,204,.06);border:1px solid rgba(0,82,204,.14);border-radius:9px;padding:9px 15px;font-size:.76rem;color:#0052cc;font-weight:600}
 
-/* ── HERO VISUAL ── */
-.hero-visual {
-  position: relative; display: flex; justify-content: center; align-items: center;
-  animation: fadeRight 0.9s 0.3s ease both;
+/* RESPONSIVE */
+@media(max-width:980px){
+  .hero-in{grid-template-columns:1fr}
+  .hv{display:none}
+  .tgrid{grid-template-columns:repeat(2,1fr)}
+  .dp{grid-template-columns:1fr}
+  .og{grid-template-columns:1fr}
+  .stgr{grid-template-columns:1fr}
+  .fg{grid-template-columns:1fr 1fr}
 }
-@keyframes fadeRight {
-  from { opacity: 0; transform: translateX(40px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(30px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.glass-card-hero {
-  background: rgba(255,255,255,0.95);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  backdrop-filter: blur(20px);
-  padding: 32px; width: 100%; max-width: 440px;
-  box-shadow: 0 20px 60px rgba(114,96,167,0.15), inset 0 1px 0 rgba(255,255,255,0.8);
-  animation: float 6s ease-in-out infinite;
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-12px); }
-}
-.card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-.card-badge {
-  padding: 5px 12px; border-radius: 50px;
-  background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25);
-  font-size: 0.75rem; font-weight: 600; color: #059669; display: flex; align-items: center; gap: 6px;
-}
-.card-menu { color: var(--muted); font-size: 1.1rem; cursor: pointer; }
-.card-title {
-  font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 700;
-  margin-bottom: 8px; line-height: 1.3; color: var(--text);
-}
-.card-sub { font-size: 0.875rem; color: var(--muted); margin-bottom: 24px; }
-.card-progress { margin-bottom: 24px; }
-.progress-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); margin-bottom: 8px; }
-.progress-bar { height: 6px; background: rgba(114,96,167,0.1); border-radius: 3px; overflow: hidden; }
-.progress-fill {
-  height: 100%; border-radius: 3px;
-  background: linear-gradient(90deg, var(--violet), var(--cyan));
-  animation: grow 2s 1s ease both;
-}
-@keyframes grow { from { width: 0%; } }
-
-.mini-modules { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-.mini-mod {
-  background: rgba(114,96,167,0.05); border: 1px solid var(--border); border-radius: var(--r-sm);
-  padding: 14px 10px; text-align: center; font-size: 0.78rem; font-weight: 500;
-  color: var(--muted); transition: all 0.2s; cursor: pointer;
-}
-.mini-mod:hover { background: rgba(114,96,167,0.12); border-color: var(--violet); color: var(--text); }
-.mini-mod-icon { font-size: 1.2rem; margin-bottom: 6px; }
-
-.card-footer { display: flex; justify-content: space-between; align-items: center; }
-.avatars { display: flex; }
-.avatar {
-  width: 30px; height: 30px; border-radius: 50%;
-  border: 2px solid #fff; margin-left: -8px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 0.65rem; font-weight: 700;
-  background: linear-gradient(135deg, var(--violet), var(--indigo));
-  color: #fff;
-}
-.avatar:first-child { margin-left: 0; }
-.card-cta {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 8px 18px; border-radius: 50px;
-  background: linear-gradient(135deg, var(--violet), var(--indigo));
-  color: #fff; font-size: 0.8rem; font-weight: 600;
-  border: none; cursor: pointer; text-decoration: none;
-  transition: all 0.2s;
-}
-.card-cta:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(114,96,167,0.35); }
-
-/* floating badges */
-.float-badge {
-  position: absolute; display: flex; align-items: center; gap: 10px;
-  background: rgba(255,255,255,0.98); border: 1px solid var(--border);
-  border-radius: var(--r-sm); padding: 12px 16px;
-  backdrop-filter: blur(16px);
-  box-shadow: 0 12px 32px rgba(114,96,167,0.2);
-  font-size: 0.82rem; font-weight: 500;
-}
-.float-badge-1 { top: -20px; left: -30px; animation: float 7s 1s ease-in-out infinite; }
-.float-badge-2 { bottom: -20px; right: -30px; animation: float 8s 2s ease-in-out infinite; }
-.float-icon {
-  width: 36px; height: 36px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.1rem;
-}
-.float-icon-ai { background: linear-gradient(135deg, rgba(114,96,167,0.15), rgba(91,77,142,0.1)); }
-.float-icon-award { background: linear-gradient(135deg, rgba(232,160,93,0.15), rgba(192,132,184,0.1)); }
-.float-num { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800; color: var(--text); }
-.float-text { font-size: 0.72rem; color: var(--muted); }
-
-/* ── SECTION COMMON ── */
-.section { padding: 100px 24px; position: relative; background: #FFFFFF; }
-.section-alt { padding: 100px 24px; background: var(--surface); position: relative; }
-.container { max-width: 1180px; margin: 0 auto; }
-.section-eyebrow {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.12em;
-  text-transform: uppercase; color: var(--violet); margin-bottom: 16px;
-}
-.section-eyebrow-line { width: 24px; height: 1px; background: var(--violet); }
-.section-title {
-  font-family: 'Syne', sans-serif; font-size: clamp(2rem, 3.5vw, 3rem);
-  font-weight: 800; letter-spacing: -0.025em; line-height: 1.15;
-  margin-bottom: 16px; color: var(--text);
-}
-.section-desc { font-size: 1rem; color: var(--muted); max-width: 520px; line-height: 1.7; }
-
-/* ── LIVE SECTION ── */
-.live-section { padding: 48px 24px; background: #FFFFFF; }
-.live-card {
-  background: linear-gradient(135deg, rgba(114,96,167,0.08), rgba(74,159,181,0.05));
-  border: 1px solid rgba(114,96,167,0.2);
-  border-radius: var(--r-lg); padding: 32px 40px;
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 20px; backdrop-filter: blur(10px);
-  position: relative; overflow: hidden;
-}
-.live-card::before {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(135deg, transparent 60%, rgba(74,159,181,0.05));
-  pointer-events: none;
-}
-.live-left { display: flex; align-items: center; gap: 16px; }
-.live-indicator { display: flex; align-items: center; gap: 8px; }
-.live-dot-wrap {
-  width: 40px; height: 40px; border-radius: 50%;
-  background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.25);
-  display: flex; align-items: center; justify-content: center;
-}
-.live-dot { width: 12px; height: 12px; border-radius: 50%; background: #10B981; animation: pulse 2s infinite; }
-.live-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #059669; font-weight: 600; }
-.live-title { font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 700; color: var(--text); }
-.live-subtitle { font-size: 0.875rem; color: var(--muted); margin-top: 4px; }
-.live-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.live-pill {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 16px; border-radius: 50px;
-  background: rgba(255,255,255,0.8); border: 1px solid var(--border);
-  font-size: 0.83rem; color: var(--text);
-}
-.live-btn {
-  display: inline-flex; align-items: center; gap: 8px;
-  padding: 12px 24px; border-radius: 50px;
-  background: linear-gradient(135deg, var(--violet), var(--indigo));
-  color: #fff; font-weight: 600; font-size: 0.875rem;
-  border: none; cursor: pointer;
-  box-shadow: 0 6px 20px rgba(114,96,167,0.25); transition: all 0.25s;
-}
-.live-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(114,96,167,0.35); }
-
-/* ── THEMES ── */
-.themes-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-top: 56px; }
-.theme-card {
-  background: #FFFFFF; border: 1px solid var(--border);
-  border-radius: var(--r-md); padding: 28px 24px;
-  transition: all 0.3s; cursor: pointer; position: relative; overflow: hidden;
-  box-shadow: 0 2px 8px rgba(114,96,167,0.06);
-}
-.theme-card::before {
-  content: ''; position: absolute; inset: 0; opacity: 0;
-  background: linear-gradient(135deg, rgba(114,96,167,0.08), rgba(74,159,181,0.04));
-  transition: opacity 0.3s;
-}
-.theme-card:hover::before { opacity: 1; }
-.theme-card:hover { border-color: var(--violet); transform: translateY(-4px); box-shadow: 0 16px 40px rgba(114,96,167,0.15); }
-.theme-icon-wrap {
-  width: 52px; height: 52px; border-radius: 14px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.3rem; margin-bottom: 20px;
-  background: linear-gradient(135deg, rgba(114,96,167,0.12), rgba(91,77,142,0.08));
-  border: 1px solid rgba(114,96,167,0.15);
-  transition: all 0.3s; color: var(--violet);
-}
-.theme-card:hover .theme-icon-wrap {
-  background: linear-gradient(135deg, var(--violet), var(--indigo));
-  border-color: transparent; box-shadow: 0 8px 24px rgba(114,96,167,0.3);
-  color: #fff;
-}
-.theme-name { font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 6px; color: var(--text); }
-.theme-desc { font-size: 0.84rem; color: var(--muted); }
-.theme-arrow { position: absolute; top: 24px; right: 24px; color: var(--muted); font-size: 1rem; transition: all 0.2s; }
-.theme-card:hover .theme-arrow { color: var(--violet); transform: translate(2px, -2px); }
-
-/* ── OBJECTIF ── */
-.objectif-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
-.objectif-visual { position: relative; }
-.phone-stack { position: relative; height: 420px; }
-.phone-card {
-  position: absolute; width: 220px;
-  background: rgba(255,255,255,0.98); border: 1px solid var(--border);
-  border-radius: 24px; overflow: hidden;
-  box-shadow: 0 24px 60px rgba(114,96,167,0.2);
-}
-.phone-a { top: 0; left: 20px; animation: float 7s ease-in-out infinite; z-index: 2; }
-.phone-b { top: 60px; left: 160px; animation: float 9s 1.5s ease-in-out infinite; opacity: 0.9; z-index: 1; }
-.phone-header { height: 12px; background: rgba(114,96,167,0.05); position: relative; }
-.phone-notch { width: 50px; height: 6px; background: rgba(114,96,167,0.12); border-radius: 3px; margin: 3px auto; }
-.phone-body { padding: 16px; }
-.phone-screen-card {
-  background: linear-gradient(135deg, rgba(114,96,167,0.15), rgba(74,159,181,0.1));
-  border-radius: 12px; padding: 16px; margin-bottom: 12px;
-}
-.ps-new { font-size: 0.6rem; background: rgba(114,96,167,0.2); color: var(--violet); padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 8px; font-weight: 600; }
-.ps-title { font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; color: var(--text); }
-.ps-sub { font-size: 0.62rem; color: var(--muted); }
-.ps-btn { margin-top: 12px; background: var(--violet); color: #fff; font-size: 0.65rem; font-weight: 700; padding: 6px 14px; border-radius: 20px; display: inline-block; }
-.phone-tiles { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-bottom: 10px; }
-.phone-tile { height: 36px; background: rgba(114,96,167,0.08); border: 1px solid var(--border); border-radius: 8px; }
-.phone-list-item { height: 10px; background: rgba(114,96,167,0.08); border-radius: 5px; margin-bottom: 6px; }
-.phone-list-item:last-child { width: 60%; }
-
-.objectif-content .section-title { margin-bottom: 20px; }
-.objectif-text { font-size: 1.05rem; color: var(--muted); line-height: 1.8; margin-bottom: 32px; }
-.store-row { display: flex; gap: 14px; }
-.store-btn {
-  display: flex; align-items: center; gap: 10px;
-  padding: 14px 22px; border-radius: var(--r-sm);
-  background: #FFFFFF; border: 1px solid var(--border);
-  color: var(--text); text-decoration: none; font-weight: 600;
-  font-size: 0.875rem; transition: all 0.25s;
-  box-shadow: 0 2px 8px rgba(114,96,167,0.06);
-}
-.store-btn:hover { background: rgba(114,96,167,0.08); border-color: var(--violet); transform: translateY(-2px); box-shadow: 0 8px 20px rgba(114,96,167,0.15); }
-
-/* ── STEPS ── */
-.steps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
-.steps-content .section-title { margin-bottom: 40px; }
-.step-item { display: flex; gap: 20px; margin-bottom: 32px; }
-.step-num-wrap {
-  flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%;
-  background: linear-gradient(135deg, var(--violet), var(--indigo));
-  display: flex; align-items: center; justify-content: center;
-  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 1rem; color: #fff;
-  box-shadow: 0 6px 20px rgba(114,96,167,0.3);
-  position: relative; flex-shrink: 0;
-}
-.step-connector {
-  position: absolute; top: 44px; left: 50%; transform: translateX(-50%);
-  width: 2px; height: 32px; background: linear-gradient(to bottom, rgba(114,96,167,0.4), transparent);
-}
-.step-body { padding-top: 10px; }
-.step-title { font-family: 'Syne', sans-serif; font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; color: var(--text); }
-.step-desc { font-size: 0.88rem; color: var(--muted); line-height: 1.6; }
-
-.steps-visual {
-  background: #FFFFFF; border: 1px solid var(--border);
-  border-radius: var(--r-lg); padding: 32px; overflow: hidden;
-  position: relative; min-height: 360px;
-  box-shadow: 0 8px 32px rgba(114,96,167,0.1);
-}
-.steps-visual::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(circle at 50% 0%, rgba(114,96,167,0.08) 0%, transparent 60%);
-}
-.preview-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-.preview-dots { display: flex; gap: 6px; }
-.preview-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(114,96,167,0.15); }
-.preview-dot:first-child { background: #EF4444; }
-.preview-dot:nth-child(2) { background: #F59E0B; }
-.preview-dot:nth-child(3) { background: #10B981; }
-.preview-label { font-size: 0.75rem; color: var(--muted); font-weight: 500; letter-spacing: 0.05em; }
-.preview-hero-bar { height: 10px; background: linear-gradient(90deg, rgba(114,96,167,0.4), rgba(74,159,181,0.2)); border-radius: 5px; margin-bottom: 12px; }
-.preview-bar { height: 7px; background: rgba(114,96,167,0.08); border-radius: 3.5px; margin-bottom: 8px; }
-.preview-bar.w80 { width: 80%; }
-.preview-bar.w60 { width: 60%; }
-.preview-bar.w90 { width: 90%; }
-.preview-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
-.preview-mini-card {
-  background: rgba(114,96,167,0.05); border: 1px solid var(--border);
-  border-radius: var(--r-sm); padding: 16px;
-  aspect-ratio: 1.4;
-  display: flex; flex-direction: column; justify-content: flex-end;
-  position: relative; overflow: hidden;
-}
-.preview-mini-card:first-child {
-  background: linear-gradient(135deg, rgba(114,96,167,0.15), rgba(91,77,142,0.1));
-  border-color: rgba(114,96,167,0.2);
-}
-.preview-mini-card:nth-child(2) {
-  background: linear-gradient(135deg, rgba(74,159,181,0.12), rgba(16,185,129,0.08));
-  border-color: rgba(74,159,181,0.2);
-}
-.pmc-label { font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; }
-.pmc-value { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--text); }
-
-/* ── FOOTER ── */
-.footer { background: #F8F9FB; padding: 64px 24px 32px; border-top: 1px solid var(--border); }
-.footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 60px; margin-bottom: 56px; }
-.footer-brand-text { font-size: 0.9rem; color: var(--muted); line-height: 1.7; margin-top: 16px; max-width: 280px; }
-.footer-col-title { font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); margin-bottom: 20px; }
-.footer-col a { display: block; color: var(--muted); text-decoration: none; font-size: 0.9rem; margin-bottom: 12px; transition: color 0.2s; }
-.footer-col a:hover { color: var(--violet); }
-.footer-bottom { border-top: 1px solid var(--border); padding-top: 28px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
-.footer-bottom-left { font-size: 0.83rem; color: var(--muted); }
-.footer-bottom-right { font-size: 0.78rem; color: var(--violet); }
-
-/* ── MOBILE MENU ── */
-.mobile-menu {
-  position: fixed; inset: 0; z-index: 200; background: rgba(255,255,255,0.98);
-  backdrop-filter: blur(20px);
-  display: flex; flex-direction: column; padding: 100px 32px 40px;
-  transform: translateX(100%); transition: transform 0.35s ease;
-}
-.mobile-menu.open { transform: translateX(0); }
-.mobile-close { position: absolute; top: 24px; right: 24px; background: none; border: none; color: var(--text); font-size: 1.5rem; cursor: pointer; }
-.mobile-links { display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px; }
-.mobile-links a { color: var(--text); font-family: 'Syne', sans-serif; font-size: 2rem; font-weight: 700; text-decoration: none; padding: 12px 0; border-bottom: 1px solid var(--border); transition: color 0.2s; }
-.mobile-links a:hover { color: var(--violet); }
-.mobile-actions { display: flex; flex-direction: column; gap: 12px; }
-
-/* ── RESPONSIVE ── */
-@media (max-width: 900px) {
-  .nav-links, .nav-actions { display: none; }
-  .nav-mobile-toggle { display: flex; }
-  .hero-container { grid-template-columns: 1fr; gap: 48px; }
-  .hero-visual { display: none; }
-  .themes-grid { grid-template-columns: 1fr 1fr; }
-  .objectif-grid, .steps-grid { grid-template-columns: 1fr; }
-  .objectif-visual { display: none; }
-  .footer-grid { grid-template-columns: 1fr 1fr; gap: 40px; }
-  .footer-grid > div:first-child { grid-column: 1 / -1; }
-  .live-card { flex-direction: column; align-items: flex-start; }
-}
-@media (max-width: 600px) {
-  .themes-grid { grid-template-columns: 1fr; }
-  .hero h1 { font-size: 2.4rem; }
-  .hero-stats { gap: 20px; }
-  .stat-divider { display: none; }
+@media(max-width:640px){
+  .nav-links{display:none}
+  .nav-tog{display:block}
+  .tgrid{grid-template-columns:1fr 1fr}
+  .hstats{gap:14px}
+  .fg{grid-template-columns:1fr}
 }
 `;
 
-/* ─── COMPONENTS (reste identique) ─────────────────────────────────────────── */
-function StyleInjector() {
-  useEffect(() => {
-    const id = "swafy-styles";
-    if (!document.getElementById(id)) {
-      const el = document.createElement("style");
-      el.id = id;
-      el.textContent = css;
-      document.head.appendChild(el);
-    }
-    return () => {
-      const el = document.getElementById(id);
-      if (el) el.remove();
-    };
-  }, []);
+function StyleInjector(){
+  useEffect(()=>{
+    const el=document.createElement("style");
+    el.textContent=CSS;
+    document.head.appendChild(el);
+    return()=>el.remove();
+  },[]);
   return null;
 }
 
-function Brand() {
-  return (
+function Brand(){
+  return(
     <div className="brand">
-      <div className="brand-dot" />
-      <span>SWAFY</span>
+      <div className="bdot"/>
+      SWAFY
     </div>
   );
 }
 
-function HeroCard() {
-  return (
-    <div className="hero-visual">
-      
-      <div className="float-badge float-badge-1">
-        <div className="float-icon float-icon-ai">🤖</div>
+/* ── HERO CARD ─────────────────────────────────── */
+function HeroCard(){
+  return(
+    <div className="hv">
+      <div className="fb fb1">
+        <div className="fbi" style={{background:"rgba(74,159,181,.12)"}}>🔬</div>
         <div>
-          <div className="float-num">+1200</div>
-          <div className="float-text">Jeunes formés</div>
+          <div className="fbn">235</div>
+          <div className="fbt">Bourses MOBIDOC</div>
         </div>
       </div>
-
-      <div className="glass-card-hero">
-        <div className="card-header">
-          <div className="card-badge">
-            <div className="live-pulse" /> En Direct
-          </div>
-          <div className="card-menu">⋯</div>
+      <div className="hcard">
+        <div className="ch">
+          <div className="cbadge"><div className="lpulse"/>EU4Youth · Actif</div>
+          <div style={{color:"var(--mut)"}}>···</div>
         </div>
-        <div className="card-title">Formation & Innovation</div>
-        <div className="card-sub">Parcours IA · Sécurité · Support · Tech</div>
-
-        <div className="card-progress">
-          <div className="progress-label">
-            <span>Progression globale</span>
-            <span style={{ color: "#7260A7", fontWeight: 600 }}>68%</span>
-          </div>
-          <div className="progress-bar">
-            <div className="progress-fill" style={{ width: "68%" }} />
-          </div>
+        <div className="ct">Parcours SWAFY</div>
+        <div className="cs">Science · Entrepreneuriat · Tunisie</div>
+        <div className="cpl"><span>Déploiement national</span><span style={{color:"var(--v)",fontWeight:700}}>73%</span></div>
+        <div className="cpb"><div className="cpf" style={{width:"73%"}}/></div>
+        <div className="cmg">
+          {[["🧠","IA & Tech"],["🚀","Startup"],["🎮","Gaming Lab"]].map(([ic,lb])=>(
+            <div key={lb} className="cm"><div className="cmi">{ic}</div>{lb}</div>
+          ))}
         </div>
-
-        <div className="mini-modules">
-          <div className="mini-mod"><div className="mini-mod-icon">🧠</div>IA</div>
-          <div className="mini-mod"><div className="mini-mod-icon">🔐</div>Sécurité</div>
-          <div className="mini-mod"><div className="mini-mod-icon">⚡</div>Innovation</div>
-        </div>
-
-        <div className="card-footer">
-          <div className="avatars">
-            {["AH", "SM", "KR", "IB"].map((l, i) => (
-              <div key={i} className="avatar">{l}</div>
-            ))}
+        <div className="cf">
+          <div className="avs">
+            {["DS","BB","CA","MK"].map(l=><div key={l} className="av">{l}</div>)}
           </div>
-          <Link className="card-cta" to="/register">
-            Rejoindre <FiChevronRight />
-          </Link>
+          <Link to="/register" className="ccta">Rejoindre <FiArrowRight/></Link>
         </div>
       </div>
-
-      <div className="float-badge float-badge-2">
-        <div className="float-icon float-icon-award">🏆</div>
+      <div className="fb fb2">
+        <div className="fbi" style={{background:"rgba(192,132,184,.12)"}}>🏆</div>
         <div>
-          <div className="float-num">98%</div>
-          <div className="float-text">Satisfaction</div>
+          <div className="fbn">70+</div>
+          <div className="fbt">Clubs scientifiques</div>
         </div>
       </div>
     </div>
   );
 }
 
-function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", handler);
-    return () => window.removeEventListener("scroll", handler);
-  }, []);
-
-  return (
+/* ── NAVBAR ────────────────────────────────────── */
+function Navbar(){
+  const [sc,setSc]=useState(false);
+  const [op,setOp]=useState(false);
+  useEffect(()=>{
+    const h=()=>setSc(window.scrollY>20);
+    window.addEventListener("scroll",h);
+    return()=>window.removeEventListener("scroll",h);
+  },[]);
+  const links=[
+    {href:"#accueil",label:"Accueil"},
+    {href:"#direct",label:"En Direct"},
+    {href:"#thematique",label:"Thématiques"},
+    {href:"#objectif",label:"Objectif"},
+    {href:"#contact",label:"Contact"},
+  ];
+  return(
     <>
-      <header className={`nav-wrap ${scrolled ? "scrolled" : ""}`}>
-        <div className="nav-inner">
-          <Link to="/swafy" style={{ textDecoration: "none" }}>
-            <Brand />
-          </Link>
-
+      <header className={`nav ${sc?"sc":""}`}>
+        <div className="nav-in">
+          <Link to="/swafy" style={{textDecoration:"none"}}><Brand/></Link>
           <nav className="nav-links">
-            {["accueil", "direct", "thematique", "objectif", "contact"].map((item) => (
-              <a key={item} href={`#${item}`}>{item}</a>
-            ))}
+            {links.map(l=><a key={l.href} href={l.href}>{l.label}</a>)}
           </nav>
-
-          <div className="nav-actions">
-            <Link className="btn-ghost" to="/register">Register</Link>
-            <Link className="btn-primary-sm" to="/login">Sign in</Link>
+          <div className="nav-act">
+            <Link className="btn-g" to="/register">S'inscrire</Link>
+            <Link className="btn-p" to="/login">Connexion</Link>
           </div>
-
-          <button className="nav-mobile-toggle" onClick={() => setMenuOpen(true)}>
-            <FiMenu />
-          </button>
+          <button className="nav-tog" onClick={()=>setOp(true)}><FiMenu/></button>
         </div>
       </header>
-
-      <div className={`mobile-menu ${menuOpen ? "open" : ""}`}>
-        <button className="mobile-close" onClick={() => setMenuOpen(false)}><FiX /></button>
-        <nav className="mobile-links">
-          {["accueil", "direct", "thematique", "objectif", "contact"].map((item) => (
-            <a key={item} href={`#${item}`} onClick={() => setMenuOpen(false)}>{item}</a>
-          ))}
+      <div className={`mob ${op?"open":""}`}>
+        <button className="mob-close" onClick={()=>setOp(false)}><FiX/></button>
+        <nav className="mob-links">
+          {links.map(l=><a key={l.href} href={l.href} onClick={()=>setOp(false)}>{l.label}</a>)}
         </nav>
-        <div className="mobile-actions">
-          <Link className="btn-outline-lg" to="/register" onClick={() => setMenuOpen(false)}>Register</Link>
-          <Link className="btn-primary-lg" to="/login" onClick={() => setMenuOpen(false)}>Sign in</Link>
+        <div className="mob-act">
+          <Link className="btn-ol" to="/register" onClick={()=>setOp(false)}>S'inscrire</Link>
+          <Link className="btn-lg" to="/login" onClick={()=>setOp(false)}>Connexion</Link>
         </div>
       </div>
     </>
   );
 }
 
-function Hero() {
-  return (
+/* ── HERO ──────────────────────────────────────── */
+function Hero(){
+  return(
     <section className="hero" id="accueil">
-      <div className="orb orb-1" />
-      <div className="orb orb-2" />
-      <div className="orb orb-3" />
-
-      <div className="container">
-        <div className="hero-container">
-          <div className="hero-text">
-            <div className="hero-tag">
-              <div className="live-pulse" />
-              Agence de Tunis · Débat IA Jeunes
-            </div>
-
-            <h1>
-              Science With<br />
-              and For{" "}
-              <span className="gradient-text">Youth</span>
-            </h1>
-
-            <p className="hero-desc">
-              منصة SWAFY تقود شباب تونس نحو الاقتصاد الرقمي — تعلّم،
-              تطبيق، وتحدّيات في الذكاء الاصطناعي والأمن الرقمي.
+      <div className="orb o1"/><div className="orb o2"/>
+      <div className="noise"/>
+      <div style={{maxWidth:1180,margin:"0 auto",width:"100%"}}>
+        <div className="hero-in">
+          <div>
+            <div className="htag"><div className="lpulse"/>ANPR · Programme EU4Youth</div>
+            <h1>Science With<br/>and For <span className="grad">Youth</span></h1>
+            <p className="hdesc">
+              SWAFY accompagne la jeunesse tunisienne vers l'innovation et l'entrepreneuriat
+              scientifique — financé par l'Union européenne à hauteur de 9,5 M€, géré par
+              l'ANPR sur 48 mois dans les 24 gouvernorats de Tunisie.
             </p>
-
-            <div className="hero-actions">
-              <Link to="/register" className="btn-primary-lg">
-                Créer un compte <FiArrowRight />
-              </Link>
-              <Link to="/login" className="btn-outline-lg">
-                J'ai déjà un compte
-              </Link>
+            <div className="hact">
+              <Link to="/register" className="btn-lg">Rejoindre la plateforme <FiArrowRight/></Link>
+              <Link to="/login" className="btn-ol">J'ai déjà un compte</Link>
             </div>
-
-            <div className="hero-stats">
-              <div className="stat">
-                <span className="stat-num">1.2K+</span>
-                <span className="stat-label">Jeunes inscrits</span>
-              </div>
-              <div className="stat-divider" />
-              <div className="stat">
-                <span className="stat-num">24/7</span>
-                <span className="stat-label">Support actif</span>
-              </div>
-              <div className="stat-divider" />
-              <div className="stat">
-                <span className="stat-num">98%</span>
-                <span className="stat-label">Satisfaction</span>
-              </div>
+            <div className="hstats">
+              <div className="hs"><span className="hs-n">9,5M€</span><span className="hs-l">Budget UE</span></div>
+              <div className="hsdiv"/>
+              <div className="hs"><span className="hs-n">235</span><span className="hs-l">Bourses MOBIDOC</span></div>
+              <div className="hsdiv"/>
+              <div className="hs"><span className="hs-n">24</span><span className="hs-l">Gouvernorats</span></div>
             </div>
           </div>
-
-          <HeroCard />
+          <HeroCard/>
         </div>
       </div>
     </section>
   );
 }
 
-function LiveCard() {
-  return (
-    <section id="direct" className="live-section">
-      <div className="container">
-        <div className="live-card">
-          <div className="live-left">
-            <div className="live-dot-wrap">
-              <div className="live-dot" />
-            </div>
+/* ── LIVE ──────────────────────────────────────── */
+function LiveCard(){
+  return(
+    <section id="direct" className="live-sec">
+      <div className="con">
+        <div className="lc">
+          <div className="ll">
+            <div className="ldw"><div className="ld"/></div>
             <div>
-              <div className="live-label">● En Direct</div>
-              <div className="live-title">Session : Maintenance & Support IA</div>
-              <div className="live-subtitle">Statut en temps réel · Assistance instantanée</div>
+              <div className="llbl">● Appel ouvert — Mai 2026</div>
+              <div className="lt">Gaming Labs & Fablabs SWAFY</div>
+              <div className="lsub">Nouvel appel à propositions · 24 gouvernorats · Date limite : 31 mai 2026</div>
             </div>
           </div>
-
-          <div className="live-right">
-            <div className="live-pill"><FiCpu /> Intelligence Artificielle</div>
-            <div className="live-pill"><FiShield /> Cybersécurité</div>
-            <button className="live-btn">
-              Rejoindre <FiArrowRight />
-            </button>
+          <div className="lr">
+            <div className="lpill"><FiZap/>Gaming Lab</div>
+            <div className="lpill"><FiUsers/>13 000 jeunes visés</div>
+            <a
+              href="http://www.anpr.tn/projet-swafy-appel-a-propositions-a-lattention-des-associations-pour-la-creation-renforcement-de-gaming-labs/"
+              target="_blank" rel="noreferrer" className="lbtn"
+            >Voir l'appel <FiArrowRight/></a>
           </div>
         </div>
       </div>
@@ -867,272 +427,358 @@ function LiveCard() {
   );
 }
 
-const themes = [
-  { icon: <FiTrendingUp />, name: "Recherche partenariale", desc: "Stimuler l'employabilité des jeunes chercheurs à travers une recherche inclusive et structurée." },
-  { icon: <FiZap />,         name: "Entrepreneuriat & Créativité", desc: "Renforcer l'esprit d'entrepreneuriat, d'innovation et de créativité chez les jeunes tunisiens." },
-  { icon: <FiUsers />,       name: "Jeunesse Créative", desc: "Dynamiser le tissu associatif Jeunesse-Science dans tous les gouvernorats de Tunisie." },
-  { icon: <FiAward />,       name: "Clubs Scientifiques", desc: "Création et restructuration de clubs scientifiques dans les établissements éducatifs publics." },
+/* ════════════════════════════════════════════════
+   5 THÉMATIQUES RÉELLES — avec formations & liens
+════════════════════════════════════════════════ */
+const THEMES=[
+  {
+    icon:<FiTrendingUp/>,
+    name:"Recherche Partenariale",
+    color:"#7260A7",
+    tag:"Composante MOBIDOC",
+    desc:"Stimuler l'employabilité des jeunes chercheurs à travers une recherche appliquée répondant aux besoins réels de l'économie tunisienne.",
+    kpis:[{n:"235",l:"Bourses MOBIDOC"},{n:"190+",l:"Projets financés"}],
+    points:[
+      {ic:"🎓",t:"Bourses MOBIDOC Doctorant",d:"80% financé par l'ANPR, 20% par l'organisme bénéficiaire — pour des travaux de recherche appliquée en milieu socio-économique."},
+      {ic:"🏢",t:"Recherche orientée marché",d:"Travaux dirigés vers les besoins concrets du secteur productif et sociétal tunisien."},
+      {ic:"🚀",t:"Incubation de startups scientifiques",d:"Accompagnement des doctorants dans la création et l'incubation de startups innovantes (IncubCher ANPR)."},
+    ],
+    formations:[
+      {ic:"📋",t:"Management de projet (PMP)",d:"Formation certifiante · 22 j/j · Présentiel + En ligne",href:"https://www.anpr.tn/wp-content/uploads/2024/01/TDR-Expert-Management-de-projet_final_18012024.pdf"},
+      {ic:"🔬",t:"MOBIDOC Doctorant · Session 2024",d:"Appel à propositions · Bourse UE · Recherche appliquée",href:"https://www.anpr.tn/projet-swafy-appel-a-propositions-mobidoc-doctorant-session-2024/"},
+      {ic:"💼",t:"MOBIDOC Post-doc Université",d:"Gestion · Management · Recherche appliquée",href:"http://www.anpr.tn/projet-swafy-appel-a-candidature-mobidoc-post-doc-universite-management/"},
+    ],
+  },
+  {
+    icon:<FiZap/>,
+    name:"Entrepreneuriat & Créativité",
+    color:"#E8A05D",
+    tag:"Jeunesse Créative",
+    desc:"Renforcer l'esprit d'entrepreneuriat, d'innovation et de créativité chez les jeunes tunisiens, dans une perspective de genre et d'inclusion.",
+    kpis:[{n:"100+",l:"Nouveaux clubs"},{n:"24",l:"Gouvernorats couverts"}],
+    points:[
+      {ic:"💡",t:"Foire de la Créativité SWAFY",d:"1ère édition · 24-25 mars 2026 · Cité de la Culture, Tunis — expositions de prototypes et projets scientifiques."},
+      {ic:"🎮",t:"Gaming Labs",d:"Création et renforcement de Gaming Labs dans des associations — appel ouvert jusqu'au 31 mai 2026."},
+      {ic:"⚙️",t:"Fablabs régionaux",d:"Ben Arous, La Manouba, Le Kef, Siliana, Tozeur, Kébili, Kasserine et Monastir — appel ouvert en mai 2026."},
+    ],
+    formations:[
+      {ic:"🎮",t:"Création / renforcement de Gaming Labs",d:"Appel associations · Délai : 31 mai 2026",href:"http://www.anpr.tn/projet-swafy-appel-a-propositions-a-lattention-des-associations-pour-la-creation-renforcement-de-gaming-labs/"},
+      {ic:"🔧",t:"Création de Fablabs · 8 gouvernorats",d:"Ben Arous · La Manouba · Kef · Siliana · Tozeur · Kébili · Kasserine · Monastir",href:"http://www.anpr.tn/appel-a-propositions-a-lattention-des-associations-en-vue-du-renforcement-ou-la-creation-de-fablabs-dans-les-gouvernorats-de-ben-arous-la-manouba-le-kef-siliana-tozeur-kebili-kasserine/"},
+      {ic:"🌟",t:"Foire de la Créativité SWAFY",d:"Participation · Cité de la Culture, Tunis · 2026",href:"https://www.anpr.tn/projet-swafy-foire-de-la-creativite-swafy-appel-a-participation/"},
+    ],
+  },
+  {
+    icon:<FiUsers/>,
+    name:"Dialogue Jeunesse-Science",
+    color:"#4A9FB5",
+    tag:"Débat National",
+    desc:"Dynamiser le rôle des jeunes dans la définition des politiques publiques en Science, Technologie et Innovation à travers 260 séances de débat nationales.",
+    kpis:[{n:"260",l:"Séances de débat"},{n:"13 000",l:"Jeunes participants"}],
+    points:[
+      {ic:"🗣️",t:"Congrès national Jeunesse & Science",d:"Élaboration d'une feuille de route jeunesse-science à l'horizon 2035, en appui à la stratégie nationale de la jeunesse."},
+      {ic:"🗺️",t:"Couverture nationale équitable",d:"Séances dans les 24 gouvernorats, avec priorité aux zones marginalisées."},
+      {ic:"📋",t:"Contribution aux politiques STI",d:"Implication directe des jeunes dans la définition des politiques publiques en Science, Technologie et Innovation."},
+    ],
+    formations:[
+      {ic:"🗣️",t:"Techniques de communication",d:"Formation jeunes · Clubs scientifiques · En présentiel",href:"https://www.anpr.tn"},
+      {ic:"🏛️",t:"Leadership & Engagement citoyen",d:"Formation certifiante · Gouvernance · Participation publique",href:"https://www.anpr.tn"},
+      {ic:"🎬",t:"Techniques audiovisuelles",d:"Production vidéo · Reportage scientifique · Diffusion",href:"https://www.anpr.tn"},
+      {ic:"📊",t:"Expert processus de débat",d:"Sélection d'expert · Conception du débat · Feuille de route 2035",href:"https://www.anpr.tn/projet-swafy-termes-de-reference-en-vue-de-la-selection-dun-expert/"},
+    ],
+  },
+  {
+    icon:<FiAward/>,
+    name:"Clubs Scientifiques",
+    color:"#C084B8",
+    tag:"Réseau Associatif",
+    desc:"Création et restructuration de clubs scientifiques dans des établissements éducatifs publics, maisons de jeunes et espaces de créativité en Tunisie.",
+    kpis:[{n:"70+",l:"Clubs créés"},{n:"19",l:"Gouvernorats actifs"}],
+    points:[
+      {ic:"🏫",t:"Implantation dans le public",d:"Lycées, universités, maisons de jeunes — opérationnel depuis février 2024 dans 19 gouvernorats."},
+      {ic:"🤝",t:"18 associations partenaires",d:"Budgets de 140 000 à 440 000 DT · 19 conventions de financement EU."},
+      {ic:"🤖",t:"RobotBattle & Compétitions",d:"1ère compétition de robotique en Tunisie : COBRA (1er) · POWER BOMB (2ème) · DRAGON (3ème)."},
+    ],
+    formations:[
+      {ic:"🤝",t:"Expert accompagnateur d'associations",d:"Sélection d'experts · Accompagnement projet · 2024",href:"https://www.anpr.tn/wp-content/uploads/2024/06/SWAFY-TDR-Expert-daccompagnement-associationsVF.pdf"},
+      {ic:"🌐",t:"Plateforme de réseautage associatif",d:"Développement & administration · Appel en cours",href:"http://www.anpr.tn/projet-swafy-appel-a-candidatures-recrutement-de-deux-charge-e-s-de-projets/"},
+      {ic:"📸",t:"Concours Photo & Art Visuel Scientifiques",d:"Jeunes 6-30 ans · Tout le territoire tunisien · 2026",href:"https://www.anpr.tn"},
+    ],
+  },
+  {
+    icon:<FiGlobe/>,
+    name:"Culture Scientifique",
+    color:"#10B981",
+    tag:"Dissémination",
+    desc:"Améliorer l'attractivité de la science et renforcer la culture scientifique chez les jeunes tunisiens, via un accès équitable sur tout le territoire.",
+    kpis:[{n:"48",l:"Mois de programme"},{n:"9,5M€",l:"Budget européen"}],
+    points:[
+      {ic:"🌍",t:"Accès équitable & inclusif",d:"Discrimination positive pour les zones défavorisées et les jeunes ayant moins d'opportunités d'accès à la créativité scientifique."},
+      {ic:"🏛️",t:"Partenaires institutionnels",d:"Ministères (Éducation, Emploi, Jeunesse, Culture) + Fondation Orange Tunisie + Délégation UE."},
+      {ic:"📡",t:"Live streaming & Diffusion",d:"Séminaires et événements SWAFY diffusés en direct sur les pages Facebook ANPR et SWAFY."},
+    ],
+    formations:[
+      {ic:"🎯",t:"Expert thématique & analyse de données",d:"Sélection d'experts · Évaluation subventions · Appui mise en œuvre",href:"https://www.anpr.tn/projet-swafy-termes-de-reference-pour-selection-dune-equipe-dexperts-thematiques-et-dun-expert-en-analyse-des-donnees-en-vue-de-lappui-a-la-mise-en-oeuvre-d"},
+      {ic:"💼",t:"Chargé(e)s de projets SWAFY",d:"Recrutement · 2 postes · Délai : 1er juin 2026",href:"http://www.anpr.tn/projet-swafy-appel-a-candidatures-recrutement-de-deux-charge-e-s-de-projets/"},
+      {ic:"🔎",t:"Manager de subventions",d:"Gestion financière · Suivi · Reporting EU",href:"https://www.anpr.tn/wp-content/uploads/2024/04/SWAFY-Appel-à-candidaturesManagerdeSubvention_Final-1.pdf"},
+    ],
+  },
 ];
 
-function Thematique() {
-  return (
-    <section id="thematique" className="section">
-      <div className="container">
-        <div className="section-eyebrow">
-          <div className="section-eyebrow-line" /> Les thématiques
-        </div>
-        <h2 className="section-title">
-          Parcours pensés<br />pour les jeunes
-        </h2>
-        <p className="section-desc">
-          Des modules simples et structurés : support, IA, sécurité et innovation —
-          adaptés au rythme des jeunes tunisiens.
-        </p>
-
-        <div className="themes-grid">
-          {themes.map(({ icon, name, desc }) => (
-            <div className="theme-card" key={name}>
-              <div className="theme-icon-wrap">{icon}</div>
-              <div className="theme-name">{name}</div>
-              <div className="theme-desc">{desc}</div>
-              <div className="theme-arrow"><FiArrowRight /></div>
+function Thematique(){
+  const [act,setAct]=useState(null);
+  const d=act!==null?THEMES[act]:null;
+  return(
+    <section id="thematique" className="sec">
+      <div className="con">
+        <div className="ey"><div className="eyl"/>Les 5 thématiques</div>
+        <h2 className="stit">Parcours pensés<br/>pour les jeunes</h2>
+        <p className="sdesc">Cliquez sur une thématique pour voir ses formations, liens officiels et résultats concrets sur le terrain.</p>
+        <div className="tgrid">
+          {THEMES.map(({icon,name,desc},i)=>(
+            <div key={name} className={`tc ${act===i?"act":""}`} onClick={()=>setAct(act===i?null:i)}>
+              <div className="tic">{icon}</div>
+              <div className="tn">{name}</div>
+              <div className="td">{desc}</div>
+              <div className="tarr">{act===i?<FiX/>:<FiArrowRight/>}</div>
             </div>
           ))}
         </div>
+        {d&&(
+          <div className="dp" key={act}>
+            {/* GAUCHE — description + points clés */}
+            <div>
+              <div className="dptag" style={{color:d.color,borderColor:d.color+"44",background:d.color+"13"}}>● {d.tag}</div>
+              <div className="dptit">{d.name}</div>
+              <div className="dpb">{d.desc}</div>
+              <div className="dpk">
+                {d.kpis.map(({n,l})=>(
+                  <div key={l} className="kpi">
+                    <span className="kn" style={{color:d.color}}>{n}</span>
+                    <span className="kl">{l}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="dpts">
+                {d.points.map(({ic,t,d:dd})=>(
+                  <div key={t} className="dpt">
+                    <div className="dptic" style={{color:d.color,background:d.color+"18"}}>{ic}</div>
+                    <div>
+                      <div className="dptt">{t}</div>
+                      <div className="dptd">{dd}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* DROITE — formations avec liens officiels */}
+            <div>
+              <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:".82rem",textTransform:"uppercase",letterSpacing:".1em",color:d.color,marginBottom:14}}>
+                Formations & Appels officiels
+              </div>
+              <div className="fmts">
+                {d.formations.map(({ic,t,d:dd,href})=>(
+                  <a key={t} className="fmt" href={href} target="_blank" rel="noreferrer">
+                    <div className="fmtic" style={{color:d.color,background:d.color+"18"}}>{ic}</div>
+                    <div>
+                      <div className="fmtt">{t}</div>
+                      <div className="fmtd">{dd}</div>
+                    </div>
+                    <FiArrowRight className="fmtarr"/>
+                  </a>
+                ))}
+              </div>
+              <div style={{marginTop:16,padding:"12px 14px",borderRadius:12,background:"rgba(114,96,167,.04)",border:"1px solid rgba(114,96,167,.1)",fontSize:".76rem",color:"var(--mut)"}}>
+                📌 Tous les appels officiels sur{" "}
+                <a href="https://www.anpr.tn" target="_blank" rel="noreferrer" style={{color:d.color,fontWeight:700,textDecoration:"none"}}>anpr.tn</a>
+                {" "}et{" "}
+                <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer" style={{color:d.color,fontWeight:700,textDecoration:"none"}}>facebook.com/swafyproject</a>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
 }
 
-function PhoneMock({ variant }) {
-  return (
-    <div className={`phone-card ${variant === "b" ? "phone-b" : "phone-a"}`}>
-      <div className="phone-header"><div className="phone-notch" /></div>
-      <div className="phone-body">
-        <div className="phone-screen-card">
-          <div className="ps-new">New</div>
-          <div className="ps-title">Nouvelles Formations & Communauté</div>
-          <div className="ps-sub">Apprends · Construis · Partage</div>
-          <div className="ps-btn">Démarrer →</div>
+/* ── OBJECTIF ──────────────────────────────────── */
+function PhoneMock({v}){
+  return(
+    <div className={`pc ${v==="b"?"pb":"pa"}`}>
+      <div className="ph"><div className="pn"/></div>
+      <div className="pbd">
+        <div className="psc">
+          <div className="psbg">EU4Youth</div>
+          <div className="pst">Formations & Clubs Scientifiques</div>
+          <div className="pss">Science · Innovation · Créativité</div>
+          <div className="psb">Démarrer →</div>
         </div>
-        <div className="phone-tiles">
-          <div className="phone-tile" />
-          <div className="phone-tile" />
-          <div className="phone-tile" />
+        <div className="ptiles"><div className="ptile"/><div className="ptile"/><div className="ptile"/></div>
+        <div><div className="pli"/><div className="pli"/><div className="pli" style={{width:"60%"}}/></div>
+      </div>
+    </div>
+  );
+}
+
+function Objectif(){
+  return(
+    <section id="objectif" className="sec-alt">
+      <div className="con">
+        <div className="og">
+          <div className="psk"><PhoneMock/><PhoneMock v="b"/></div>
+          <div>
+            <div className="ey"><div className="eyl"/>Notre objectif</div>
+            <h2 className="stit">
+              Accompagner<br/>la jeunesse<br/>
+              <span style={{backgroundImage:"linear-gradient(135deg,#7260A7,#4A9FB5)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>
+                tunisienne
+              </span>
+            </h2>
+            <p className="odesc">
+              SWAFY est un projet financé par l'Union européenne (9,5 M€ · 48 mois), inscrit sous
+              le programme EU4Youth et géré par l'ANPR. Il vise à améliorer la valeur ajoutée de la
+              recherche et de l'innovation dans le développement économique tunisien, et à soutenir
+              l'entrepreneuriat et l'employabilité des jeunes à travers le renforcement de l'esprit
+              de créativité et d'invention ainsi que le soutien aux doctorants et post-doctorants.
+            </p>
+            <div className="sr">
+              <a className="sb" href="#!"><span>🍎</span> App Store</a>
+              <a className="sb" href="#!"><span>🤖</span> Google Play</a>
+            </div>
+          </div>
         </div>
-        <div>
-          <div className="phone-list-item" />
-          <div className="phone-list-item" />
-          <div className="phone-list-item" />
+      </div>
+    </section>
+  );
+}
+
+/* ── ÉTAPES ────────────────────────────────────── */
+function Steps(){
+  const steps=[
+    {n:"1",t:"Choisissez une thématique",d:"Recherche, entrepreneuriat, clubs scientifiques, dialogue jeunesse ou culture scientifique."},
+    {n:"2",t:"Apprenez et pratiquez",d:"Modules interactifs, ateliers, Gaming Labs, compétitions de robotique et challenges."},
+    {n:"3",t:"Obtenez votre certification",d:"Progression suivie, badges officiels et accès aux bourses MOBIDOC."},
+  ];
+  return(
+    <section className="sec">
+      <div className="con">
+        <div className="stgr">
+          <div>
+            <div className="ey"><div className="eyl"/>Comment ça marche</div>
+            <h2 className="stit">Commencez en<br/>3 étapes simples</h2>
+            {steps.map(({n,t,d})=>(
+              <div key={n} className="sti">
+                <div className="stn">{n}</div>
+                <div><div className="sttit">{t}</div><div className="std">{d}</div></div>
+              </div>
+            ))}
+            <Link className="btn-lg" to="/register" style={{marginTop:10}}>
+              Commencer la formation <FiArrowRight/>
+            </Link>
+          </div>
+          <div className="prev">
+            <div className="prevt">
+              <div className="prevds"><div className="prevd"/><div className="prevd"/><div className="prevd"/></div>
+              <div className="prevl">Plateforme SWAFY</div>
+            </div>
+            <div className="prevh"/>
+            <div className="prevb" style={{width:"80%"}}/><div className="prevb" style={{width:"60%"}}/><div className="prevb" style={{width:"90%"}}/>
+            <div className="prevc">
+              <div className="pmc"><div className="pmcl">Modules complétés</div><div className="pmcv">24</div></div>
+              <div className="pmc"><div className="pmcl">Score moyen</div><div className="pmcv">91%</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ── BARRE PARTENAIRES ─────────────────────────── */
+function PartnersBar(){
+  return(
+    <div className="pbar">
+      <div className="pbar-in">
+        <span className="pbar-lbl">Partenaires officiels</span>
+        <div className="pbar-logos">
+          <img src="/logo_150-04__1_.png" alt="SWAFY"/>
+          <div className="pdiv"/>
+          <img src="https://upload.wikimedia.org/wikipedia/fr/thumb/9/9a/ANPR_logo.png/120px-ANPR_logo.png" alt="ANPR" onError={e=>{e.target.style.display="none"}}/>
+          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/80px-Flag_of_Europe.svg.png" alt="UE" style={{height:26}}/>
+          <div className="pdiv"/>
+          <span className="pbar-eu">EU4Youth</span>
         </div>
       </div>
     </div>
   );
 }
 
-function Objectif() {
-  return (
-    <section id="objectif" className="section-alt">
-      <div className="container">
-        <div className="objectif-grid">
-          <div className="objectif-visual">
-            <div className="phone-stack">
-              <PhoneMock variant="a" />
-              <PhoneMock variant="b" />
-            </div>
-          </div>
-
-          <div className="objectif-content">
-            <div className="section-eyebrow">
-              <div className="section-eyebrow-line" /> Notre objectif
-            </div>
-            <h2 className="section-title">
-              Accompagner<br />la jeunesse<br />
-              <span style={{ backgroundImage: "linear-gradient(135deg, #7260A7, #4A9FB5)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                tunisienne
-              </span>
-            </h2>
-            <p className="objectif-text">
-              SWAFY est un projet financé par l'Union européenne (9,5 M€ · 48 mois),
-              géré par l'ANPR, visant à contribuer à l'amélioration de la valeur ajoutée
-              de la recherche et l'innovation dans le développement économique tunisien,
-              et à soutenir l'entrepreneuriat et l'employabilité des jeunes à travers
-              le renforcement de l'esprit de créativité et d'invention.
-            </p>
-            <div className="store-row">
-              <a className="store-btn" href="#!"><span>🍎</span> App Store</a>
-              <a className="store-btn" href="#!"><span>🤖</span> Google Play</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Steps() {
-  const steps = [
-    { num: "1", title: "Choisis une thématique", desc: "IA, support, sécurité, innovation… explore les parcours disponibles." },
-    { num: "2", title: "Apprends & pratique", desc: "Mini modules interactifs, tâches concrètes et feedback instantané." },
-    { num: "3", title: "Décroche ton certificat", desc: "Suivi de progression + système de badges + certification officielle." },
-  ];
-
-  return (
-    <section className="section">
-      <div className="container">
-        <div className="steps-grid">
-          <div className="steps-content">
-            <div className="section-eyebrow">
-              <div className="section-eyebrow-line" /> Comment ça marche
-            </div>
-            <h2 className="section-title">
-              Commence en<br />3 étapes simples
-            </h2>
-
-            {steps.map(({ num, title, desc }, i) => (
-              <div className="step-item" key={num}>
-                <div style={{ position: "relative", flexShrink: 0 }}>
-                  <div className="step-num-wrap">{num}</div>
-                  {i < steps.length - 1 && <div className="step-connector" />}
-                </div>
-                <div className="step-body">
-                  <div className="step-title">{title}</div>
-                  <div className="step-desc">{desc}</div>
-                </div>
-              </div>
-            ))}
-
-            <Link className="btn-primary-lg" to="/register" style={{ marginTop: 8 }}>
-              Commencer la formation <FiArrowRight />
-            </Link>
-          </div>
-
-          <div className="steps-visual">
-            <div className="preview-top">
-              <div className="preview-dots">
-                <div className="preview-dot" />
-                <div className="preview-dot" />
-                <div className="preview-dot" />
-              </div>
-              <div className="preview-label">SWAFY Platform</div>
-            </div>
-            <div className="preview-hero-bar" />
-            <div className="preview-bar w80" />
-            <div className="preview-bar w60" />
-            <div className="preview-bar w90" />
-            <div className="preview-cards">
-              <div className="preview-mini-card">
-                <div className="pmc-label">Modules complétés</div>
-                <div className="pmc-value">24</div>
-              </div>
-              <div className="preview-mini-card">
-                <div className="pmc-label">Score moyen</div>
-                <div className="pmc-value">91%</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Footer() {
-  return (
-    <footer id="contact" className="footer">
-      <div className="container">
-        <div className="footer-grid">
+/* ── FOOTER ────────────────────────────────────── */
+function Footer(){
+  return(
+    <footer id="contact" className="foot">
+      <div className="con">
+        <div className="fg">
           <div>
-            <Brand />
-            <p className="footer-brand-text">
-              SWAFY — Agence de Tunis. Science with and for youth.
-              Plateforme de débat sur l'intelligence artificielle pour les jeunes.
+            <div className="fbn"><div className="bdot" style={{width:9,height:9,borderRadius:"50%",background:"linear-gradient(135deg,#7260A7,#5B4D8E)"}}/>SWAFY</div>
+            <p className="fbt">
+              Science With and For Youth — Financé par l'UE (9,5 M€ · 48 mois), géré par l'ANPR.<br/>
+              Angle Rue Danton & Rue Chaaben Bhouri N°11, Lafayette — BP 177, 1002 Tunis Belvédère.<br/>
+              ✉ recrutement.swafy@gmail.com
             </p>
           </div>
-          <div className="footer-col">
-            <div className="footer-col-title">À propos</div>
-            <a href="#objectif">Objectif</a>
-            <a href="#thematique">Thématique</a>
-            <a href="#direct">En Direct</a>
+          <div>
+            <div className="fct">À propos</div>
+            <a href="#objectif">Objectif du projet</a>
+            <a href="#thematique">Les 5 thématiques</a>
+            <a href="#direct">Actualités & Appels</a>
+            <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">ANPR.tn</a>
           </div>
-          <div className="footer-col">
-            <div className="footer-col-title">Services</div>
-            <a href="#!">Support</a>
-            <a href="#!">Formation</a>
-            <a href="#!">Communauté</a>
+          <div>
+            <div className="fct">Liens officiels</div>
+            <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer">Page Facebook SWAFY</a>
+            <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">anpr.tn</a>
+            <a href="https://eu4youth.tn" target="_blank" rel="noreferrer">eu4youth.tn</a>
+            <a href="mailto:recrutement.swafy@gmail.com">recrutement.swafy@gmail.com</a>
           </div>
         </div>
-
-        {/* Partner logos */}
-        <div className="footer-partners">
-          <div className="footer-partners-title">Partenaires & Financeurs</div>
-          <div className="footer-logos-row">
-            <div className="footer-eu-funded">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/40px-Flag_of_Europe.svg.png"
-                   alt="EU" style={{height:24}} />
+        <div className="fpart">
+          <div className="fpartt">Partenaires & Financeurs</div>
+          <div className="fpartr">
+            <div className="feu">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/40px-Flag_of_Europe.svg.png" alt="UE" style={{height:22}}/>
               Projet financé par l'Union européenne
             </div>
-            <img src="/logo_150-04__1_.png" alt="SWAFY" />
-            <span style={{fontFamily:"Syne,sans-serif",fontWeight:800,fontSize:"1.1rem",color:"#0066cc"}}>
-              ANPR
-            </span>
-            <span style={{fontFamily:"Syne,sans-serif",fontWeight:800,fontSize:"0.9rem",color:"#0066cc"}}>
-              EU4Youth
-            </span>
+            <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"1rem",color:"rgba(255,255,255,.58)"}}>ANPR</span>
+            <span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:".88rem",color:"rgba(255,255,255,.58)"}}>EU4Youth</span>
+            <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:".82rem",color:"rgba(255,255,255,.45)"}}>Min. Enseignement Supérieur</span>
+            <span style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:".82rem",color:"rgba(255,255,255,.45)"}}>Orange Tunisie</span>
           </div>
         </div>
-
-        <div className="footer-bottom">
-          <span className="footer-bottom-left">© {new Date().getFullYear()} SWAFY · Tunis, Tunisie</span>
-          <span className="footer-bottom-right">Built with React · Designed for Youth</span>
+        <div className="fbot">
+          <span className="fbc">© {new Date().getFullYear()} SWAFY · Tunis, Tunisie</span>
+          <span className="fbc">Built with React · Science With and For Youth</span>
         </div>
       </div>
     </footer>
   );
 }
 
-
-function PartnersBar() {
-  return (
-    <div className="partners-bar">
-      <div className="partners-bar-inner">
-        <span className="partners-bar-left">logo<br/>Association</span>
-        <div className="partners-logos">
-          <img src="/logo_150-04__1_.png" alt="SWAFY" />
-          <div className="partner-divider" />
-          <img src="https://upload.wikimedia.org/wikipedia/fr/thumb/9/9a/ANPR_logo.png/120px-ANPR_logo.png"
-               alt="ANPR" onError={e => { e.target.style.display='none' }} />
-          <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/b/b7/Flag_of_Europe.svg/80px-Flag_of_Europe.svg.png"
-               alt="EU" style={{height:28}} />
-          <span style={{fontSize:'0.65rem',color:'var(--muted)',maxWidth:80,lineHeight:1.2}}>
-            Délégation de l'Union européenne en Tunisie
-          </span>
-          <div className="partner-divider" />
-          <span style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'0.85rem',color:'#0066cc',letterSpacing:'-0.02em'}}>
-            ≡EU<br/><span style={{fontSize:'0.72rem',fontWeight:600}}>4Youth</span>
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─── PAGE ────────────────────────────────────────────────── */
-export default function Accueil() {
-  return (
+/* ── PAGE ──────────────────────────────────────── */
+export default function Accueil(){
+  return(
     <>
-      <StyleInjector />
-      <div className="noise" />
-      <PartnersBar />
-      <Navbar />
+      <StyleInjector/>
+      <PartnersBar/>
+      <Navbar/>
       <main>
-        <Hero />
-        <LiveCard />
-        <Thematique />
-        <Objectif />
-        <Steps />
+        <Hero/>
+        <LiveCard/>
+        <Thematique/>
+        <Objectif/>
+        <Steps/>
       </main>
-      <Footer />
+      <Footer/>
     </>
   );
 }
