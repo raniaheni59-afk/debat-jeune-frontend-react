@@ -16,7 +16,6 @@ import { Line, Bar, Doughnut } from "react-chartjs-2";
 import API from "../services/api";
 import PublierPage from "./PublierPage";
 import PublicationCard from "../components/PublicationCard";
-import PublicationCard from "../components/PublicationCard";
 import AdminContact    from "./AdminContact";
 import CalendarPage    from "./CalendarPage";
 import AdminLiveStream from "./AdminLiveStream";
