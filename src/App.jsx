@@ -33,7 +33,7 @@ import "./index.css";
 
 const BACKEND =
   import.meta.env.VITE_BACKEND_URL ||
-  "https://debat-jeune.onrender.com";
+  "https://debat-jeune.onrender.com"; // Assurez-vous que c'est votre URL Render actuelle
 
 const ProtectedAdminRoute = ({ children }) => {
   const token   = localStorage.getItem("token");
