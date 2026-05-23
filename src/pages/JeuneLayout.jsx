@@ -253,7 +253,26 @@ const JeuneLayout = () => {
     });
 
     socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
-    socketRef.current.on("new_message", () => setUnreadMessages((n) => n + 1));
+
+    // ✅ FIX: écouter "newMessage" (nom exact émis par le backend)
+    socketRef.current.on("newMessage", (m) => {
+      // N'incrémenter que si la page messages n'est pas active
+      setActivePage((current) => {
+        if (current !== PAGES.MESSAGES) setUnreadMessages((n) => n + 1);
+        return current;
+      });
+    });
+
+    // ✅ Aussi les messages de groupe
+    socketRef.current.on("newGroupMessage", (m) => {
+      setActivePage((current) => {
+        if (current !== PAGES.MESSAGES) setUnreadMessages((n) => n + 1);
+        return current;
+      });
+    });
+
+    // ✅ Rejoindre le groupe au démarrage
+    socketRef.current.emit("joinGroup");
 
     return () => {
       socketRef.current?.disconnect();
@@ -308,6 +327,8 @@ const JeuneLayout = () => {
   const goTo = (page) => {
     setActivePage(page);
     setMobileOpen(false);
+    // ✅ Reset badge messages quand on ouvre la page messages
+    if (page === PAGES.MESSAGES) setUnreadMessages(0);
   };
 
   const markNotifRead = async (id) => {

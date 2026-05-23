@@ -50,7 +50,55 @@ export default function AdminDashboard() {
   const markNotifRead = () => {};
   const markAllNotifsRead = () => {};
 
-  // ── Socket géré dans App.jsx ──
+  // ── Unread messages (socket) ──
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const socketRef = useRef(null);
+
+  const BACKEND_URL =
+    typeof import.meta !== "undefined"
+      ? (import.meta.env?.VITE_BACKEND_URL || "https://debat-jeune.onrender.com")
+      : "https://debat-jeune.onrender.com";
+
+  useEffect(() => {
+    if (socketRef.current) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    // Import dynamique socket.io-client
+    import("socket.io-client").then(({ io }) => {
+      const s = io(BACKEND_URL, {
+        auth: { token },
+        transports: ["websocket"],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 3000,
+      });
+      socketRef.current = s;
+
+      // ✅ Incrémenter badge messages si on n'est pas sur la page messages
+      s.on("newMessage", () => {
+        setActivePage((cur) => {
+          if (cur !== "messages") setUnreadMessages((n) => n + 1);
+          return cur;
+        });
+      });
+      s.on("newGroupMessage", () => {
+        setActivePage((cur) => {
+          if (cur !== "messages") setUnreadMessages((n) => n + 1);
+          return cur;
+        });
+      });
+
+      // Rejoindre le groupe Swafy
+      s.emit("joinGroup");
+
+      s.on("connect_error", (e) => console.error("AdminDashboard socket:", e.message));
+    }).catch(() => {});
+
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, []); // eslint-disable-line
   const [addChartModal, setAddChartModal] = useState(false);
   const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
   const [newChart, setNewChart] = useState({ type: "line", title: "" });
@@ -294,6 +342,8 @@ useEffect(() => {
     setActivePage(page);
     setSearchQuery("");
     setHighlightedCard(null);
+    // ✅ Reset badge messages quand on ouvre la page
+    if (page === "messages") setUnreadMessages(0);
   };
 
   const logout = () => {
@@ -578,7 +628,7 @@ const openAddData = (chart) => {
 const navItems = [
   { key:"accueil",      label: t("accueil") },
   { key:"dashboard",    label: t("dashboard") },
-  { key:"messages",     label: t("messages") },
+  { key:"messages",     label: t("messages"), badge: unreadMessages || null },
   { key:"publier",      label: t("publier") },
   { key:"calendrier",   label: t("calendrier") },
   { key:"swafyMeet",    label: "Swafy Meet" },
