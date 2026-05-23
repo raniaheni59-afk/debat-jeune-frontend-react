@@ -1,21 +1,7 @@
-/**
- * EnquetePage.jsx  —  Admin Survey Builder
- * Matches the AdminDashboard purple/glass design system
- * Stack: React + Node/Express + Railway/Render/Vercel
- *
- * Routes expected (backend):
- *   POST   /api/enquetes            → create enquête
- *   GET    /api/enquetes            → list all
- *   PUT    /api/enquetes/:id        → update
- *   DELETE /api/enquetes/:id        → delete
- *   PUT    /api/enquetes/:id/publish → toggle published
- *   GET    /api/enquetes/:id/reponses → all responses
- */
-
 import { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 
-/* ─── tiny uid helper ─── */
+
 const uid = () => Math.random().toString(36).slice(2, 10);
 
 /* ─── question types ─── */

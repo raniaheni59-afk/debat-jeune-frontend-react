@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 
-const BACKEND = API.defaults.baseURL?.split("/api")[0] || "https://debat-jeune-production.up.railway.app";
+const BACKEND = API.defaults.baseURL?.split("/api")[0] || "https://debat-jeune.onrender.com";
 
 export default function LiveBanner({ compact = false }) {
   const navigate = useNavigate();
