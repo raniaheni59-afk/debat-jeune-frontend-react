@@ -15,7 +15,7 @@ try { JeuneEnquete  = require("./JeuneEnquete").default;  } catch { JeuneEnquete
 
 const BACKEND =
   API.defaults.baseURL?.split("/api")[0] ||
-  "https://swafy-projet-production.up.railway.app";
+  "https://debat-jeune.onrender.com";
 
 const getAvatar = (photo, sexe) => {
   if (photo) return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;

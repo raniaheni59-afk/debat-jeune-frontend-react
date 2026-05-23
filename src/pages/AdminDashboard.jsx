@@ -989,7 +989,7 @@ const navItems = [
 
 {/* ══════ NOTIFICATION PAGE ══════ */}
 {activePage === "notification" && !isFullPage && (() => {
-  const BACK = (typeof API !== "undefined" && API.defaults?.baseURL?.split("/api")[0]) || "https://swafy-projet-production.up.railway.app";
+  const BACK = (typeof API !== "undefined" && API.defaults?.baseURL?.split("/api")[0]) || "https://debat-jeune.onrender.com";
   const getIcon = (type) => ({ new_post:"📢", publication_comment:"💬", publication_reaction:"❤️", debat_vote:"⚖️", comment_reaction:"👍" }[type] || "🔔");
   const timeAgo = (date) => {
     const d = Math.floor((Date.now() - new Date(date)) / 1000);

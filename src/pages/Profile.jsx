@@ -3,7 +3,7 @@
 import api from "../services/api";
 import { useNavigate, useParams } from "react-router-dom";
 
-const BACKEND = "https://debat-jeune-production.up.railway.app";
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
 
 const getAvatar = (photo, sexe) => {
   // Ken fama photo fil base, nasta3mloha

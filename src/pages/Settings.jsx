@@ -108,7 +108,7 @@ const TRANSLATIONS = {
   }
 };
 
-const BACKEND = "https://debat-jeune-production.up.railway.app";
+const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
 
 const getAvatar = (photo, sexe) => {
   if (photo) return photo.startsWith("http") ? photo : `${BACKEND}/${photo}`;
