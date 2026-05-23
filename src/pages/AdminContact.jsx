@@ -147,30 +147,22 @@ export default function AdminContact() {
       if (selRef.current && selRef.current !== "group" &&
           Number(m.conversation_id) === Number(selRef.current.id)) {
         setMsgs(p => {
-          // Déjà présent → ignorer
           if (p.find(x => !x._temp && Number(x.id)===Number(m.id))) return p;
-          // Supprimer _temp non confirmés, garder _confirmed + ajouter vrai message
-          const without = p.filter(x => !x._temp && !x._confirmed);
-          const confirmed = p.filter(x => x._confirmed);
-          return [...without, ...confirmed, m];
+          const without = p.filter(x => !x._temp);
+          return [...without, m];
         });
       }
-      // Mettre à jour last_message dans la liste des convs (même si conv pas ouverte)
-      setConvs(p => {
-        const exists = p.find(c => Number(c.id)===Number(m.conversation_id));
-        const updated = p
-          .map(c => Number(c.id)===Number(m.conversation_id)
-            ? {...c, last_message: m.text||`[${m.msg_type||"fichier"}]`, last_time: m.created_at}
-            : c)
-          .sort((a,b) => new Date(b.last_time||0)-new Date(a.last_time||0));
-        return exists ? updated : updated; // toujours retourner updated
-      });
+      setConvs(p => p
+        .map(c => Number(c.id)===Number(m.conversation_id)
+          ? {...c, last_message: m.text||`[${m.msg_type||"fichier"}]`, last_time: m.created_at}
+          : c)
+        .sort((a,b) => new Date(b.last_time||0)-new Date(a.last_time||0))
+      );
     });
 
     s.on("newGroupMessage", (m) => {
       setGrpMsgs(p => {
         if (p.find(x => !x._temp && Number(x.id)===Number(m.id))) return p;
-        // Supprimer _temp + ajouter vrai message
         const without = p.filter(x => !x._temp);
         return [...without, m];
       });
@@ -269,7 +261,7 @@ export default function AdminContact() {
     setText(""); setFile(null);
     setSending(true);
 
-    // ✅ Optimiste avec tempId unique pour remplacer le bon
+    // ✅ Message optimiste — apparaît immédiatement
     const tempId = `temp_${Date.now()}_${Math.random()}`;
     const optimistic = {
       id: tempId,
@@ -299,8 +291,7 @@ export default function AdminContact() {
         } else {
           res = await API.post("/messenger/group/messages", {text:t});
         }
-        // ✅ Remplacer UNIQUEMENT ce tempId, pas tous les _temp
-        setGrpMsgs(p => p.map(x => x._tempId===tempId ? {...res.data, _confirmed:true} : x));
+        setGrpMsgs(p => p.map(x => x._tempId===tempId ? res.data : x));
       } else {
         if (f) {
           const fd=new FormData(); fd.append("file",f);
@@ -310,14 +301,12 @@ export default function AdminContact() {
         } else {
           res = await API.post("/messenger/messages", {conversationId:sel.id, text:t});
         }
-        // ✅ Remplacer UNIQUEMENT ce tempId
-        setMsgs(p => p.map(x => x._tempId===tempId ? {...res.data, _confirmed:true} : x));
+        setMsgs(p => p.map(x => x._tempId===tempId ? res.data : x));
       }
     } catch(e) {
       console.error("send:",e);
-      // ✅ Supprimer UNIQUEMENT ce tempId en cas d'erreur
-      if (sel === "group") setGrpMsgs(p => p.filter(x => x._tempId!==tempId));
-      else setMsgs(p => p.filter(x => x._tempId!==tempId));
+      if (sel === "group") setGrpMsgs(p => p.filter(x => x._tempId !== tempId));
+      else setMsgs(p => p.filter(x => x._tempId !== tempId));
       if(t) setText(t);
       if(f) setFile(f);
     } finally { setSending(false); }
@@ -390,7 +379,14 @@ export default function AdminContact() {
               <div
                 key={item.id||item.id_user}
                 className={`chat-item ${isActive?"active":""}`}
-                onClick={() => isSrch ? openConv(item) : setSel(item)}
+                onClick={() => {
+                  if (isSrch) { openConv(item); return; }
+                  const convItem = {
+                    ...item,
+                    id_user: item.id_user || (Number(item.user_a_id) === ME ? item.user_b_id : item.user_a_id),
+                  };
+                  setSel(convItem);
+                }}
               >
                 <Av p={item.prenom_user} n={item.nom_user} id={item.id_user} size={42}/>
                 <div style={{flex:1,minWidth:0}}>

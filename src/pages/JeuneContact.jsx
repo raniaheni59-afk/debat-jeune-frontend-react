@@ -160,15 +160,14 @@ export default function JeuneContact() {
       const cur = selRef.current;
       if (cur && cur !== "group" && Number(m.conversation_id) === Number(cur.id)) {
         setMsgs((p) => {
-          // Ignorer si déjà présent (confirmé par API ou socket précédent)
+          // Déjà présent → ignorer (doublon)
           if (p.find((x) => !x._temp && Number(x.id) === Number(m.id))) return p;
-          // Supprimer tous les _temp (optimistes non encore remplacés) + ajouter le vrai
-          const without = p.filter((x) => !x._temp && !x._confirmed);
-          const confirmed = p.filter((x) => x._confirmed);
-          return [...without, ...confirmed, m];
+          // Garder tous les vrais messages + supprimer seulement les _temp + ajouter nouveau
+          const real = p.filter((x) => !x._temp);
+          return [...real, m];
         });
       }
-      // Mettre à jour last_message dans la liste des convs
+      // Mettre à jour last_message même si conv pas ouverte
       setConvs((p) =>
         p.map((c) => Number(c.id) === Number(m.conversation_id)
           ? { ...c, last_message: m.text || `[${m.msg_type || "fichier"}]`, last_time: m.created_at }
@@ -180,9 +179,8 @@ export default function JeuneContact() {
     sock.on("newGroupMessage", (m) => {
       setGrpMsgs((p) => {
         if (p.find((x) => !x._temp && Number(x.id) === Number(m.id))) return p;
-        // Supprimer _temp restants + ajouter vrai message
-        const without = p.filter((x) => !x._temp);
-        return [...without, m];
+        const real = p.filter((x) => !x._temp);
+        return [...real, m];
       });
     });
 
@@ -318,8 +316,8 @@ export default function JeuneContact() {
         } else {
           res = await API.post("/messenger/group/messages", { text: msgText });
         }
-        // ✅ Remplacer UNIQUEMENT ce tempId
-        setGrpMsgs((p) => p.map((x) => x._tempId === tempId ? {...res.data, _confirmed:true} : x));
+        // ✅ Remplacer ce tempId par le vrai message (sans flag _confirmed — juste id réel)
+        setGrpMsgs((p) => p.map((x) => x._tempId === tempId ? res.data : x));
       } else {
         if (file) {
           const fd = new FormData();
@@ -330,8 +328,8 @@ export default function JeuneContact() {
         } else {
           res = await API.post("/messenger/messages", { conversationId: sel.id, text: msgText });
         }
-        // ✅ Remplacer UNIQUEMENT ce tempId
-        setMsgs((p) => p.map((x) => x._tempId === tempId ? {...res.data, _confirmed:true} : x));
+        // ✅ Remplacer ce tempId par le vrai message
+        setMsgs((p) => p.map((x) => x._tempId === tempId ? res.data : x));
       }
     } catch (e) {
       console.error("send:", e);
@@ -465,7 +463,15 @@ export default function JeuneContact() {
               <div
                 key={item.id || item.id_user}
                 className={`chat-item ${isActive ? "active" : ""}`}
-                onClick={() => isSearch ? openConv(item) : setSel(item)}
+                onClick={() => {
+                  if (isSearch) { openConv(item); return; }
+                  // ✅ s'assurer que item a id_user pour l'avatar
+                  const convItem = {
+                    ...item,
+                    id_user: item.id_user || (Number(item.user_a_id) === myId ? item.user_b_id : item.user_a_id),
+                  };
+                  setSel(convItem);
+                }}
               >
                 {isAdmin ? <AdminAv size={42} /> : <Av user={item} size={42} />}
                 <div style={{ flex: 1, minWidth: 0 }}>
