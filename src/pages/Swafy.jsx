@@ -42,7 +42,7 @@ body {
   font-family: 'DM Sans', sans-serif;
   background: var(--bg);
   color: var(--text);
-  overflow-x: hidden;
+  overflow-x: clip;
   min-height: 100vh;
 }
 ::-webkit-scrollbar { width: 4px; }
@@ -105,7 +105,7 @@ body {
 }
 
 /* ── PAGE WRAP ── */
-.sw-page { position: relative; z-index: 1; overflow-x: hidden; }
+.sw-page { position: relative; z-index: 1; overflow-x: clip; }
 .sw-container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
 
 /* ── NAV ── */

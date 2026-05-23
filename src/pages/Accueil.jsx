@@ -47,7 +47,7 @@ body {
   font-family: 'Inter', sans-serif;
   background: var(--bg);
   color: var(--text);
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* ── SCROLLBAR ── */
@@ -210,7 +210,7 @@ body {
   position: relative; min-height: 100vh;
   display: flex; align-items: center;
   padding: 120px 24px 80px;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(180deg, #FFFFFF 0%, #F8F9FB 100%);
 }
 .hero-container {
