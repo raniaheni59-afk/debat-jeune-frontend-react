@@ -16,6 +16,15 @@ import { Line, Bar, Doughnut } from "react-chartjs-2";
 import API from "../services/api";
 import PublierPage from "./PublierPage";
 import PublicationCard from "../components/PublicationCard";
+import AdminContact    from "./AdminContact";
+import CalendarPage    from "./CalendarPage";
+import AdminLiveStream from "./AdminLiveStream";
+import Swafy_Meet      from "./Swafy_Meet";
+import NewLive         from "./NewLive";
+import ArchivePage     from "./ArchivePage";
+import EnquetePage     from "./EnquetePage";      
+import ParametrePage   from "./ParametrePage";    
+import ParametreContact from "./ParametreContact";
 
 
 
