@@ -142,30 +142,32 @@ export default function JeuneContact() {
       auth: { token },
       transports: ["websocket"],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 2000,
     });
     sockRef.current = sock;
 
-    // ✅ Rejoindre dès que connecté (et à chaque reconnexion)
+    // ✅ joinGroup + rejoindre conv active à chaque (re)connexion
     sock.on("connect", () => {
       sock.emit("joinGroup");
-      const selNow = selRef.current;
-      if (selNow && selNow !== "group" && selNow.id) {
-        sock.emit("joinConversation", { conversationId: selNow.id });
+      const cur = selRef.current;
+      if (cur && cur !== "group" && cur.id) {
+        sock.emit("joinConversation", { conversationId: cur.id });
       }
     });
 
     sock.on("newMessage", (m) => {
-      const selNow = selRef.current;
-      if (selNow && selNow !== "group" && Number(m.conversation_id) === Number(selNow.id)) {
+      const cur = selRef.current;
+      if (cur && cur !== "group" && Number(m.conversation_id) === Number(cur.id)) {
         setMsgs((p) => {
-          if (p.find((x) => Number(x.id) === Number(m.id))) return p;
-          // Supprimer le message optimiste correspondant s'il existe
-          const filtered = p.filter((x) => !x._temp);
-          return [...filtered, m];
+          // Ignorer doublon
+          if (p.find((x) => !x._temp && Number(x.id) === Number(m.id))) return p;
+          // Remplacer le message optimiste _temp par le vrai
+          const without = p.filter((x) => !x._temp);
+          return [...without, m];
         });
       }
+      // Mettre à jour last_message dans la liste des convs
       setConvs((p) =>
         p.map((c) => Number(c.id) === Number(m.conversation_id)
           ? { ...c, last_message: m.text || `[${m.msg_type || "fichier"}]`, last_time: m.created_at }
@@ -175,11 +177,14 @@ export default function JeuneContact() {
     });
 
     sock.on("newGroupMessage", (m) => {
-      setGrpMsgs((p) => p.find((x) => Number(x.id) === Number(m.id)) ? p : [...p, m]);
+      setGrpMsgs((p) => {
+        if (p.find((x) => !x._temp && Number(x.id) === Number(m.id))) return p;
+        const without = p.filter((x) => !x._temp);
+        return [...without, m];
+      });
     });
 
-    sock.on("connect_error", (e) => console.error("JeuneContact socket:", e.message));
-
+    sock.on("connect_error", (e) => console.error("Socket:", e.message));
     return () => sock.disconnect();
   }, []);
 
@@ -259,6 +264,8 @@ export default function JeuneContact() {
         const r = await API.get(`/messenger/messages/${sel.id}`);
         setMsgs(Array.isArray(r.data) ? r.data : []);
         sockRef.current?.emit("joinConversation", { conversationId: sel.id });
+        // ✅ Marquer les messages comme lus
+        API.put(`/messenger/messages/read/${sel.id}`).catch(() => {});
       } catch (e) { console.error("loadMsgs:", e); }
       finally { setLoadingMsgs(false); }
     };
@@ -278,10 +285,9 @@ export default function JeuneContact() {
     setText(""); setFilePrev(null);
     setSending(true);
 
-    // ✅ Optimistic update — afficher le message immédiatement sans attendre socket
-    const tempId = `temp_${Date.now()}`;
+    // ✅ Message optimiste — apparaît immédiatement
     const optimistic = {
-      id: tempId,
+      id: `temp_${Date.now()}`,
       _temp: true,
       conversation_id: sel !== "group" ? sel.id : null,
       sender_id: myId,
@@ -291,49 +297,42 @@ export default function JeuneContact() {
         ? (file.type.startsWith("image/") ? "image"
           : file.type.startsWith("video/") ? "video" : "pdf")
         : "text",
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     };
 
-    if (sel === "group") {
-      setGrpMsgs((p) => [...p, optimistic]);
-    } else {
-      setMsgs((p) => [...p, optimistic]);
-    }
+    if (sel === "group") setGrpMsgs((p) => [...p, optimistic]);
+    else setMsgs((p) => [...p, optimistic]);
 
     try {
+      let res;
       if (sel === "group") {
         if (file) {
           const fd = new FormData();
           fd.append("file", file);
           if (msgText) fd.append("text", msgText);
-          const res = await API.post("/messenger/group/messages/upload", fd);
-          // Remplacer optimiste par le vrai message
-          setGrpMsgs((p) => p.map((x) => x._temp ? res.data : x));
+          res = await API.post("/messenger/group/messages/upload", fd);
         } else {
-          const res = await API.post("/messenger/group/messages", { text: msgText });
-          setGrpMsgs((p) => p.map((x) => x._temp ? res.data : x));
+          res = await API.post("/messenger/group/messages", { text: msgText });
         }
+        // Remplacer optimiste par vrai message (le socket peut aussi arriver — le filtre _temp gère)
+        setGrpMsgs((p) => p.map((x) => x._temp ? res.data : x));
       } else {
         if (file) {
           const fd = new FormData();
           fd.append("file", file);
           fd.append("conversationId", String(sel.id));
           if (msgText) fd.append("text", msgText);
-          const res = await API.post("/messenger/messages/upload", fd);
-          setMsgs((p) => p.map((x) => x._temp ? res.data : x));
+          res = await API.post("/messenger/messages/upload", fd);
         } else {
-          const res = await API.post("/messenger/messages", { conversationId: sel.id, text: msgText });
-          setMsgs((p) => p.map((x) => x._temp ? res.data : x));
+          res = await API.post("/messenger/messages", { conversationId: sel.id, text: msgText });
         }
+        setMsgs((p) => p.map((x) => x._temp ? res.data : x));
       }
     } catch (e) {
       console.error("send:", e);
-      // Supprimer le message optimiste en cas d'erreur
-      if (sel === "group") {
-        setGrpMsgs((p) => p.filter((x) => !x._temp));
-      } else {
-        setMsgs((p) => p.filter((x) => !x._temp));
-      }
+      // Annuler le message optimiste
+      if (sel === "group") setGrpMsgs((p) => p.filter((x) => !x._temp));
+      else setMsgs((p) => p.filter((x) => !x._temp));
       if (msgText) setText(msgText);
       if (file) setFilePrev(file);
     } finally {

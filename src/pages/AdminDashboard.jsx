@@ -16,15 +16,6 @@ import { Line, Bar, Doughnut } from "react-chartjs-2";
 import API from "../services/api";
 import PublierPage from "./PublierPage";
 import PublicationCard from "../components/PublicationCard";
-import AdminContact    from "./AdminContact";
-import CalendarPage    from "./CalendarPage";
-import AdminLiveStream from "./AdminLiveStream";
-import Swafy_Meet      from "./Swafy_Meet";
-import NewLive         from "./NewLive";
-import ArchivePage     from "./ArchivePage";
-import EnquetePage     from "./EnquetePage";      
-import ParametrePage   from "./ParametrePage";    
-import ParametreContact from "./ParametreContact";
 
 
 
@@ -68,12 +59,21 @@ export default function AdminDashboard() {
       ? (import.meta.env?.VITE_BACKEND_URL || "https://debat-jeune.onrender.com")
       : "https://debat-jeune.onrender.com";
 
+  // ✅ Fetch unread count depuis l'API au chargement
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await API.get("/messenger/unread-count");
+      setUnreadMessages(res.data?.count || 0);
+    } catch { setUnreadMessages(0); }
+  }, []);
+
   useEffect(() => {
+    fetchUnreadCount();
+
     if (socketRef.current) return;
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    // Import dynamique socket.io-client
     import("socket.io-client").then(({ io }) => {
       const s = io(BACKEND_URL, {
         auth: { token },
@@ -83,7 +83,7 @@ export default function AdminDashboard() {
       });
       socketRef.current = s;
 
-      // ✅ Incrémenter badge messages si on n'est pas sur la page messages
+      // ✅ Incrémenter badge si on n'est PAS sur la page messages
       s.on("newMessage", () => {
         setActivePage((cur) => {
           if (cur !== "messages") setUnreadMessages((n) => n + 1);
@@ -97,9 +97,7 @@ export default function AdminDashboard() {
         });
       });
 
-      // Rejoindre le groupe Swafy
       s.emit("joinGroup");
-
       s.on("connect_error", (e) => console.error("AdminDashboard socket:", e.message));
     }).catch(() => {});
 
@@ -107,7 +105,7 @@ export default function AdminDashboard() {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
-  }, []); // eslint-disable-line
+  }, [fetchUnreadCount]); // eslint-disable-line
   const [addChartModal, setAddChartModal] = useState(false);
   const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
   const [newChart, setNewChart] = useState({ type: "line", title: "" });
