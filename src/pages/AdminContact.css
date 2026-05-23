@@ -1,116 +1,163 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+/* ═══════════════════════════════════════════════
+   AdminContact.css — Messenger Swafy
+   Utilisé par AdminContact.jsx ET JeuneContact.jsx
+═══════════════════════════════════════════════ */
 
+/* ── Layout principal ── */
 .admin-contact {
   display: flex;
   height: 100vh;
-  background: #f4f2fb;
-  font-family: 'DM Sans', system-ui, sans-serif;
+  width: 100%;
   overflow: hidden;
+  background: #f4f2fb;
+  font-family: 'Poppins', 'Segoe UI', sans-serif;
 }
 
-/* ── SIDEBAR ─────────────────────────────────────────── */
+/* ── Sidebar gauche (liste conversations) ── */
 .contacts-panel {
   width: 300px;
-  min-width: 300px;
-  background: #ffffff;
+  min-width: 260px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
   border-right: 1px solid #ede9ff;
-  display: flex;
-  flex-direction: column;
   overflow: hidden;
-}
-
-.chat-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 6px 0 12px;
-}
-.chat-list::-webkit-scrollbar { width: 4px; }
-.chat-list::-webkit-scrollbar-thumb { background: #ede9ff; border-radius: 4px; }
-
-.chat-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  transition: background 0.15s;
-  border-radius: 12px;
-  margin: 1px 8px;
-}
-.chat-item:hover { background: #f4f2fb; }
-.chat-item.active { background: #ede9ff; }
-
-/* ── CHAT WINDOW ────────────────────────────────────── */
-.chat-window {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: #f4f2fb;
-  overflow: hidden;
-  animation: slideIn 0.3s ease;
-}
-
-/* ── SCROLLBAR ──────────────────────────────────────── */
-.chat-window ::-webkit-scrollbar { width: 4px; }
-.chat-window ::-webkit-scrollbar-track { background: transparent; }
-.chat-window ::-webkit-scrollbar-thumb { background: #d0c9f5; border-radius: 4px; }
-
-/* ── FILE PREVIEW BAR ───────────────────────────────── */
-.file-preview-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  background: #f0ecff;
-  border-top: 1px solid #ede9ff;
-  font-size: 13px;
-  color: #6d56c1;
-}
-
-/* ── GROUP ITEM ─────────────────────────────────────── */
-.group-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  cursor: pointer;
-  transition: background 0.15s;
-  border-radius: 12px;
-  margin: 1px 8px;
-}
-.group-item:hover { background: #f4f2fb; }
-.group-item.active { background: #ede9ff; }
-
-.group-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-size: 14px;
   flex-shrink: 0;
 }
 
+/* ── Liste des chats ── */
+.chat-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.chat-list::-webkit-scrollbar { width: 4px; }
+.chat-list::-webkit-scrollbar-thumb { background: #e0daff; border-radius: 4px; }
+
+/* ── Section label ── */
 .section-label {
-  padding: 10px 18px 4px;
-  font-size: 10.5px;
+  padding: 8px 16px 4px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: #b0a9d4;
 }
 
-/* ── ANIMATIONS ─────────────────────────────────────── */
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(20px); }
-  to   { opacity: 1; transform: translateX(0); }
+/* ── Item conversation ── */
+.chat-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 10px;
+  margin: 1px 8px;
+  transition: background .15s;
+}
+
+.chat-item:hover {
+  background: #f5f2ff;
+}
+
+.chat-item.active {
+  background: #ede9ff;
+}
+
+/* ── Groupe item ── */
+.group-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-radius: 10px;
+  margin: 1px 8px;
+  transition: background .15s;
+}
+
+.group-item:hover {
+  background: #f5f2ff;
+}
+
+.group-item.active {
+  background: #ede9ff;
+}
+
+/* ── Avatar groupe ── */
+.group-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6d56c1, #4f3fa0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* ── Fenêtre chat ── */
+.chat-window {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* ── Preview fichier ── */
+.file-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  background: #f0ecff;
+  border-top: 1px solid #e0daff;
+  font-size: 13px;
+  color: #4a3f80;
+  flex-shrink: 0;
+}
+
+/* ── Animations ── */
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Mobile responsive ── */
+@media (max-width: 640px) {
+  .contacts-panel {
+    width: 100%;
+    max-width: 100%;
+    position: absolute;
+    z-index: 10;
+    height: 100%;
+  }
+
+  .chat-window {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: 20;
+  }
+
+  .admin-contact {
+    position: relative;
+  }
+}
+
+/* ── Quand admin-contact est dans un flex container ── */
+.admin-contact {
+  flex: 1;
+  min-height: 0;
 }

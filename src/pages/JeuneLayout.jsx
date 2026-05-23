@@ -735,7 +735,15 @@ const JeuneLayout = () => {
 
         {/* Content */}
         {activePage === PAGES.MESSAGES ? (
-          <div className="jl-messages-full"><JeuneContact/></div>
+          <div style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            height: "calc(100vh - 56px)", /* 56px = hauteur topbar */
+          }}>
+            <JeuneContact/>
+          </div>
         ) : (
           <div className="jl-scroll">{renderContent()}</div>
         )}
