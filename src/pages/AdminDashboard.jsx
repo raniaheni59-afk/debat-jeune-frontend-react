@@ -227,22 +227,28 @@ const fetchGouvernoratStats = useCallback(async () => {
 
   // ── FETCH DES EVENEMENTS DEPUIS LA BASE DE DONNEES ──
   // ── Chargement des statistiques des événements par gouvernorat ──
- const fetchEnqueteSatisfaction = useCallback(async () => {
+// ✅ Enquête fetch CORRIGÉ
+const fetchEnqueteSatisfaction = useCallback(async () => {
   console.log("🔥 fetchEnqueteSatisfaction CALLED");
 
   setCharts((prev) =>
-    prev.map((chart) =>
-      chart.id === "chart-enquete-satisfaction"
-        ? {
-            ...chart,
-            labels: ["Jan", "Feb", "Mar", "Apr"],
-            datasets: [
-              { ...chart.datasets[0], data: [5, 4, 3, 4] },
-              { ...chart.datasets[1], data: [2, 3, 1, 4] },
-            ],
-          }
-        : chart
-    )
+    prev.map((chart) => {
+      if (chart.id !== "chart-enquete-satisfaction") return chart;
+      
+      // ✅ Guard: vérifier que datasets existe avant d'y accéder
+      const existingDatasets = chart.datasets || [];
+      const ds0 = existingDatasets[0] || { data: [], color: "#7c5cbf", dashed: false, label: "Satisfaction" };
+      const ds1 = existingDatasets[1] || { data: [], color: "rgba(231,76,60,0.7)", dashed: true, label: "Nb réponses" };
+      
+      return {
+        ...chart,
+        labels: ["Jan", "Feb", "Mar", "Apr"],
+        datasets: [
+          { ...ds0, data: [5, 4, 3, 4] },
+          { ...ds1, data: [2, 3, 1, 4] },
+        ],
+      };
+    })
   );
 }, []);
 
