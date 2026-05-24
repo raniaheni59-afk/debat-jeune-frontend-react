@@ -33,7 +33,7 @@ ChartJS.register(
 );
 
 export default function AdminDashboard() {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}") || {}; } catch { return {}; } })();
   const navigate = useNavigate();
   const t = (key) => key;
  
@@ -241,7 +241,7 @@ const fetchGouvernoratStats = useCallback(async () => {
   useEffect(() => {
     const sync = async () => {
       try {
-       const res = await API.get("/users/count/jeune-profiles");
+       const res = await API.get("/admin/stats/jeune-count");
         if (res.data?.count != null) {
           setStatCards((p) =>
             p.map((c) => c.id === "stat-participant" ? { ...c, value: res.data.count } : c)
