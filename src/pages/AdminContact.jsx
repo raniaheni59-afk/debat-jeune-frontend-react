@@ -6,6 +6,7 @@ import "./AdminContact.css";
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
 const PALETTE  = ["#7c5cbf","#3b82f6","#22c55e","#f59e0b","#ef4444","#ec4899","#06b6d4","#8b5cf6"];
 
+// ── Fix: null[0] crash — handle null explicitly ──
 const ini  = (p,n) => { const ps=String(p??""); const ns=String(n??""); return ((ps[0]||"")+(ns[0]||"")).toUpperCase()||"?"; };
 const col  = (id) => PALETTE[(Number(id)||0)%PALETTE.length];
 const abs  = (u) => !u?null:u.startsWith("http")?u:BACKEND+u;
@@ -61,18 +62,37 @@ function FileBubble({msg,isMe}) {
   );
 }
 
-export default function AdminContact() {
-  const [convs,   setConvs]   = useState([]);
-  const [sel,     setSel]     = useState(null);
-  const [msgs,    setMsgs]    = useState([]);
-  const [grpMsgs, setGrpMsgs] = useState([]);
-  const [query,   setQuery]   = useState("");
-  const [results, setResults] = useState([]);
-  const [srching, setSrching] = useState(false);
-  const [text,    setText]    = useState("");
-  const [file,    setFile]    = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [sending, setSending] = useState(false);
+// Badge component for unread count
+function UnreadBadge({count}) {
+  if (!count || count < 1) return null;
+  return (
+    <span style={{
+      marginLeft:"auto", flexShrink:0,
+      background:"#e74c3c", color:"#fff",
+      fontSize:10, fontWeight:800,
+      padding:"2px 7px", borderRadius:10,
+      minWidth:18, textAlign:"center",
+      lineHeight:"16px", display:"inline-block",
+    }}>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+export default function AdminContact({ onUnreadChange }) {
+  const [convs,    setConvs]    = useState([]);
+  const [sel,      setSel]      = useState(null);
+  const [msgs,     setMsgs]     = useState([]);
+  const [grpMsgs,  setGrpMsgs]  = useState([]);
+  const [query,    setQuery]    = useState("");
+  const [results,  setResults]  = useState([]);
+  const [srching,  setSrching]  = useState(false);
+  const [text,     setText]     = useState("");
+  const [file,     setFile]     = useState(null);
+  const [loading,  setLoading]  = useState(false);
+  const [sending,  setSending]  = useState(false);
+  // unread: { [convId]: count }
+  const [unread,   setUnread]   = useState({});
 
   const botRef  = useRef(null);
   const sockRef = useRef(null);
@@ -82,7 +102,27 @@ export default function AdminContact() {
 
   const ME = (() => { try { return Number(JSON.parse(localStorage.getItem("user")||"{}").id_user||0); } catch { return 0; } })();
 
-  // ── Socket ───────────────────────────────────────────────────────
+  // ── Compute total unread & notify parent ──
+  useEffect(() => {
+    const total = Object.values(unread).reduce((s,v)=>s+(v||0), 0);
+    onUnreadChange?.(total);
+  }, [unread, onUnreadChange]);
+
+  // ── Fetch per-conversation unread counts ──
+  const fetchUnreadCounts = useCallback(async () => {
+    try {
+      const r = await API.get("/messenger/conversations/unread-counts");
+      if (Array.isArray(r.data)) {
+        const map = {};
+        r.data.forEach(row => { map[row.conversation_id] = Number(row.unread_count||0); });
+        setUnread(map);
+      }
+    } catch {
+      // fallback: use is_read from messages if endpoint missing
+    }
+  }, []);
+
+  // ── Socket ──
   useEffect(() => {
     const token = localStorage.getItem("token");
     const s = io(BACKEND, {
@@ -98,7 +138,6 @@ export default function AdminContact() {
         s.emit("joinConversation", { conversationId: cur.id });
     });
 
-    // ✅ Backend émet uniquement vers le destinataire → on est toujours le destinataire ici
     s.on("newMessage", (m) => {
       if (!m?.id || !m?.conversation_id) return;
       const cur = selRef.current;
@@ -111,11 +150,21 @@ export default function AdminContact() {
       );
 
       if (cur && cur!=="group" && Number(m.conversation_id)===Number(cur.id)) {
+        // active conversation → mark read immediately, no badge
         setMsgs(p => {
           const arr = safe(p);
           if (arr.some(x=>!x._temp && Number(x.id)===Number(m.id))) return arr;
           return [...arr, m];
         });
+        API.put(`/messenger/messages/read/${m.conversation_id}`).catch(()=>{});
+      } else {
+        // not open → increment badge
+        if (Number(m.sender_id) !== ME) {
+          setUnread(prev => ({
+            ...prev,
+            [m.conversation_id]: (prev[m.conversation_id]||0) + 1,
+          }));
+        }
       }
     });
 
@@ -135,10 +184,16 @@ export default function AdminContact() {
   useEffect(() => { selRef.current = sel; }, [sel]);
 
   const fetchConvs = useCallback(async () => {
-    try { const r=await API.get("/messenger/conversations"); setConvs(safe(r.data)); }
-    catch(e) { console.error(e); }
+    try {
+      const r=await API.get("/messenger/conversations");
+      setConvs(safe(r.data));
+    } catch(e) { console.error(e); }
   }, []);
-  useEffect(() => { fetchConvs(); }, [fetchConvs]);
+
+  useEffect(() => {
+    fetchConvs();
+    fetchUnreadCounts();
+  }, [fetchConvs, fetchUnreadCounts]);
 
   useEffect(() => {
     API.get("/messenger/group/messages").then(r=>setGrpMsgs(safe(r.data))).catch(()=>{});
@@ -172,12 +227,27 @@ export default function AdminContact() {
     } catch(e) { console.error(e); }
   };
 
+  // Open conversation: mark read & clear badge
+  const openSel = (item) => {
+    setSel(item);
+    if (item && item !== "group" && item.id) {
+      setUnread(prev => { const next={...prev}; delete next[item.id]; return next; });
+      API.put(`/messenger/messages/read/${item.id}`).catch(()=>{});
+    }
+  };
+
   useEffect(() => {
     if (!sel||sel==="group"||!sel.id) return;
     setMsgs([]);
     setLoading(true);
     API.get(`/messenger/messages/${sel.id}`)
-      .then(r=>{ setMsgs(safe(r.data)); sockRef.current?.emit("joinConversation",{conversationId:sel.id}); API.put(`/messenger/messages/read/${sel.id}`).catch(()=>{}); })
+      .then(r=>{
+        setMsgs(safe(r.data));
+        sockRef.current?.emit("joinConversation",{conversationId:sel.id});
+        API.put(`/messenger/messages/read/${sel.id}`).catch(()=>{});
+        // clear badge for this conv
+        setUnread(prev => { const next={...prev}; delete next[sel.id]; return next; });
+      })
       .catch(e=>console.error(e))
       .finally(()=>setLoading(false));
   }, [sel?.id]);
@@ -222,7 +292,9 @@ export default function AdminContact() {
 
   const isGrp  = sel==="group";
   const isSrch = !!query.trim();
-  const list   = isSrch?results:convs;
+  // Filter out the group admin from private convs list (id_user matches group "Swafy" admin)
+  const filteredConvs = convs.filter(c => c.id_user != null);
+  const list   = isSrch?results:filteredConvs;
   const actMsgs= safe(isGrp?grpMsgs:msgs);
   const ok     = !!(text.trim()||file)&&!sending;
 
@@ -247,6 +319,7 @@ export default function AdminContact() {
         </div>
 
         <div className="chat-list">
+          {/* ── GROUPE (toujours visible, pas dans search) ── */}
           {!isSrch&&<>
             <div className="section-label">Groupe</div>
             <div className={`group-item ${isGrp?"active":""}`} onClick={()=>{setSel("group");setFile(null);}}>
@@ -261,27 +334,32 @@ export default function AdminContact() {
             </div>
           </>}
 
-          {!isSrch&&convs.length>0&&<div className="section-label">Conversations ({convs.length})</div>}
-          {!isSrch&&convs.length===0&&<div style={{padding:"18px 16px",textAlign:"center",color:"#b0a9d4",fontSize:12}}>Aucune conversation</div>}
+          {/* ── CONVERSATIONS ── */}
+          {!isSrch&&filteredConvs.length>0&&<div className="section-label">Conversations ({filteredConvs.length})</div>}
+          {!isSrch&&filteredConvs.length===0&&<div style={{padding:"18px 16px",textAlign:"center",color:"#b0a9d4",fontSize:12}}>Aucune conversation</div>}
           {isSrch&&<div className="section-label">{srching?"Recherche…":results.length?`${results.length} résultat(s)`:"Aucun résultat"}</div>}
 
           {safe(list).map(item=>{
             if(!item) return null;
             const isActive=!isGrp&&sel&&sel!=="group"&&Number(sel.id)===Number(item.id);
+            const unreadCount = isSrch ? 0 : (unread[item.id]||0);
             return (
               <div key={item.id||item.id_user} className={`chat-item ${isActive?"active":""}`}
-                onClick={()=>isSrch?openConv(item):setSel(item)}>
+                onClick={()=>isSrch?openConv(item):openSel(item)}>
                 <Av p={item.prenom_user} n={item.nom_user} id={item.id_user} size={42}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-                    <span style={{fontWeight:600,fontSize:13.5,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:140}}>
-                      {item.prenom_user||""} {item.nom_user||""}
+                    <span style={{fontWeight: unreadCount>0?700:600, fontSize:13.5,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>
+                      {String(item.prenom_user??"")} {String(item.nom_user??"")}
                     </span>
                     {item.last_time&&<span style={{fontSize:10,color:"#b0a9d4",flexShrink:0,marginLeft:6}}>{ago(item.last_time)}</span>}
                   </div>
-                  <p style={{fontSize:12,color:"#9e97c0",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {isSrch?(item.role==="admin"?"👑 Admin":"👤 Jeune"):(item.last_message||"Nouvelle conversation")}
-                  </p>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <p style={{fontSize:12,color: unreadCount>0?"#5a3fa0":"#9e97c0",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:unreadCount>0?600:400,flex:1}}>
+                      {isSrch?(item.role==="admin"?"👑 Admin":"👤 Jeune"):(item.last_message||"Nouvelle conversation")}
+                    </p>
+                    <UnreadBadge count={unreadCount}/>
+                  </div>
                 </div>
               </div>
             );
@@ -304,7 +382,7 @@ export default function AdminContact() {
               :<Av p={sel.prenom_user} n={sel.nom_user} id={sel.id_user} size={42}/>}
             <div style={{flex:1}}>
               <div style={{fontWeight:700,fontSize:14.5,color:"#1a1a2e"}}>
-                {isGrp?"Swafy":`${sel.prenom_user||""} ${sel.nom_user||""}`}
+                {isGrp?"Swafy":`${String(sel.prenom_user??"")} ${String(sel.nom_user??"")}`}
               </div>
               <div style={{fontSize:11,color:"#22c55e",display:"flex",alignItems:"center",gap:5,marginTop:2}}>
                 <span style={{width:7,height:7,borderRadius:"50%",background:"#22c55e",display:"inline-block"}}/>
@@ -335,7 +413,7 @@ export default function AdminContact() {
                   {isGrp&&!isMe&&(
                     <div style={{display:"flex",alignItems:"center",gap:6,paddingLeft:4,marginBottom:2}}>
                       <Av p={m.prenom_user} n={m.nom_user} id={m.sender_id} size={20}/>
-                      <span style={{fontSize:11,color:"#7c5cbf",fontWeight:700}}>{m.prenom_user} {m.nom_user}</span>
+                      <span style={{fontSize:11,color:"#7c5cbf",fontWeight:700}}>{String(m.prenom_user??"")} {String(m.nom_user??"")}</span>
                     </div>
                   )}
                   <div style={{background:isMe?"linear-gradient(135deg,#7c5cbf,#5a3fa0)":"#fff",
@@ -397,3 +475,4 @@ export default function AdminContact() {
     </div>
   );
 }
+
