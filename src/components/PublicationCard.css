@@ -79,9 +79,10 @@
 /* ── media grid ── */
 .pc-media { display:grid; gap:3px; overflow:hidden; border-radius:0 0 4px 4px; }
 
+/* 1 image — hauteur auto pour montrer l'image complète */
 .pc-media-1 { grid-template-columns:1fr; }
-.pc-media-1 .pc-media-item { height:300px; }
-.pc-media-1 .pc-media-item img { object-fit:cover; }
+.pc-media-1 .pc-media-item { height:auto; max-height:420px; }
+.pc-media-1 .pc-media-item img { object-fit:contain; background:#f5f3ff; }
 
 .pc-media-2 { grid-template-columns:1fr 1fr; }
 .pc-media-2 .pc-media-item { height:200px; }
@@ -99,8 +100,12 @@
   background: #ede9ff;
   cursor    : pointer;
 }
-.pc-media-item img { width:100%; height:100%; object-fit:cover; display:block; transition:transform .35s ease; }
-.pc-media-item:hover img { transform:scale(1.04); }
+.pc-media-item img { width:100%; height:100%; object-fit:contain; background:#f5f3ff; display:block; transition:transform .35s ease; }
+/* Pour les grilles multi-photos, cover est mieux */
+.pc-media-2 .pc-media-item img,
+.pc-media-3 .pc-media-item img,
+.pc-media-4 .pc-media-item img { object-fit:cover; background:transparent; }
+.pc-media-item:hover img { transform:scale(1.02); }
 .pc-media-more {
   position  : absolute; inset:0;
   background: rgba(0,0,0,0.45);
