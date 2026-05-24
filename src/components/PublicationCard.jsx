@@ -17,9 +17,11 @@ const BACKEND = (() => {
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
+  // normalise backslashes and strip leading slashes
   const clean = p.split("\\").join("/").replace(/^\/+/, "");
-  if (clean.startsWith("uploads/")) return BACKEND + "/" + clean;
-  return BACKEND + "/uploads/" + clean;
+  // strip duplicate uploads/ prefix
+  const nodup = clean.replace(/^(uploads\/)+/, "");
+  return BACKEND + "/uploads/" + nodup;
 };
 
 const avatar = (name) =>
@@ -43,7 +45,6 @@ const getSrcSafe = (m) => {
   const s = getSrc(m);
   if (!s) return null;
   if (s.endsWith("/uploads/") || s.endsWith("/uploads")) return null;
-  if (s === BACKEND + "/uploads/") return null;
   return s;
 };
 
@@ -202,7 +203,7 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
       form.append("contenu",             contenu);
       medias.forEach(m=>{ const id=m.id_media??m.id??""; if(id!=="") form.append("kept_media_ids[]",String(id)); });
       newFiles.forEach(f=>form.append("medias",f.file));
-      await API.patch(`/publications/${publication.id_publication}`, form, { headers:{"Content-Type":"multipart/form-data"} });
+      await API.patch(`/publications/${publication.id_publication}`, form);
       onSaved({ titre_publication:titre, contenu, contenu_publication:contenu, medias });
       onClose();
     } catch(e) {
@@ -382,9 +383,10 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
     setReplyText(""); setReplyOpen(false); setShowReplies(true);
     try {
       await API.post(`/publications/${pubId}/comments`,{
-        contenu_commentaire:t, contenu:t, parent_id:comment.id_commentaire
+        contenu_commentaire:t, contenu:t,
+        parent_id:comment.id_commentaire
       });
-      onRefresh(); // refresh to get real data
+      onRefresh();
     } catch(e){
       console.error("reply:",e?.response?.data||e.message);
       setReplyText(t); setReplyOpen(true);
@@ -591,28 +593,30 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const sendComment = async(text_override)=>{
     const t=(text_override||cmtText).trim(); if(!t||cmtSending) return;
     setCmtSending(true);
-    // Optimistic: add comment immediately
-    const currentUser2 = getCurrentUser();
+    setCmtText(""); // clear immediately for better UX
+    // Optimistic: show comment right away
+    const me = getCurrentUser();
     const optimistic = {
       id_commentaire: `tmp-${Date.now()}`,
-      contenu_commentaire: t,
-      contenu: t,
-      prenom_user: currentUser2?.prenom_user||currentUser2?.prenom||"",
-      nom_user: currentUser2?.nom_user||currentUser2?.nom||"",
-      photo_user: currentUser2?.photo_user||null,
-      id_user: currentUser2?.id_user||currentUser2?.id,
-      user_id: currentUser2?.id_user||currentUser2?.id,
+      contenu_commentaire: t, contenu: t,
+      prenom_user: me?.prenom_user||me?.prenom||"",
+      nom_user: me?.nom_user||me?.nom||"",
+      photo_user: me?.photo_user||null,
+      id_user: me?.id_user||me?.id,
+      user_id: me?.id_user||me?.id,
       created_at: new Date().toISOString(),
       reaction_counts:{}, my_reaction:null, replies:[],
     };
     setComments(prev=>[...prev, optimistic]);
     setCmtCount(c=>c+1);
-    setCmtText("");
     try {
-      await API.post(`/publications/${pub.id_publication}/comments`,{contenu_commentaire:t, contenu:t});
-      await loadComments(); // refresh to get real ID
+      await API.post(`/publications/${pub.id_publication}/comments`,{
+        contenu_commentaire:t, contenu:t
+      });
+      await loadComments(); // refresh to get real IDs
     } catch(e){
       console.error("comment:",e?.response?.status,e?.response?.data||e.message);
+      // rollback optimistic
       setComments(prev=>prev.filter(c=>c.id_commentaire!==optimistic.id_commentaire));
       setCmtCount(c=>Math.max(0,c-1));
       setCmtText(t);
