@@ -6,7 +6,7 @@ import "./AdminContact.css";
 const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
 const PALETTE  = ["#7c5cbf","#3b82f6","#22c55e","#f59e0b","#ef4444","#ec4899","#06b6d4","#8b5cf6"];
 
-const ini  = (p="",n="") => ((p[0]||"")+(n[0]||"")).toUpperCase()||"?";
+const ini  = (p,n) => { const ps=String(p??""); const ns=String(n??""); return ((ps[0]||"")+(ns[0]||"")).toUpperCase()||"?"; };
 const col  = (id) => PALETTE[(Number(id)||0)%PALETTE.length];
 const abs  = (u) => !u?null:u.startsWith("http")?u:BACKEND+u;
 const safe = (a) => Array.isArray(a)?a.filter(Boolean):[];
@@ -34,7 +34,7 @@ const prefixSort = (arr,q) => {
   });
 };
 
-function Av({p="",n="",id,size=42}) {
+function Av({p,n,id,size=42}) {
   return (
     <div style={{width:size,height:size,borderRadius:"50%",flexShrink:0,background:col(id),
       display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",
