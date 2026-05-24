@@ -270,6 +270,245 @@ const LiveEvWidget = ({ goToLive }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
+   JEUNE CALENDAR VIEW — Read-only calendar
+   Shows only events/notes posted by Admin (from localStorage).
+   Jeune cannot add, edit or delete anything.
+   Clicking any cell shows a friendly "équipe Swafy" message.
+═══════════════════════════════════════════════════════════ */
+const CAL_CAT_COLORS_J = {
+  Live:      { bg:"#0ABFAA", light:"#E6F9F7", text:"#065E56" },
+  Enquete:   { bg:"#F59E0B", light:"#FEF3C7", text:"#78350F" },
+  Evenement: { bg:"#6366F1", light:"#EEF2FF", text:"#3730A3" },
+  Personnel: { bg:"#EC4899", light:"#FCE7F3", text:"#9D174D" },
+};
+
+function JeuneCalendarView() {
+  const [current,  setCurrent]  = React.useState(new Date());
+  const [selected, setSelected] = React.useState(new Date());
+  const [notes,    setNotes]    = React.useState({});
+  const [lives,    setLives]    = React.useState({});
+  const [toast,    setToast]    = React.useState(null);
+  const [detailEv, setDetailEv] = React.useState(null);
+
+  // Load admin notes from localStorage (read-only)
+  React.useEffect(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem("swafy_calendar_notes") || "{}");
+      setNotes(raw);
+    } catch {}
+  }, []);
+
+  // Fetch lives from API
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch("https://debat-jeune.onrender.com/api/lives", { headers:{ Authorization:`Bearer ${token}` } })
+      .then(r => r.json())
+      .then(list => {
+        if (!Array.isArray(list)) return;
+        const map = {};
+        list.forEach(live => {
+          if (!live.date) return;
+          const key = live.date.slice(0,10);
+          if (!map[key]) map[key] = [];
+          map[key].push({ title: live.title_live || "Live", time: live.time || "", category:"Live", isActive: live.is_active });
+        });
+        setLives(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  const showTeamToast = () => {
+    setToast("💬 L'équipe Swafy gère le calendrier. Tu peux consulter les événements ici !");
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const keyOf = d => {
+    const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), dd = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${dd}`;
+  };
+
+  const eventsOfDay = (day) => {
+    const key = keyOf(day);
+    const noteEvs = (notes[key] || []).map((n,i) => ({ ...n, id:`note-${key}-${i}`, isNote:true }));
+    const liveEvs = (lives[key] || []);
+    return [...liveEvs, ...noteEvs];
+  };
+
+  // Build month grid
+  const monthStart = new Date(current.getFullYear(), current.getMonth(), 1);
+  const monthEnd   = new Date(current.getFullYear(), current.getMonth()+1, 0);
+  // Start on Monday
+  const gridStart  = new Date(monthStart);
+  gridStart.setDate(gridStart.getDate() - ((gridStart.getDay()+6)%7));
+  const gridEnd    = new Date(monthEnd);
+  gridEnd.setDate(gridEnd.getDate() + ((7 - (gridEnd.getDay()+6)%7) % 7));
+
+  const days = [];
+  for (let d = new Date(gridStart); d <= gridEnd; d.setDate(d.getDate()+1))
+    days.push(new Date(d));
+
+  const fmt = (d, opts) => d.toLocaleDateString("fr-FR", opts);
+  const isToday = d => keyOf(d) === keyOf(new Date());
+  const isSel   = d => keyOf(d) === keyOf(selected);
+  const inMonth = d => d.getMonth() === current.getMonth();
+
+  const prev = () => setCurrent(new Date(current.getFullYear(), current.getMonth()-1, 1));
+  const next = () => setCurrent(new Date(current.getFullYear(), current.getMonth()+1, 1));
+
+  const selEvs = eventsOfDay(selected);
+
+  return (
+    <div className="jl-page" style={{ padding:0 }}>
+      <style>{`
+        .jcal-root { font-family:'DM Sans',sans-serif; background:#fff; border-radius:18px; overflow:hidden; box-shadow:0 4px 24px rgba(90,63,160,.08); border:1px solid #EEF2FF; }
+        .jcal-header { display:flex; align-items:center; gap:12px; padding:18px 22px; border-bottom:1px solid #EEF2FF; background:linear-gradient(135deg,#5a3fa0,#7c5cbf); }
+        .jcal-title  { font-size:17px; font-weight:700; color:#fff; flex:1; font-family:'Poppins',sans-serif; }
+        .jcal-nav    { background:rgba(255,255,255,.18); border:none; color:#fff; width:30px; height:30px; border-radius:8px; cursor:pointer; font-size:15px; display:flex; align-items:center; justify-content:center; transition:background .15s; }
+        .jcal-nav:hover { background:rgba(255,255,255,.3); }
+        .jcal-readonly-badge { background:rgba(255,255,255,.2); color:#fff; font-size:10px; font-weight:700; padding:3px 10px; border-radius:20px; letter-spacing:.5px; }
+        .jcal-dow-row { display:grid; grid-template-columns:repeat(7,1fr); background:#F7F9FC; }
+        .jcal-dow    { text-align:center; font-size:10px; font-weight:700; color:#94A3B8; padding:8px 0; text-transform:uppercase; letter-spacing:.6px; }
+        .jcal-grid   { display:grid; grid-template-columns:repeat(7,1fr); }
+        .jcal-cell   { border-right:1px solid #EEF2FF; border-bottom:1px solid #EEF2FF; padding:6px 8px; min-height:80px; cursor:pointer; transition:background .12s; display:flex; flex-direction:column; }
+        .jcal-cell:hover { background:#F0FDF9; }
+        .jcal-cell.sel { background:#E6F9F7; }
+        .jcal-day-num { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; font-size:12px; font-weight:500; margin-bottom:4px; }
+        .jcal-day-num.today { background:#0ABFAA; color:#fff; font-weight:700; }
+        .jcal-ev-chip { border-radius:5px; padding:1px 6px; font-size:10px; font-weight:600; margin-bottom:2px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+        .jcal-more   { font-size:10px; color:#6366F1; font-weight:700; }
+        .jcal-side   { background:#F7F9FC; border-top:1px solid #EEF2FF; padding:16px 20px; }
+        .jcal-side-title { font-size:13px; font-weight:700; color:#1A2340; margin-bottom:10px; font-family:'Poppins',sans-serif; }
+        .jcal-ev-row { display:flex; gap:10px; padding:8px 0; border-bottom:1px solid #EEF2FF; align-items:flex-start; }
+        .jcal-ev-dot { width:8px; height:8px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+        .jcal-ev-name { font-size:12px; font-weight:600; color:#1A2340; }
+        .jcal-ev-time { font-size:10px; color:#94A3B8; }
+        .jcal-empty  { font-size:12px; color:#94A3B8; padding:12px 0; text-align:center; }
+        .jcal-toast  { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); background:#1A2340; color:#fff; padding:12px 22px; border-radius:12px; font-size:13px; font-weight:600; z-index:9999; box-shadow:0 8px 24px rgba(0,0,0,.2); animation:jcalToast .25s ease; white-space:nowrap; }
+        @keyframes jcalToast { from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)} }
+        .jcal-detail-overlay { position:fixed; inset:0; background:rgba(15,23,42,.35); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; z-index:9999; }
+        .jcal-detail-box { background:#fff; border-radius:16px; width:360px; max-width:95vw; padding:24px; box-shadow:0 20px 60px rgba(0,0,0,.18); animation:jcalPop .2s cubic-bezier(.34,1.56,.64,1); }
+        @keyframes jcalPop { from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1} }
+      `}</style>
+
+      <div style={{ padding:"16px 16px 20px" }}>
+        <div className="jcal-root">
+          {/* Header */}
+          <div className="jcal-header">
+            <button className="jcal-nav" onClick={prev}>‹</button>
+            <span className="jcal-title">
+              {fmt(current, { month:"long", year:"numeric" })}
+            </span>
+            <span className="jcal-readonly-badge">📅 Consultation uniquement</span>
+            <button className="jcal-nav" onClick={next}>›</button>
+          </div>
+
+          {/* DOW row */}
+          <div className="jcal-dow-row">
+            {["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"].map(d => (
+              <div key={d} className="jcal-dow">{d}</div>
+            ))}
+          </div>
+
+          {/* Grid */}
+          <div className="jcal-grid">
+            {days.map((day, i) => {
+              const evs = eventsOfDay(day);
+              const sel = isSel(day);
+              const tod = isToday(day);
+              const inM = inMonth(day);
+              return (
+                <div key={i} className={`jcal-cell${sel ? " sel" : ""}`}
+                  style={{ opacity: inM ? 1 : 0.3 }}
+                  onClick={() => {
+                    setSelected(new Date(day));
+                    if (!evs.length) showTeamToast();
+                  }}>
+                  <div className={`jcal-day-num${tod ? " today" : ""}`}
+                    style={{ color: !tod ? (inM ? "#1A2340" : "#94A3B8") : undefined }}>
+                    {day.getDate()}
+                  </div>
+                  {evs.slice(0,2).map((ev, j) => {
+                    const col = CAL_CAT_COLORS_J[ev.category] || CAL_CAT_COLORS_J.Personnel;
+                    return (
+                      <div key={j} className="jcal-ev-chip"
+                        style={{ background:col.bg, color:"#fff" }}
+                        onClick={e => { e.stopPropagation(); setDetailEv(ev); }}>
+                        {ev.title}
+                      </div>
+                    );
+                  })}
+                  {evs.length > 2 && <div className="jcal-more">+{evs.length-2} autres</div>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Selected day events */}
+          <div className="jcal-side">
+            <div className="jcal-side-title">
+              {fmt(selected, { weekday:"long", day:"numeric", month:"long" })}
+            </div>
+            {selEvs.length === 0 ? (
+              <div className="jcal-empty">Aucun événement ce jour-là</div>
+            ) : selEvs.map((ev, i) => {
+              const col = CAL_CAT_COLORS_J[ev.category] || CAL_CAT_COLORS_J.Personnel;
+              return (
+                <div key={i} className="jcal-ev-row"
+                  style={{ cursor:"pointer" }}
+                  onClick={() => setDetailEv(ev)}>
+                  <div className="jcal-ev-dot" style={{ background:col.bg }} />
+                  <div>
+                    <div className="jcal-ev-name">{ev.title}</div>
+                    {ev.time && <div className="jcal-ev-time">🕐 {ev.time}</div>}
+                    {ev.isActive && (
+                      <span style={{ background:"#EF4444", color:"#fff", fontSize:9, padding:"1px 5px", borderRadius:4, fontWeight:800 }}>EN DIRECT</span>
+                    )}
+                  </div>
+                  <span style={{ marginLeft:"auto", fontSize:10, color:col.bg, fontWeight:700, background:col.light, padding:"2px 8px", borderRadius:10 }}>
+                    {ev.category === "Enquete" ? "Enquête" : ev.category === "Evenement" ? "Événement" : ev.category}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Toast */}
+      {toast && <div className="jcal-toast">{toast}</div>}
+
+      {/* Detail popup */}
+      {detailEv && (
+        <div className="jcal-detail-overlay" onClick={() => setDetailEv(null)}>
+          <div className="jcal-detail-box" onClick={e => e.stopPropagation()}>
+            <div style={{ display:"flex", gap:10, alignItems:"flex-start", marginBottom:14 }}>
+              <div style={{ width:10, height:10, borderRadius:"50%", background:(CAL_CAT_COLORS_J[detailEv.category]||CAL_CAT_COLORS_J.Personnel).bg, marginTop:5, flexShrink:0 }} />
+              <div style={{ flex:1 }}>
+                <p style={{ fontSize:16, fontWeight:700, color:"#1A2340", fontFamily:"Poppins,sans-serif", marginBottom:4 }}>{detailEv.title}</p>
+                {detailEv.time && <p style={{ fontSize:12, color:"#94A3B8", marginBottom:4 }}>🕐 {detailEv.time}</p>}
+                {detailEv.text && <p style={{ fontSize:12, color:"#4A5568", lineHeight:1.5 }}>{detailEv.text}</p>}
+                {detailEv.isActive && <span style={{ background:"#EF4444", color:"#fff", fontSize:10, padding:"2px 8px", borderRadius:6, fontWeight:800 }}>EN DIRECT</span>}
+              </div>
+            </div>
+            <div style={{ background:"#FEF3C7", borderRadius:10, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#78350F", display:"flex", gap:8, alignItems:"flex-start" }}>
+              <span>ℹ️</span>
+              <span>Cet événement est géré par l'équipe Swafy. Pour toute question, contactez-nous via la messagerie.</span>
+            </div>
+            <div style={{ display:"flex", justifyContent:"flex-end" }}>
+              <button onClick={() => setDetailEv(null)}
+                style={{ padding:"8px 20px", border:"none", borderRadius:8, background:"#0ABFAA", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Poppins,sans-serif" }}>
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════ */
 const JeuneLayout = () => {
@@ -486,28 +725,10 @@ const JeuneLayout = () => {
           />
         );
 
-      /* ── CALENDAR ── */
+      /* ── CALENDAR ── Read-only for Jeune, fed by admin notes in localStorage ── */
       case PAGES.CALENDAR:
-        return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="calendar" size={18}/> Calendrier</h2>
-            {[
-              { ico:"📚", title:"Débat : Réforme éducative",      date:"Lun 12 Mai · 18h00" },
-              { ico:"🌱", title:"Live : Environnement & Jeunesse", date:"Mer 14 Mai · 20h00" },
-              { ico:"📊", title:"Enquête nationale : Emploi",      date:"Ven 16 Mai · Toute la journée" },
-              { ico:"🎤", title:"Atelier : Prise de parole",       date:"Sam 17 Mai · 10h00" },
-            ].map((ev, i) => (
-              <div key={i} className="jl-event-item" style={{ animationDelay:`${i*0.08}s` }}>
-                <div className="jl-event-dot">{ev.ico}</div>
-                <div>
-                  <p className="jl-event-title">{ev.title}</p>
-                  <p className="jl-event-meta"><Icon name="clock" size={12}/>{ev.date}</p>
-                </div>
-                <button className="jl-event-btn">S'inscrire</button>
-              </div>
-            ))}
-          </div>
-        );
+        return <JeuneCalendarView />;
+
 
       /* ── LIVE ── */
       case PAGES.LIVE:
