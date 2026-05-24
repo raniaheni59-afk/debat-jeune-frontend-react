@@ -235,22 +235,32 @@ const fetchEnqueteSatisfaction = useCallback(async () => {
     prev.map((chart) => {
       if (chart.id !== "chart-enquete-satisfaction") return chart;
       
-      // ✅ Guard: vérifier que datasets existe avant d'y accéder
-      const existingDatasets = chart.datasets || [];
-      const ds0 = existingDatasets[0] || { data: [], color: "#7c5cbf", dashed: false, label: "Satisfaction" };
-      const ds1 = existingDatasets[1] || { data: [], color: "rgba(231,76,60,0.7)", dashed: true, label: "Nb réponses" };
+      // ✅ Protection stricte contre null/undefined
+      const existingDatasets = Array.isArray(chart.datasets) ? chart.datasets : [];
+      const ds0 = existingDatasets?.[0] ?? null;
+      const ds1 = existingDatasets?.[1] ?? null;
       
       return {
         ...chart,
         labels: ["Jan", "Feb", "Mar", "Apr"],
         datasets: [
-          { ...ds0, data: [5, 4, 3, 4] },
-          { ...ds1, data: [2, 3, 1, 4] },
+          { 
+            data: [5, 4, 3, 4], 
+            color: ds0?.color ?? "#7c5cbf", 
+            dashed: ds0?.dashed ?? false, 
+            label: "Satisfaction" 
+          },
+          { 
+            data: [2, 3, 1, 4], 
+            color: ds1?.color ?? "rgba(231,76,60,0.7)", 
+            dashed: ds1?.dashed ?? true, 
+            label: "Nb réponses" 
+          },
         ],
       };
     })
   );
-}, []);
+}, []);  // ← Vide OK si stable
 
 // ✅ fetch publications
 const fetchPublications = useCallback(async () => {
