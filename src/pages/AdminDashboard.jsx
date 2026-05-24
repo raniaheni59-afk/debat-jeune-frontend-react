@@ -13,6 +13,7 @@ import {
   Legend,
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
+import React from "react";
 import API from "../services/api";
 import PublierPage from "./PublierPage";
 import PublicationCard from "../components/PublicationCard";
