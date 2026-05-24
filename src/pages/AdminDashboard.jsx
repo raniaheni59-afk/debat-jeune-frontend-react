@@ -355,21 +355,30 @@ useEffect(() => {
   // ── Chart CRUD ──
 const openEditChart = (chart) => {
   const copy = JSON.parse(JSON.stringify(chart));
+  if (!copy.labels) copy.labels = [];
+  if (!copy.datasets?.length) copy.datasets = [{ label:"Données", data:[], color:"#7c5cbf", dashed:false }];
   copy.labels.push("");
-  if (copy.type === "doughnut") { 
+  if (copy.type === "doughnut") {
+    if (!copy.datasets[0].data) copy.datasets[0].data = [];
+    if (!copy.datasets[0].colors) copy.datasets[0].colors = [];
     copy.datasets[0].data.push(0); 
     copy.datasets[0].colors.push("#3b82f6"); 
   } else {
-    copy.datasets.forEach((ds) => ds.data.push(0));
+    copy.datasets.forEach((ds) => { if (!ds.data) ds.data = []; ds.data.push(0); });
   }
   setEditModal({ open:true, mode:"edit-chart", targetId:chart.id, data:copy });
 };
 
 const openAddData = (chart) => {
   const copy = JSON.parse(JSON.stringify(chart));
+  if (!copy.labels) copy.labels = [];
+  if (!copy.datasets?.length) copy.datasets = [{ label:"Données", data:[], color:"#7c5cbf", dashed:false }];
   copy.labels.push("");
-  if (copy.type === "doughnut") { copy.datasets[0].data.push(0); copy.datasets[0].colors.push("#3b82f6"); }
-  else copy.datasets.forEach((ds) => ds.data.push(0));
+  if (copy.type === "doughnut") {
+    if (!copy.datasets[0].data) copy.datasets[0].data = [];
+    if (!copy.datasets[0].colors) copy.datasets[0].colors = [];
+    copy.datasets[0].data.push(0); copy.datasets[0].colors.push("#3b82f6");
+  } else copy.datasets.forEach((ds) => { if (!ds.data) ds.data = []; ds.data.push(0); });
   setEditModal({ open:true, mode:"add-data", targetId:chart.id, data:copy });
 }; 
 
@@ -484,11 +493,15 @@ const openAddData = (chart) => {
 
   // ── Chart builders ──
   const buildData = (chart) => {
+    // ✅ Guard: jamais de datasets vides vers Chart.js
+    if (!chart?.datasets?.length) return { labels: [], datasets: [] };
     if (chart.type === "line") {
+      // Si pas encore de données, retourner structure vide valide
+      if (!chart.labels?.length) return { labels: ["..."], datasets: chart.datasets.map(ds => ({ label: ds.label||"", data: [0], borderColor: ds.color||"#ccc", backgroundColor: "transparent", tension: 0.4, borderWidth: 2 })) };
       return {
         labels: chart.labels,
         datasets: chart.datasets.map((ds) => ({
-          label: ds.label, data: ds.data, borderColor: ds.color,
+          label: ds.label, data: ds.data?.length ? ds.data : [0], borderColor: ds.color,
           backgroundColor: ds.dashed ? "transparent" : `${ds.color}12`,
           tension: 0.4, fill: !ds.dashed,
           borderWidth: ds.dashed ? 2 : 2.5,
@@ -612,9 +625,12 @@ const navItems = [
   const removeRow = (i) => {
     updateModalData((d) => {
       const copy = JSON.parse(JSON.stringify(d));
+      if (!copy.labels) copy.labels = [];
       copy.labels.splice(i, 1);
-      if (copy.type === "doughnut") { copy.datasets[0].data.splice(i,1); copy.datasets[0].colors.splice(i,1); }
-      else copy.datasets.forEach((ds) => ds.data.splice(i,1));
+      if (copy.type === "doughnut") {
+        if (copy.datasets[0]?.data) copy.datasets[0].data.splice(i,1);
+        if (copy.datasets[0]?.colors) copy.datasets[0].colors.splice(i,1);
+      } else copy.datasets.forEach((ds) => { if (ds.data) ds.data.splice(i,1); });
       return copy;
     });
   };
@@ -622,9 +638,13 @@ const navItems = [
   const addRow = () => {
     updateModalData((d) => {
       const copy = JSON.parse(JSON.stringify(d));
+      if (!copy.labels) copy.labels = [];
       copy.labels.push("");
-      if (copy.type === "doughnut") { copy.datasets[0].data.push(0); copy.datasets[0].colors.push("#3b82f6"); }
-      else copy.datasets.forEach((ds) => ds.data.push(0));
+      if (copy.type === "doughnut") {
+        if (!copy.datasets[0]?.data) copy.datasets[0].data = [];
+        if (!copy.datasets[0]?.colors) copy.datasets[0].colors = [];
+        copy.datasets[0].data.push(0); copy.datasets[0].colors.push("#3b82f6");
+      } else copy.datasets.forEach((ds) => { if (!ds.data) ds.data = []; ds.data.push(0); });
       return copy;
     });
   };
