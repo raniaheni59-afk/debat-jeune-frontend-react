@@ -1,5 +1,21 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import CalendarPage from "./CalendarPage";
+import AdminContact from "./AdminContact";
+import NewLive from "./NewLive";
+import AdminLiveStream from "./AdminLiveStream";
+import Swafy_Meet from "./Swafy_Meet";
+import ArchivePage from "./ArchivePage";
+import ParametrePage from "./ParametrePage";
+import { useLang } from "../i18n/LanguageContext";
+import ParametreContact from "./ParametreContact";
+import PublierPage from "./PublierPage";
+import Acceuil from "./Acceuil";
+import AdminEnquete from "./AdminEnquete";
+import Suivi from "./Suivi";
+import Participants from "../pages/Participants";
 import { useNavigate } from "react-router-dom";
+import Notifications from "../pages/Notifications";
+import { useLocation } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,8 +30,6 @@ import {
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import API from "../services/api";
-import PublierPage from "./PublierPage";
-import PublicationCard from "../components/PublicationCard";
 
 
 
