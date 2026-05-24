@@ -9,7 +9,7 @@ import { useLang } from "../i18n/LanguageContext";
 import ParametreContact from "./ParametreContact";
 import PublierPage from "./PublierPage";
 import AdminEnquete from "./EnquetePage";
-import Suivi from "./Suivi";
+import Suivi from "./suivi";
 import Participants from "../pages/Participants";
 import { useNavigate } from "react-router-dom";
 import Notifications from "../pages/Notifications";
