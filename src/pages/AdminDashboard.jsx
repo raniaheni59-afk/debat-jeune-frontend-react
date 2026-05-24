@@ -1280,8 +1280,11 @@ const navItems = [
           </div>
           {chart.subtitle && <p style={S.sub}>{chart.subtitle}</p>}
           <div style={{ height: chart.type === "doughnut" ? 200 : 250 }}>
-            <C data={buildData(chart)} options={chartOptions} />
-          </div>
+  {(chart.labels?.length > 0 || chart.type === "doughnut")
+    ? <C data={buildData(chart)} options={chartOptions} />
+    : <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"#bbb", fontSize:13 }}>Chargement…</div>
+  }
+</div>
           <div style={S.actions}>
             <button style={S.actBtn} onClick={() => openEditChart(chart)}>✏️ Modifier</button>
             <button style={{ ...S.actBtn, ...S.actDel }}
