@@ -30,14 +30,13 @@ import { Line, Bar, Doughnut } from "react-chartjs-2";
 import API from "../services/api";
 
 
-
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
   BarElement, ArcElement, Filler, Tooltip, Legend
 );
 
 export default function AdminDashboard() {
-  const user = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}") || {}; } catch { return {}; } })();
+  const user = JSON.parse(localStorage.getItem("user"));
   const navigate = useNavigate();
   const t = (key) => key;
  
@@ -367,30 +366,21 @@ useEffect(() => {
   // ── Chart CRUD ──
 const openEditChart = (chart) => {
   const copy = JSON.parse(JSON.stringify(chart));
-  if (!copy.labels) copy.labels = [];
-  if (!copy.datasets?.length) copy.datasets = [{ label:"Données", data:[], color:"#7c5cbf", dashed:false }];
   copy.labels.push("");
-  if (copy.type === "doughnut") {
-    if (!copy.datasets[0].data) copy.datasets[0].data = [];
-    if (!copy.datasets[0].colors) copy.datasets[0].colors = [];
+  if (copy.type === "doughnut") { 
     copy.datasets[0].data.push(0); 
     copy.datasets[0].colors.push("#3b82f6"); 
   } else {
-    copy.datasets.forEach((ds) => { if (!ds.data) ds.data = []; ds.data.push(0); });
+    copy.datasets.forEach((ds) => ds.data.push(0));
   }
   setEditModal({ open:true, mode:"edit-chart", targetId:chart.id, data:copy });
 };
 
 const openAddData = (chart) => {
   const copy = JSON.parse(JSON.stringify(chart));
-  if (!copy.labels) copy.labels = [];
-  if (!copy.datasets?.length) copy.datasets = [{ label:"Données", data:[], color:"#7c5cbf", dashed:false }];
   copy.labels.push("");
-  if (copy.type === "doughnut") {
-    if (!copy.datasets[0].data) copy.datasets[0].data = [];
-    if (!copy.datasets[0].colors) copy.datasets[0].colors = [];
-    copy.datasets[0].data.push(0); copy.datasets[0].colors.push("#3b82f6");
-  } else copy.datasets.forEach((ds) => { if (!ds.data) ds.data = []; ds.data.push(0); });
+  if (copy.type === "doughnut") { copy.datasets[0].data.push(0); copy.datasets[0].colors.push("#3b82f6"); }
+  else copy.datasets.forEach((ds) => ds.data.push(0));
   setEditModal({ open:true, mode:"add-data", targetId:chart.id, data:copy });
 }; 
 
@@ -505,38 +495,61 @@ const openAddData = (chart) => {
 
   // ── Chart builders ──
   const buildData = (chart) => {
-    // ✅ Guard: jamais de datasets vides vers Chart.js
-    if (!chart?.datasets?.length) return { labels: [], datasets: [] };
+    // ✅ Guard complet — jamais de data vide vers Chart.js
+    if (!chart?.datasets?.length) return { labels: ["..."], datasets: [{ data: [0] }] };
+
     if (chart.type === "line") {
-      // Si pas encore de données, retourner structure vide valide
-      if (!chart.labels?.length) return { labels: ["..."], datasets: chart.datasets.map(ds => ({ label: ds.label||"", data: [0], borderColor: ds.color||"#ccc", backgroundColor: "transparent", tension: 0.4, borderWidth: 2 })) };
+      const labels = chart.labels?.length ? chart.labels : ["..."];
       return {
-        labels: chart.labels,
-        datasets: chart.datasets.map((ds) => ({
-          label: ds.label, data: ds.data?.length ? ds.data : [0], borderColor: ds.color,
-          backgroundColor: ds.dashed ? "transparent" : `${ds.color}12`,
-          tension: 0.4, fill: !ds.dashed,
-          borderWidth: ds.dashed ? 2 : 2.5,
-          borderDash: ds.dashed ? [6,4] : [],
-          pointRadius: 4, pointBackgroundColor: ds.color,
-          pointBorderColor: "#fff", pointBorderWidth: 2, pointHoverRadius: 7,
-        })),
+        labels,
+        datasets: chart.datasets.map((ds) => {
+          const data = ds.data?.length ? ds.data : new Array(labels.length).fill(0);
+          return {
+            label: ds.label || "",
+            data,
+            borderColor: ds.color || "#7c5cbf",
+            backgroundColor: ds.dashed ? "transparent" : `${ds.color || "#7c5cbf"}12`,
+            tension: 0.4,
+            fill: !ds.dashed,
+            borderWidth: ds.dashed ? 2 : 2.5,
+            borderDash: ds.dashed ? [6, 4] : [],
+            pointRadius: data.length > 0 ? 4 : 0,
+            pointBackgroundColor: ds.color || "#7c5cbf",
+            pointBorderColor: "#fff",
+            pointBorderWidth: 2,
+            pointHoverRadius: 7,
+          };
+        }),
       };
     }
+
     if (chart.type === "bar") {
+      const labels = chart.labels?.length ? chart.labels : ["..."];
       return {
-        labels: chart.labels,
+        labels,
         datasets: chart.datasets.map((ds) => ({
-          label: ds.label, data: ds.data, backgroundColor: ds.color,
-          borderRadius: 6, borderSkipped: false,
+          label: ds.label || "",
+          data: ds.data?.length ? ds.data : new Array(labels.length).fill(0),
+          backgroundColor: ds.color || "#7c5cbf",
+          borderRadius: 6,
+          borderSkipped: false,
         })),
       };
     }
+
+    // doughnut
+    const ds0 = chart.datasets[0] || {};
+    const data = ds0.data?.length ? ds0.data : [1];
+    const colors = ds0.colors?.length ? ds0.colors : ["#7c5cbf"];
+    const labels = chart.labels?.length ? chart.labels : data.map((_, i) => `Cat ${i+1}`);
     return {
-      labels: chart.labels,
+      labels,
       datasets: [{
-        data: chart.datasets[0].data, backgroundColor: chart.datasets[0].colors,
-        borderWidth: 3, borderColor: "#fff", hoverOffset: 10,
+        data,
+        backgroundColor: colors,
+        borderWidth: 3,
+        borderColor: "#fff",
+        hoverOffset: 10,
       }],
     };
   };
@@ -637,12 +650,9 @@ const navItems = [
   const removeRow = (i) => {
     updateModalData((d) => {
       const copy = JSON.parse(JSON.stringify(d));
-      if (!copy.labels) copy.labels = [];
       copy.labels.splice(i, 1);
-      if (copy.type === "doughnut") {
-        if (copy.datasets[0]?.data) copy.datasets[0].data.splice(i,1);
-        if (copy.datasets[0]?.colors) copy.datasets[0].colors.splice(i,1);
-      } else copy.datasets.forEach((ds) => { if (ds.data) ds.data.splice(i,1); });
+      if (copy.type === "doughnut") { copy.datasets[0].data.splice(i,1); copy.datasets[0].colors.splice(i,1); }
+      else copy.datasets.forEach((ds) => ds.data.splice(i,1));
       return copy;
     });
   };
@@ -650,13 +660,9 @@ const navItems = [
   const addRow = () => {
     updateModalData((d) => {
       const copy = JSON.parse(JSON.stringify(d));
-      if (!copy.labels) copy.labels = [];
       copy.labels.push("");
-      if (copy.type === "doughnut") {
-        if (!copy.datasets[0]?.data) copy.datasets[0].data = [];
-        if (!copy.datasets[0]?.colors) copy.datasets[0].colors = [];
-        copy.datasets[0].data.push(0); copy.datasets[0].colors.push("#3b82f6");
-      } else copy.datasets.forEach((ds) => { if (!ds.data) ds.data = []; ds.data.push(0); });
+      if (copy.type === "doughnut") { copy.datasets[0].data.push(0); copy.datasets[0].colors.push("#3b82f6"); }
+      else copy.datasets.forEach((ds) => ds.data.push(0));
       return copy;
     });
   };
@@ -1177,7 +1183,10 @@ const navItems = [
                         </select>
                       </div>
                       <div style={{ height:220 }}>
-                        <C data={buildData(firstChart)} options={opts[firstChart.type]} />
+                        {(firstChart.labels?.length > 0 || firstChart.type === "doughnut")
+                          ? <C data={buildData(firstChart)} options={opts[firstChart.type]} />
+                          : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13}}>Chargement…</div>
+                        }
                       </div>
                       {firstChart.type === "line" && (
                         <div style={S.legend}>
@@ -1237,7 +1246,10 @@ const navItems = [
                         </div>
                         {chart.subtitle && <p style={S.sub}>{chart.subtitle}</p>}
                         <div style={{ height: chart.type === "doughnut" ? 200 : 250 }}>
-                          <C data={buildData(chart)} options={opts[chart.type]} />
+                          {(chart.labels?.length > 0 || chart.type === "doughnut")
+                            ? <C data={buildData(chart)} options={opts[chart.type]} />
+                            : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13}}>Chargement…</div>
+                          }
                         </div>
                         <div style={S.actions}>
                           <button style={S.actBtn} onClick={() => openEditChart(chart)}>✏️ Modifier</button>
