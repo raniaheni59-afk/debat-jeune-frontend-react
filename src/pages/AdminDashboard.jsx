@@ -231,36 +231,32 @@ const fetchGouvernoratStats = useCallback(async () => {
 const fetchEnqueteSatisfaction = useCallback(async () => {
   console.log("🔥 fetchEnqueteSatisfaction CALLED");
 
-  setCharts((prev) =>
-    prev.map((chart) => {
+  setCharts((prev) => {
+    console.log("📊 prev charts:", prev.map(c => ({ id: c.id, datasets: c.datasets })));
+    
+    return prev.map((chart) => {
       if (chart.id !== "chart-enquete-satisfaction") return chart;
       
-      // ✅ Protection stricte contre null/undefined
-      const existingDatasets = Array.isArray(chart.datasets) ? chart.datasets : [];
-      const ds0 = existingDatasets?.[0] ?? null;
-      const ds1 = existingDatasets?.[1] ?? null;
+      // ✅ TOUJOURS un tableau, JAMAIS null
+      const existingDatasets = chart.datasets == null ? [] : Array.isArray(chart.datasets) ? chart.datasets : [];
+      const ds0 = existingDatasets?.[0] ?? { data: [], color: "#7c5cbf", dashed: false, label: "Satisfaction" };
+      const ds1 = existingDatasets?.[1] ?? { data: [], color: "rgba(231,76,60,0.7)", dashed: true, label: "Nb réponses" };
+      
+      console.log("✅ existingDatasets:", existingDatasets);
+      console.log("✅ ds0:", ds0);
+      console.log("✅ ds1:", ds1);
       
       return {
         ...chart,
         labels: ["Jan", "Feb", "Mar", "Apr"],
         datasets: [
-          { 
-            data: [5, 4, 3, 4], 
-            color: ds0?.color ?? "#7c5cbf", 
-            dashed: ds0?.dashed ?? false, 
-            label: "Satisfaction" 
-          },
-          { 
-            data: [2, 3, 1, 4], 
-            color: ds1?.color ?? "rgba(231,76,60,0.7)", 
-            dashed: ds1?.dashed ?? true, 
-            label: "Nb réponses" 
-          },
+          { ...ds0, data: [5, 4, 3, 4] },
+          { ...ds1, data: [2, 3, 1, 4] },
         ],
       };
-    })
-  );
-}, []);  // ← Vide OK si stable
+    });
+  });
+}, []); 
 
 // ✅ fetch publications
 const fetchPublications = useCallback(async () => {
@@ -1220,7 +1216,10 @@ const navItems = [
       </div>
       <div style={{ height:220 }}>
         {(firstChart.labels?.length > 0 || firstChart.type === "doughnut")
-          ? <C data={buildData(firstChart)} options={opts[firstChart.type]} />
+          ? <C 
+  data={buildData(firstChart) || { labels: [], datasets: [] }} 
+  options={opts[firstChart.type] || {}} 
+/>
           : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13}}>Chargement…</div>
         }
       </div>
