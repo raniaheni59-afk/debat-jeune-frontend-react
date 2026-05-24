@@ -1187,53 +1187,57 @@ const navItems = [
               {/* ROW 1 */}
               <div style={S.row1}>
                 {firstChart && (() => {
-                  const C = Comp[firstChart.type];
-                  return (
-                    <div id={firstChart.id}
-                      style={cardStyle(firstChart.id, firstChart.keywords, { flex:1.6, padding:24 })}>
-                      <div style={S.hdr}>
-                        <span style={S.hdrTitle}>{firstChart.title}</span>
-                        <div style={S.yearNav}>
-                          <button style={S.yBtn} onClick={() => changeYear(-1)}>◀</button>
-                          <span style={S.yLabel}>{year}</span>
-                          <button style={S.yBtn} onClick={() => changeYear(1)}>▶</button>
-                        </div>
-                        <select style={S.sel} value={period}
-                          onChange={(e) => { setPeriod(e.target.value); toast(`📆 Période : ${e.target.value} jours`); }}>
-                          <option value="7">7 days</option>
-                          <option value="30">30 days</option>
-                          <option value="90">90 days</option>
-                        </select>
-                      </div>
-                      <div style={{ height:220 }}>
-                        {(firstChart.labels?.length > 0 || firstChart.type === "doughnut")
-                          ? <C data={buildData(firstChart)} options={opts[firstChart.type]} />
-                          : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13}}>Chargement…</div>
-                        }
-                      </div>
-                      {firstChart.type === "line" && (
-                        <div style={S.legend}>
-                          {firstChart.datasets.map((ds, i) => (
-                            <span key={i} style={S.legendItem}>
-                              <span style={{ ...S.dot, background:ds.color, opacity:ds.dashed?0.5:1 }} />
-                              {ds.label}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      <div style={S.actions}>
-                        <button style={S.actBtn} onClick={() => openEditChart(firstChart)}>✏️ Modifier</button>
-                        <button style={{ ...S.actBtn, ...S.actDel }}
-                          onClick={() => setConfirmDel({ open:true, id:firstChart.id, title:firstChart.title })}>
-                          🗑 Supprimer
-                        </button>
-                        <button style={{ ...S.actBtn, ...S.actAdd }} onClick={() => openAddData(firstChart)}>
-                          ➕ Ajouter
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()}
+  const C = Comp[firstChart.type];
+  // ✅ Sécuriser l'accès aux datasets
+  const safeDatasets = firstChart.datasets || [];
+  
+  return (
+    <div id={firstChart.id}
+      style={cardStyle(firstChart.id, firstChart.keywords, { flex:1.6, padding:24 })}>
+      <div style={S.hdr}>
+        <span style={S.hdrTitle}>{firstChart.title}</span>
+        <div style={S.yearNav}>
+          <button style={S.yBtn} onClick={() => changeYear(-1)}>◀</button>
+          <span style={S.yLabel}>{year}</span>
+          <button style={S.yBtn} onClick={() => changeYear(1)}>▶</button>
+        </div>
+        <select style={S.sel} value={period}
+          onChange={(e) => { setPeriod(e.target.value); toast(`📆 Période : ${e.target.value} jours`); }}>
+          <option value="7">7 days</option>
+          <option value="30">30 days</option>
+          <option value="90">90 days</option>
+        </select>
+      </div>
+      <div style={{ height:220 }}>
+        {(firstChart.labels?.length > 0 || firstChart.type === "doughnut")
+          ? <C data={buildData(firstChart)} options={opts[firstChart.type]} />
+          : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13}}>Chargement…</div>
+        }
+      </div>
+      {/* ✅ CORRECTION: protéger le map avec safeDatasets */}
+      {firstChart.type === "line" && safeDatasets.length > 0 && (
+        <div style={S.legend}>
+          {safeDatasets.map((ds, i) => (
+            <span key={i} style={S.legendItem}>
+              <span style={{ ...S.dot, background: ds?.color || "#7c5cbf", opacity: ds?.dashed ? 0.5 : 1 }} />
+              {ds?.label || ""}
+            </span>
+          ))}
+        </div>
+      )}
+      <div style={S.actions}>
+        <button style={S.actBtn} onClick={() => openEditChart(firstChart)}>✏️ Modifier</button>
+        <button style={{ ...S.actBtn, ...S.actDel }}
+          onClick={() => setConfirmDel({ open:true, id:firstChart.id, title:firstChart.title })}>
+          🗑 Supprimer
+        </button>
+        <button style={{ ...S.actBtn, ...S.actAdd }} onClick={() => openAddData(firstChart)}>
+          ➕ Ajouter
+        </button>
+      </div>
+    </div>
+  );
+})()}
 
                 <div style={S.statsCol}>
                   {statCards.map((s) => (
