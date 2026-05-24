@@ -104,20 +104,10 @@ export default function AdminDashboard() {
   type: "line",
   title: "Évolution de la satisfaction (Enquête)",
   keywords: "enquete satisfaction evolution",
-  labels: [],
+  labels: ["..."],     // ← placeholder, remplacé par fetchEnqueteSatisfaction
   datasets: [
-    {
-      label: "Satisfaction moyenne",
-      data: [],
-      color: "#7c5cbf",
-      dashed: false,
-    },
-    {
-      label: "Nb réponses",
-      data: [],
-      color: "rgba(231,76,60,0.7)",
-      dashed: true,
-    },
+    { label: "Satisfaction moyenne", data: [0], color: "#7c5cbf", dashed: false },
+    { label: "Nb réponses",          data: [0], color: "rgba(231,76,60,0.7)", dashed: true },
   ],
 },
 
