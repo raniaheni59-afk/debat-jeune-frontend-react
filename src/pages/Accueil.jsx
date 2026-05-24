@@ -724,7 +724,7 @@ function Footer(){
             <p className="fbt">
               Science With and For Youth — Financé par l'UE (9,5 M€ · 48 mois), géré par l'ANPR.<br/>
               Angle Rue Danton & Rue Chaaben Bhouri N°11, Lafayette — BP 177, 1002 Tunis Belvédère.<br/>
-              ✉ recrutement.swafy@gmail.com
+              ✉ swafy@anpr.tn
             </p>
           </div>
           <div>
@@ -736,10 +736,12 @@ function Footer(){
           </div>
           <div>
             <div className="fct">Liens officiels</div>
-            <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer">Page Facebook SWAFY</a>
+            <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer">📘 Facebook SWAFY</a>
+            <a href="https://www.youtube.com/watch?v=eK-aLZ0nj8U" target="_blank" rel="noreferrer">▶️ YouTube — Lancement SWAFY</a>
+            <a href="https://www.linkedin.com/in/dhouha-sbaoulji-5a42aa28/" target="_blank" rel="noreferrer">🔗 LinkedIn — Dhouha Sbaoulji</a>
             <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">anpr.tn</a>
-            <a href="https://eu4youth.tn" target="_blank" rel="noreferrer">eu4youth.tn</a>
-            <a href="mailto:recrutement.swafy@gmail.com">recrutement.swafy@gmail.com</a>
+            <a href="https://eu4youth.tn/explorer/swafy/" target="_blank" rel="noreferrer">eu4youth.tn/swafy</a>
+            <a href="mailto:swafy@anpr.tn">✉ swafy@anpr.tn</a>
           </div>
         </div>
         <div className="fpart">

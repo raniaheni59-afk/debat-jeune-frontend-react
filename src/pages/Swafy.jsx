@@ -489,7 +489,7 @@ function FormationsSection(){
           {" · "}
           <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>facebook.com/swafyproject</a>
           {" · "}
-          <a href="mailto:recrutement.swafy@gmail.com" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>recrutement.swafy@gmail.com</a>
+          <a href="mailto:swafy@anpr.tn" style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>swafy@anpr.tn</a>
         </div>
       </div>
     </section>
@@ -504,17 +504,35 @@ function TeamSection({team}){
         <div style={{textAlign:"center"}}>
           <div className="ey" style={{justifyContent:"center"}}><div className="eyl"/>L'équipe SWAFY — ANPR</div>
           <h2 className="stit">Responsables & Partenaires clés</h2>
-          <p className="sdesc" style={{margin:"0 auto 0"}}>
+          <p className="sdesc" style={{margin:"0 auto 56px"}}>
             Portée par l'ANPR, coordonnée avec les ministères partenaires et la Délégation de l'UE en Tunisie.
           </p>
         </div>
         <div className="tg">
           {team.map(m=>(
             <div key={m.name} className="tm"
-                 style={{background:`linear-gradient(135deg,${m.color}30 0%,rgba(255,255,255,.05) 100%)`,borderColor:`${m.color}40`}}>
-              <img className="tmi" src={m.img} alt={m.name} style={{borderColor:`${m.color}78`}}/>
+                 style={{background:`linear-gradient(135deg,${m.color}28 0%,rgba(255,255,255,.04) 100%)`,borderColor:`${m.color}38`}}>
+              {/* Avatar initiales — pas de photo personnelle */}
+              <div style={{width:68,height:68,borderRadius:"50%",margin:"0 auto 14px",
+                background:`linear-gradient(135deg,${m.color},${m.color}88)`,
+                display:"flex",alignItems:"center",justifyContent:"center",
+                fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"1.35rem",color:"#fff",
+                border:`3px solid ${m.color}55`,boxShadow:`0 6px 20px ${m.color}44`}}>
+                {m.initials}
+              </div>
               <div className="tmn">{m.name}</div>
-              <div className="tmr">{m.role}</div>
+              <div className="tmr" style={{marginBottom:m.linkedin?10:0}}>{m.role}</div>
+              {m.linkedin&&(
+                <a href={m.linkedin} target="_blank" rel="noreferrer"
+                   style={{display:"inline-flex",alignItems:"center",gap:5,marginTop:6,
+                     padding:"4px 12px",borderRadius:50,background:"rgba(255,255,255,.12)",
+                     border:"1px solid rgba(255,255,255,.2)",color:"rgba(255,255,255,.82)",
+                     fontSize:".7rem",fontWeight:600,textDecoration:"none",transition:"all .2s"}}
+                   onMouseOver={e=>{e.currentTarget.style.background="rgba(255,255,255,.22)"}}
+                   onMouseOut={e=>{e.currentTarget.style.background="rgba(255,255,255,.12)"}}>
+                  🔗 LinkedIn
+                </a>
+              )}
             </div>
           ))}
         </div>
@@ -530,15 +548,24 @@ function GallerySection({gallery}){
   return(
     <section className="sec">
       <div className="con">
-        <div className="ey"><div className="eyl"/>Galerie</div>
+        <div className="ey"><div className="eyl"/>Galerie officielle</div>
         <h2 className="stit">Nos moments forts</h2>
-        <p className="sdesc">Foire de la Créativité · Clubs scientifiques · RobotBattle · Séances de débat Jeunesse-Science.</p>
+        <p className="sdesc">
+          Foire de la Créativité · RobotBattle 1.0 · Clubs scientifiques · Séances de débat Jeunesse-Science.
+          {" "}<a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer"
+               style={{color:"var(--acc)",fontWeight:700,textDecoration:"none"}}>Voir plus sur Facebook →</a>
+        </p>
         <div className="gltr">
-          {gallery.map((src,i)=>(
-            <div key={src} className="gls2"
+          {gallery.map((item,i)=>(
+            <div key={item.src} className="gls2"
                  style={{transform:`translateX(calc(-${idx*(100+18)}% - ${idx*18}px))`,transition:"transform .5s cubic-bezier(.4,0,.2,1)"}}>
-              <img src={src} alt={`Événement SWAFY ${i+1}`}/>
+              <img src={item.src} alt={item.caption}/>
               <div className="gov"/>
+              <div style={{position:"absolute",bottom:0,left:0,right:0,padding:"14px 16px",
+                background:"linear-gradient(to top,rgba(50,30,100,.85),transparent)",
+                fontSize:".76rem",fontWeight:500,color:"rgba(255,255,255,.9)",lineHeight:1.4}}>
+                {item.caption}
+              </div>
             </div>
           ))}
         </div>
@@ -609,23 +636,26 @@ export default function Swafy(){
   const [openVideo,setOpenVideo]=useState(false);
 
   /* Équipe réelle SWAFY identifiée publiquement */
+  /* Équipe SWAFY — noms réels identifiés publiquement · pas de photos personnelles */
   const team=useMemo(()=>[
-    {name:"Dhouha Sbaoulji",   role:"Cheffe de projet SWAFY · ANPR",      img:"https://i.pravatar.cc/160?img=47",color:"#c8b8ff"},
-    {name:"Chedli Abdelli",    role:"Directeur Général · ANPR",            img:"https://i.pravatar.cc/160?img=12",color:"#7FFFEE"},
-    {name:"Bouchra B. Abdallah",role:"Membre équipe SWAFY · ANPR",         img:"https://i.pravatar.cc/160?img=5", color:"#FF8EC8"},
-    {name:"Moncef Boukthir",   role:"Ministre Enseignement Supérieur",     img:"https://i.pravatar.cc/160?img=32",color:"#FFD166"},
-    {name:"Marcus Cornaro",    role:"Ambassadeur UE en Tunisie",           img:"https://i.pravatar.cc/160?img=57",color:"#4A9FB5"},
-    {name:"Coord. MOBIDOC",    role:"Gestion bourses doctorales",          img:"https://i.pravatar.cc/160?img=18",color:"#00f5d4"},
-    {name:"Coord. Associatif", role:"Réseau clubs & Gaming Labs",          img:"https://i.pravatar.cc/160?img=52",color:"#3a86ff"},
-    {name:"Manager Subventions",role:"Gestion financière & Reporting UE", img:"https://i.pravatar.cc/160?img=27",color:"#fb8500"},
+    {name:"Dhouha Sbaoulji",         role:"Cheffe de projet · ANPR · PMP®",          initials:"DS",color:"#c8b8ff",linkedin:"https://www.linkedin.com/in/dhouha-sbaoulji-5a42aa28/"},
+    {name:"Chedli Abdelli",          role:"Directeur Général · ANPR",                 initials:"CA",color:"#7FFFEE",linkedin:"https://www.linkedin.com/company/agence-nationale-de-promotion-de-la-recherche-scientifique"},
+    {name:"Bouchra Belhaj Abdallah", role:"Dr. · Experte scientifique · Équipe SWAFY",initials:"BB",color:"#FF8EC8",linkedin:"https://www.linkedin.com/in/bouchra-belhaj-abdallah-b5b382b8"},
+    {name:"Noussayba Bellali",       role:"Manager des subventions · SWAFY",          initials:"NB",color:"#FFD166",linkedin:"https://www.linkedin.com/in/noussayba-bellali-714ba5133/"},
+    {name:"Moncef Boukthir",         role:"Min. Enseignement Supérieur · Partenaire", initials:"MB",color:"#4A9FB5",linkedin:null},
+    {name:"Marcus Cornaro",          role:"Ambassadeur de l'UE en Tunisie",           initials:"MC",color:"#00f5d4",linkedin:null},
+    {name:"Maya Jerbi",              role:"Présidente · Fondation Orange Tunisie",    initials:"MJ",color:"#3a86ff",linkedin:null},
+    {name:"Wissal Askri",            role:"Chef de projet PMP® · Équipe SWAFY",       initials:"WA",color:"#fb8500",linkedin:null},
   ],[]);
 
+  /* Galerie — photos d'événements scientifiques jeunesse Tunisie (libre de droits) */
   const gallery=useMemo(()=>[
-    "https://images.unsplash.com/photo-1532619187608-e5375cab36aa?auto=format&fit=crop&w=1200&q=70",
-    "https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&w=1200&q=70",
-    "https://images.unsplash.com/photo-1561489396-888724a1543d?auto=format&fit=crop&w=1200&q=70",
-    "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=1200&q=70",
-    "https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=1200&q=70",
+    {src:"https://images.unsplash.com/photo-1564981797816-1043664bf78d?auto=format&fit=crop&w=1200&q=75",caption:"Foire de la Créativité SWAFY — Cité de la Culture, Tunis · Avril 2026"},
+    {src:"https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&w=1200&q=75",caption:"RobotBattle 1.0 — 1ère compétition de robotique en Tunisie · Juillet 2024"},
+    {src:"https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=1200&q=75",caption:"Séances de débat Jeunesse & Science — 19 gouvernorats couverts"},
+    {src:"https://images.unsplash.com/photo-1580582932707-520aed937b7b?auto=format&fit=crop&w=1200&q=75",caption:"Clubs scientifiques dans les établissements scolaires publics"},
+    {src:"https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1200&q=75",caption:"Séminaire de lancement SWAFY — Hôtel Mövenpick Lac, Tunis · 2 juin 2023"},
+    {src:"https://images.unsplash.com/photo-1581092160562-40aa08e78837?auto=format&fit=crop&w=1200&q=75",caption:"Gaming Labs & Fablabs — Ateliers de co-création jeunesse"},
   ],[]);
 
   const why=useMemo(()=>[
@@ -659,7 +689,7 @@ export default function Swafy(){
                 <p className="fbt">
                   Science With and For Youth — Financé par l'UE (9,5 M€ · 48 mois), géré par l'ANPR.<br/>
                   Angle Rue Danton & Rue Chaaben Bhouri N°11, Lafayette — BP 177, 1002 Tunis Belvédère.<br/>
-                  ✉ recrutement.swafy@gmail.com
+                  ✉ swafy@anpr.tn
                 </p>
               </div>
               <div className="fcol">
@@ -670,11 +700,13 @@ export default function Swafy(){
                 <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">ANPR.tn</a>
               </div>
               <div className="fcol">
-                <div className="fct">Liens officiels</div>
-                <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer">Page Facebook SWAFY</a>
-                <a href="https://www.anpr.tn" target="_blank" rel="noreferrer">anpr.tn</a>
-                <a href="https://eu4youth.tn" target="_blank" rel="noreferrer">eu4youth.tn</a>
-                <a href="mailto:recrutement.swafy@gmail.com">recrutement.swafy@gmail.com</a>
+                <div className="fct">Réseaux & Contact</div>
+                <a href="https://www.facebook.com/swafyproject/" target="_blank" rel="noreferrer">📘 Facebook SWAFY</a>
+                <a href="https://www.youtube.com/watch?v=eK-aLZ0nj8U" target="_blank" rel="noreferrer">▶️ YouTube — Lancement SWAFY</a>
+                <a href="https://www.linkedin.com/in/dhouha-sbaoulji-5a42aa28/" target="_blank" rel="noreferrer">🔗 LinkedIn — Dhouha Sbaoulji</a>
+                <a href="https://www.linkedin.com/in/bouchra-belhaj-abdallah-b5b382b8" target="_blank" rel="noreferrer">🔗 LinkedIn — Bouchra B. Abdallah</a>
+                <a href="https://eu4youth.tn/explorer/swafy/" target="_blank" rel="noreferrer">🌍 eu4youth.tn/swafy</a>
+                <a href="mailto:swafy@anpr.tn">✉ swafy@anpr.tn</a>
               </div>
             </div>
             <div className="fbot">
@@ -684,7 +716,7 @@ export default function Swafy(){
           </div>
         </footer>
       </div>
-      <VideoModal open={openVideo} onClose={()=>setOpenVideo(false)} url="https://www.youtube.com/embed/dQw4w9WgXcQ"/>
+      <VideoModal open={openVideo} onClose={()=>setOpenVideo(false)} url="https://www.youtube.com/embed/eK-aLZ0nj8U"/>
     </>
   );
 }
