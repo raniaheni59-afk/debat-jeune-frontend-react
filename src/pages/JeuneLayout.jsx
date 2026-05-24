@@ -8,10 +8,11 @@ import PublierPage from "./PublierPage";
 
 
 // Import conditionnel — adapte les chemins selon ta structure
-let JeuneContact, LiveBanner, JeuneEnquete;
+let JeuneContact, LiveBanner, JeuneEnquete, LiveSection;
 try { JeuneContact  = require("./JeuneContact").default;  } catch { JeuneContact  = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Messages — bientôt disponible</div>; }
 try { LiveBanner    = require("../components/LiveBanner").default; } catch { LiveBanner = () => null; }
 try { JeuneEnquete  = require("./JeuneEnquete").default;  } catch { JeuneEnquete  = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Enquêtes — bientôt disponible</div>; }
+try { LiveSection   = require("./Livesection").default;   } catch { LiveSection   = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Live — bientôt disponible</div>; }
 
 
 
@@ -195,6 +196,77 @@ const MODAL_MAP = {
   priv    : { title:"Confidentialité", Body: () => <ModalToggles items={[{label:"Profil public"},{label:"Afficher mes publications"},{label:"Autoriser les messages"},{label:"Indexation dans la recherche"}]} initState={[true,true,true,false]}/>, hasFoot:true },
   app     : { title:"Apparence",       Body: ModalAppearance, hasFoot: true },
   sec     : { title:"Sécurité",        Body: ModalSecurity,   hasFoot: true },
+};
+
+/* ═══════════════════════════════════════════════════════════
+   LIVE WIDGET — sidebar, shows active live from API
+═══════════════════════════════════════════════════════════ */
+const LiveEvWidget = ({ goToLive }) => {
+  const [live, setLive] = React.useState(null);
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    // Fetch active live
+    fetch("https://debat-jeune.onrender.com/api/lives", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(list => {
+        const active = Array.isArray(list) ? list.find(l => l.is_active) : null;
+        setLive(active || null);
+      })
+      .catch(() => {});
+
+    const onStarted = e => {
+      const { roomCode, viewerLink } = e.detail || {};
+      if (viewerLink) setLive({ room_code: roomCode, stream_link: viewerLink, is_active: 1, title_live: "Live en cours" });
+    };
+    const onEnded = () => setLive(null);
+    window.addEventListener("live-started", onStarted);
+    window.addEventListener("live-ended",   onEnded);
+    return () => {
+      window.removeEventListener("live-started", onStarted);
+      window.removeEventListener("live-ended",   onEnded);
+    };
+  }, []);
+
+  const joinLive = () => {
+    if (live?.stream_link) {
+      try {
+        const url      = new URL(live.stream_link);
+        const parts    = url.pathname.split("/").filter(Boolean);
+        const roomCode = parts[parts.length - 1];
+        const vt       = url.searchParams.get("vt");
+        if (roomCode && vt) { navigate(`/meet/${roomCode}?vt=${vt}`); return; }
+      } catch {}
+    }
+    goToLive();
+  };
+
+  if (!live) return (
+    <div className="jl-ev-widget">
+      <p className="jl-ev-tag">Sessions Live</p>
+      <p className="jl-ev-name">Aucun live en cours</p>
+      <p className="jl-ev-time"><Icon name="clock" size={12}/>Disponible prochainement</p>
+      <button className="jl-ev-join" onClick={goToLive}>
+        <Icon name="radio" size={13}/>Voir les lives
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="jl-ev-widget" style={{ borderColor: "#ea4335", borderWidth: 2 }}>
+      <p className="jl-ev-tag" style={{ color: "#ea4335", display:"flex", alignItems:"center", gap:4 }}>
+        <span style={{ width:8, height:8, borderRadius:"50%", background:"#ea4335", display:"inline-block", animation:"jlPulse 1s infinite" }}/>
+        LIVE EN COURS
+      </p>
+      <p className="jl-ev-name">{live.title_live || "Live en cours"}</p>
+      {live.time && <p className="jl-ev-time"><Icon name="clock" size={12}/>{live.time}</p>}
+      <button className="jl-ev-join" onClick={joinLive} style={{ background:"linear-gradient(135deg,#ea4335,#b31412)" }}>
+        <Icon name="play" size={13}/>Rejoindre maintenant
+      </button>
+    </div>
+  );
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -440,36 +512,8 @@ const JeuneLayout = () => {
       /* ── LIVE ── */
       case PAGES.LIVE:
         return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="radio" size={18}/> Sessions Live</h2>
-            <LiveBanner />
-            <div className="jl-live-banner">
-              <div className="jl-live-top">
-                <span className="jl-live-badge">● LIVE</span>
-                <span className="jl-live-desc">Débat : L'avenir de la jeunesse tunisienne</span>
-              </div>
-              <div className="jl-live-screen">
-                <div style={{ textAlign:"center" }}>
-                  <div style={{ fontSize:44, marginBottom:8 }}>🎙️</div>
-                  <p style={{ fontSize:12, color:"rgba(255,255,255,0.72)" }}>342 spectateurs en direct</p>
-                </div>
-              </div>
-              <button className="jl-submit-btn"><Icon name="play" size={16}/>Rejoindre le Live</button>
-            </div>
-            <h2 className="jl-section-title" style={{ marginTop:8 }}>Prochains lives</h2>
-            {[
-              { title:"Santé mentale des jeunes",    date:"Demain · 19h00" },
-              { title:"Entrepreneuriat & Innovation", date:"Jeudi · 20h00" },
-            ].map((l, i) => (
-              <div key={i} className="jl-event-item" style={{ animationDelay:`${i*0.08}s` }}>
-                <div className="jl-event-dot"><Icon name="mic" size={22}/></div>
-                <div>
-                  <p className="jl-event-title">{l.title}</p>
-                  <p className="jl-event-meta"><Icon name="clock" size={12}/>{l.date}</p>
-                </div>
-                <button className="jl-event-btn">Rappel</button>
-              </div>
-            ))}
+          <div className="jl-page" style={{ padding: 0 }}>
+            <LiveSection />
           </div>
         );
 
@@ -724,15 +768,8 @@ const JeuneLayout = () => {
               <div className="jl-q-sc"><p className="jl-q-num">8</p><p className="jl-q-lbl">Événements</p></div>
             </div>
 
-            {/* Upcoming event */}
-            <div className="jl-ev-widget">
-              <p className="jl-ev-tag">Prochain événement</p>
-              <p className="jl-ev-name">Débat : Réforme éducative</p>
-              <p className="jl-ev-time"><Icon name="clock" size={12}/>Lundi 12 Mai · 18h00</p>
-              <button className="jl-ev-join" onClick={() => goTo(PAGES.LIVE)}>
-                <Icon name="play" size={13}/>Rejoindre le live
-              </button>
-            </div>
+            {/* Upcoming event / Live widget */}
+            <LiveEvWidget goToLive={() => goTo(PAGES.LIVE)} />
 
             {/* Trending */}
             <p className="jl-sec-label">Tendances</p>
