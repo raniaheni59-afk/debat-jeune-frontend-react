@@ -1,21 +1,5 @@
-import CalendarPage from "./CalendarPage";
-import AdminContact from "./AdminContact";
-import NewLive from "./NewLive";
-import AdminLiveStream from "./AdminLiveStream";
-import Swafy_Meet from "./Swafy_Meet";
-import ArchivePage from "./ArchivePage";
-import ParametrePage from "./ParametrePage";
-import { useLang } from "../i18n/LanguageContext";
-import ParametreContact from "./ParametreContact";
-import PublierPage from "./PublierPage";
-import Acceuil from "./Acceuil";
-import AdminEnquete from "./AdminEnquete";
-import Suivi from "./Suivi";
-import Participants from "../pages/Participants";
-import { useNavigate } from "react-router-dom";
-import Notifications from "../pages/Notifications";
-import { useLocation } from "react-router-dom";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -30,15 +14,29 @@ import {
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import API from "../services/api";
+import PublierPage from "./PublierPage";
+import PublicationCard from "../components/PublicationCard";
+import AdminContact    from "./AdminContact";
+import CalendarPage    from "./CalendarPage";
+import AdminLiveStream from "./AdminLiveStream";
+import Swafy_Meet      from "./Swafy_Meet";
+import NewLive         from "./NewLive";
+import ArchivePage     from "./ArchivePage";
+import EnquetePage     from "./EnquetePage";      
+import ParametrePage   from "./ParametrePage";    
+import ParametreContact from "./ParametreContact";
+
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
   BarElement, ArcElement, Filler, Tooltip, Legend
 );
+
 export default function AdminDashboard() {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}") || {}; } catch { return {}; } })();
   const navigate = useNavigate();
-  const { t } = useLang();
+  const t = (key) => key;
+ 
   const [activePage, setActivePage] = useState("dashboard");
   const [calSplash, setCalSplash] = useState(false);
   const [archiveSplash, setArchiveSplash] = useState(false);
@@ -51,11 +49,78 @@ export default function AdminDashboard() {
   const [period, setPeriod] = useState("7");
   const [toasts, setToasts] = useState([]);
   const toastId = useRef(0);
-  const [participantCount, setParticipantCount] = useState(0);
+
   const [editModal, setEditModal] = useState({ open: false, mode: "", targetId: null, data: {} });
+
+  // ── Notifications real-time ──
+  const [adminNotifs, setAdminNotifs] = useState([]);
+  const adminUnread = 0;
+  const markNotifRead = () => {};
+  const markAllNotifsRead = () => {};
+
+  // ── Unread messages (socket) ──
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const socketRef = useRef(null);
+
+  const BACKEND_URL =
+    typeof import.meta !== "undefined"
+      ? (import.meta.env?.VITE_BACKEND_URL || "https://debat-jeune.onrender.com")
+      : "https://debat-jeune.onrender.com";
+
+  // ✅ Fetch unread count depuis l'API au chargement
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await API.get("/messenger/unread-count");
+      setUnreadMessages(res.data?.count || 0);
+    } catch { setUnreadMessages(0); }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCount();
+
+    if (socketRef.current) return;
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    import("socket.io-client").then(({ io }) => {
+      const s = io(BACKEND_URL, {
+        auth: { token },
+        transports: ["websocket"],
+        reconnectionAttempts: 5,
+        reconnectionDelay: 3000,
+      });
+      socketRef.current = s;
+
+      // ✅ Incrémenter badge si on n'est PAS sur la page messages
+      s.on("newMessage", () => {
+        setActivePage((cur) => {
+          if (cur !== "messages") setUnreadMessages((n) => n + 1);
+          return cur;
+        });
+      });
+      s.on("newGroupMessage", () => {
+        setActivePage((cur) => {
+          if (cur !== "messages") setUnreadMessages((n) => n + 1);
+          return cur;
+        });
+      });
+
+      s.emit("joinGroup");
+      s.on("connect_error", (e) => console.error("AdminDashboard socket:", e.message));
+    }).catch(() => {});
+
+    return () => {
+      socketRef.current?.disconnect();
+      socketRef.current = null;
+    };
+  }, [fetchUnreadCount]); // eslint-disable-line
   const [addChartModal, setAddChartModal] = useState(false);
   const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
   const [newChart, setNewChart] = useState({ type: "line", title: "" });
+  const [publications, setPublications] = useState([]);
+  const [pubLoading, setPubLoading] = useState(false);
+  
+ 
   const [charts, setCharts] = useState([
     {
       id: "chart-event",
@@ -65,7 +130,7 @@ export default function AdminDashboard() {
       labels: [
         "Tunis","Ariana","Ben Arous","Manouba",
         "Nabeul","Zaghouan","Bizerte",
-        "Béja","Jendouba","Kef","Siliana",
+        "Beja","Jendouba","Kef","Siliana",
         "Sousse","Monastir","Mahdia",
         "Sfax","Kairouan","Kasserine","Sidi Bouzid",
         "Gabes","Mednine","Tataouine",
@@ -80,7 +145,14 @@ export default function AdminDashboard() {
         },
       ],
     },
-  
+   
+    {
+      id: "chart-donut", type: "doughnut", title: "Catégorie",
+      subtitle: "From 1-6 Dec, 2021",
+      keywords: "categorie donut pie etudiant eleve parent camembert pourcentage",
+      labels: ["etudiant","eleve","parent"],
+      datasets: [{ data:[40,32,28], colors:["#4a5568","#7c5cbf","#ec4899"] }],
+    },
     {
   id: "chart-enquete-satisfaction",
   type: "line",
@@ -107,7 +179,7 @@ export default function AdminDashboard() {
 
   const [statCards, setStatCards] = useState([
     {
-      id:"stat-participant", label:"Nombre participant", value:0,
+      id:"stat-participant", label:"Nombre participant", value:4000,
       gradient:"linear-gradient(135deg,#3498db,#2980b9)",
       keywords:"nombre participant nbr jeune bleu users", autoSync:true,
     },
@@ -117,7 +189,7 @@ export default function AdminDashboard() {
       keywords:"nombre gouvernant vert admin", autoSync:false,
     },
   ]);
-  
+  // ✅ FETCH STATS EVENEMENTS (من DB)
 const fetchGouvernoratStats = useCallback(async () => {
   try {
     const res = await API.get(`/events/stats-gouvernorat?year=${year}`);
@@ -137,7 +209,7 @@ const fetchGouvernoratStats = useCallback(async () => {
       )
     );
   } catch (err) {
-    console.error(" fetchGouvernoratStats error", err);
+    console.error("❌ fetchGouvernoratStats error", err);
   }
 }, [year]);
   const lastScrollY  = useRef(0);
@@ -153,6 +225,7 @@ const fetchGouvernoratStats = useCallback(async () => {
       @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
       @keyframes glow{0%,100%{box-shadow:0 0 0 3px rgba(142,114,209,.3)}50%{box-shadow:0 0 0 6px rgba(142,114,209,.15)}}
       @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.015)}}
+      @keyframes spin{to{transform:rotate(360deg)}}
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:'Poppins',sans-serif}
       ::-webkit-scrollbar{width:6px}
@@ -163,32 +236,23 @@ const fetchGouvernoratStats = useCallback(async () => {
     return () => document.head.removeChild(style);
   }, []);
 
- // ── Update Stat Card when participantCount changes ──
-useEffect(() => {
-  setStatCards((prev) =>
-    prev.map((card) =>
-      card.id === "stat-participant"
-        ? { ...card, value: participantCount }
-        : card
-    )
-  );
-}, [participantCount]);
 
- useEffect(() => {
-  const sync = async () => {
-    try {
-      const res = await API.get("/users/count/jeune-profiles");
-      if (res.data?.count != null) {
-       setParticipantCount(res.data.count); 
-       console.log(" participantCount =", res.data.count);
-      }
-    } catch {}
-  };
-
-  sync();
-  const interval = setInterval(sync, 30000);
-  return () => clearInterval(interval);
-}, []);
+  // ── Auto-sync participant count ──//
+  useEffect(() => {
+    const sync = async () => {
+      try {
+       const res = await API.get("/admin/stats/jeune-count");
+        if (res.data?.count != null) {
+          setStatCards((p) =>
+            p.map((c) => c.id === "stat-participant" ? { ...c, value: res.data.count } : c)
+          );
+        }
+      } catch {}
+    };
+    sync();
+    const interval = setInterval(sync, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── Scroll → sidebar hide/show ──
   useEffect(() => {
@@ -218,7 +282,7 @@ useEffect(() => {
   // ── FETCH DES EVENEMENTS DEPUIS LA BASE DE DONNEES ──
   // ── Chargement des statistiques des événements par gouvernorat ──
  const fetchEnqueteSatisfaction = useCallback(async () => {
-  console.log(" fetchEnqueteSatisfaction CALLED");
+  console.log("🔥 fetchEnqueteSatisfaction CALLED");
 
   setCharts((prev) =>
     prev.map((chart) =>
@@ -236,12 +300,26 @@ useEffect(() => {
   );
 }, []);
 
+// ✅ fetch publications
+const fetchPublications = useCallback(async () => {
+  try {
+    setPubLoading(true);
+    const res = await API.get("/publications");
+    setPublications(Array.isArray(res.data) ? res.data : []);
+  } catch { setPublications([]); }
+  finally { setPubLoading(false); }
+}, []);
 
+useEffect(() => {
+  fetchPublications();
+}, [fetchPublications]);
+
+// ✅ events من DB
 useEffect(() => {
   fetchGouvernoratStats();
 }, [fetchGouvernoratStats]);
 
-
+// ✅ enquête test
 useEffect(() => {
   fetchEnqueteSatisfaction();
 }, [fetchEnqueteSatisfaction]);
@@ -266,23 +344,7 @@ useEffect(() => {
 
   return () => clearTimeout(t);
 }, [activePage]);
-useEffect(() => {
-  setCharts(prev =>
-    prev.map(chart =>
-      chart.id === "chart-donut"
-        ? {
-            ...chart,
-            datasets: [
-              {
-                ...chart.datasets[0],
-                data: [participantCount, 0, 0], 
-              },
-            ],
-          }
-        : chart
-    )
-  );
-}, [participantCount]);
+
   // ── Toast ──
   const toast = useCallback((msg, type = "success") => {
     const id = ++toastId.current;
@@ -295,6 +357,8 @@ useEffect(() => {
     setActivePage(page);
     setSearchQuery("");
     setHighlightedCard(null);
+    // ✅ Reset badge messages quand on ouvre la page
+    if (page === "messages") setUnreadMessages(0);
   };
 
   const logout = () => {
@@ -305,14 +369,13 @@ useEffect(() => {
       navigate("/");
     }, 800);
   };
-  
+
   // ── Search ──
   const allSearchable = [
     ...charts.map((c) => ({
       id: c.id, label: c.title, kw: c.keywords,
       icon: c.type === "line" ? "📈" : c.type === "bar" ? "📊" : "🍩",
     })),
-    
     ...statCards.map((s) => ({
       id: s.id, label: `${s.label} (${s.value.toLocaleString()})`,
       kw: s.keywords, icon: "💳",
@@ -357,12 +420,12 @@ useEffect(() => {
   // ── Chart CRUD ──
 const openEditChart = (chart) => {
   const copy = JSON.parse(JSON.stringify(chart));
-  copy.labels.push(""); // Ajouter un nouveau label vide
+  copy.labels.push("");
   if (copy.type === "doughnut") { 
     copy.datasets[0].data.push(0); 
     copy.datasets[0].colors.push("#3b82f6"); 
   } else {
-    copy.datasets.forEach((ds) => ds.data.push(0)); // Ajouter 0 pour chaque série
+    copy.datasets.forEach((ds) => ds.data.push(0));
   }
   setEditModal({ open:true, mode:"edit-chart", targetId:chart.id, data:copy });
 };
@@ -381,11 +444,6 @@ const openAddData = (chart) => {
   const saveModal = async () => {
   const { mode, targetId, data } = editModal;
 
-  console.log(" SAVE clicked");
-  console.log("mode:", mode);
-  console.log("targetId:", targetId);
-  console.log("data:", data);
-
   if (targetId === "chart-event" && mode === "add-data") {
     try {
       const payload = {
@@ -395,44 +453,34 @@ const openAddData = (chart) => {
         id_user: user?.id_user || user?.id || user?.userId,
       };
 
-      console.log(" Payload à envoyer :", JSON.stringify(payload, null, 2));
-
       if (
         !payload.titre_evenement?.trim() ||
         !payload.id_gouvernorat ||
         !payload.date_evenement
       ) {
-        toast(" Tous les champs sont obligatoires.", "error");
+        toast("❌ Tous les champs sont obligatoires.", "error");
         return;
       }
 
       const token = localStorage.getItem("token");
-
-      const response = await API.post("/events", payload, {
+      await API.post("/events", payload, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
-      console.log(" Réponse backend :", response.data);
 
-      toast(" Événement ajouté avec succès !");
+      toast("✅ Événement ajouté avec succès !");
       await fetchGouvernoratStats();
       closeModal();
       return;
     } catch (error) {
-      console.error(" Erreur ajout événement :", {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-      });
-
       toast(
         error.response?.data?.message ||
-          " Erreur serveur lors de l'ajout de l'événement",
+          "❌ Erreur serveur lors de l'ajout de l'événement",
         "error"
       );
-      return; 
+      return;
     }
   }
+
   if (mode === "edit-stat" && targetId?.startsWith("stat-")) {
     setStatCards((p) =>
       p.map((s) =>
@@ -441,20 +489,18 @@ const openAddData = (chart) => {
           : s
       )
     );
-    toast(" Stat modifié");
+    toast("✅ Stat modifié");
     closeModal();
     return;
   }
 
-  
   if ((mode === "edit-chart" || mode === "add-data") && targetId) {
     setCharts((p) => p.map((c) => (c.id === targetId ? data : c)));
-    toast(" Diagramme mis à jour");
+    toast("✅ Diagramme mis à jour");
     closeModal();
     return;
   }
 
-  //  fallback
   closeModal();
 };
   const closeModal = () => setEditModal({ open:false, mode:"", targetId:null, data:{} });
@@ -490,7 +536,15 @@ const openAddData = (chart) => {
     setCharts((p) => [...p, c]);
     setAddChartModal(false);
     setNewChart({ type:"line", title:"" });
-    toast(" Nouveau diagramme créé !");
+    toast("✅ Nouveau diagramme créé !");
+  };
+
+  const openPowerBI = () => {
+    const a = document.createElement("a");
+    a.href = "powerbi:";
+    a.click();
+    toast("🔄 Tentative d'ouverture de Power BI Desktop...");
+    setTimeout(() => toast("⚠️ Si Power BI ne s'est pas ouvert, installez-le depuis le Microsoft Store.", "warning"), 3000);
   };
 
   // ── Chart builders ──
@@ -582,26 +636,31 @@ const openAddData = (chart) => {
       }
     }
   };
-  const Comp = { line:Line, bar:Bar, doughnut:Doughnut }; 
+  const Comp = { line:Line, bar:Bar, doughnut:Doughnut };
+
+  
+  // ── NAV ITEMS ── ✅ ENQUETES AJOUTÉ
 const navItems = [
-  { key:"acceuil",      label: t("acceuil") },
-   { key:"statistique",  label:"Suivi" },
+  { key:"accueil",      label: t("accueil") },
   { key:"dashboard",    label: t("dashboard") },
-  { key:"messages",     label: t("messages") },
+  { key:"messages",     label: t("messages"), badge: unreadMessages || null },
   { key:"publier",      label: t("publier") },
   { key:"calendrier",   label: t("calendrier") },
-  { key:"swafyMeet",    label: "Swafy Meet" }, 
+  { key:"swafyMeet",    label: "Swafy Meet" },
   { key:"live",         label: t("live"), isLive:true },
+  { key:"enquetes",     label: "Enquêtes", icon: "📋" }, // ✅ AJOUT
   { key:"participant",  label: t("participants") },
-  { key:"notification", label: t("notifications") },
+  { key:"notification", label: t("notifications"), badge: adminUnread || null },
   { key:"archive",      label: t("archive") },
   { key:"parametre",    label: t("parametre") },
-  { key: "enquetes",    label: "Enquêtes" },
-
-
-
 ];
-const emptyPages={};
+
+  // ── Empty pages ──
+ const emptyPages = {
+  participant:  { icon:"👥" },
+  parametre:    { icon:"⚙️" },
+};
+
   // ── Helpers ──
   const cardStyle = (id, kw, extra = {}) => {
     const base = { ...S.card, ...extra };
@@ -637,24 +696,27 @@ const emptyPages={};
 
   const firstChart = charts[0] || null;
   const restCharts = charts.slice(1);
+
+  
   const fullPages = [
-  "acceuil",
+  "accueil",
+  "calendrier",
   "messages",
-  "publier",
   "newlive",
   "live",
   "swafyMeet",
   "archive",
-  "parametre" ,
+  "parametre",
   "parametreContact",
-  "enquetes",
-  "notification",
-  "statistique",
+  "publier",
+  "enquetes", // ✅ AJOUT
 ];
+
   const isFullPage = fullPages.includes(activePage);
-  /* ═════════════════════════════════
+
+  /* ════════════════════════════════════════
      R E N D E R
-  ════════════════════════════════════ */
+  ════════════════════════════════════════ */
   return (
     <div style={S.wrapper}>
 
@@ -704,21 +766,53 @@ const emptyPages={};
 
         <button style={S.exitBtn} onClick={logout}> {t("logout")}</button>
       </aside>
-     
-{/* ══════════════════════════════════
-     A C C U E I L  ✅
-══════════════════════════════════ */}
-{activePage === "acceuil" && (
-  <div
-    style={{
-      marginLeft: sidebarVisible ? 240 : 0,
-      transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
-      minHeight: "100vh",
-      background: "#f8f7fc",
-    }}
-  >
-    <Acceuil />
-  </div>
+
+      {/* ══════════════════════════════════
+           CALENDRIER
+      ══════════════════════════════════ */}
+      {activePage === "calendrier" && (
+  <>
+    {calSplash && (
+      <>
+        <style>{`
+          .cal-splash {
+            position: fixed;
+            inset: 0;
+            background: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+          }
+          .cal-splash img {
+            width: 150px;
+            animation: calAnim 2s ease forwards;
+          }
+          @keyframes calAnim {
+            0% { transform: scale(.6); opacity: 0; }
+            25% { transform: scale(1); opacity: 1; }
+            75% { transform: scale(1); opacity: 1; }
+            100% { transform: scale(.9); opacity: 0; }
+          }
+        `}</style>
+        <div className="cal-splash">
+         <img src={`/calendrier.png?v=${Date.now()}`} alt="calendrier" />
+        </div>
+      </>
+    )}
+
+    <div
+      style={{
+        marginLeft: sidebarVisible ? 240 : 0,
+        transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+        minHeight: "100vh",
+        background: "#f8f7fc",
+        padding: "30px 40px",
+      }}
+    >
+      <CalendarPage />
+    </div>
+  </>
 )}
 
       {/* ══════════════════════════════════
@@ -728,15 +822,17 @@ const emptyPages={};
         <div style={{
           marginLeft: sidebarVisible ? 240 : 0,
           transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
-          minHeight: "100vh",
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}>
          <AdminContact setActivePage={setActivePage} />
         </div>
       )}
 
-
       {/* ══════════════════════════════════
-           NEW LIVE PAGE ✅
+           NEW LIVE PAGE
       ══════════════════════════════════ */}
       {activePage === "newlive" && (
         <div style={{
@@ -756,9 +852,10 @@ const emptyPages={};
           />
         </div>
       )}
+
       {/* ══════════════════════════════════
-     LIVE ✅
-══════════════════════════════════ */}
+           LIVE
+      ══════════════════════════════════ */}
 {activePage === "live" && (
   <div
     style={{
@@ -769,6 +866,25 @@ const emptyPages={};
       padding: "30px 40px",
     }}
   >
+    {/* ✅ Copy live viewer link for admin to share with jeunes */}
+    {(() => {
+      const vLink = localStorage.getItem("currentLiveViewerLink");
+      if (!vLink) return null;
+      return (
+        <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:14, padding:"14px 18px", marginBottom:20, display:"flex", alignItems:"center", gap:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
+          <span style={{ fontSize:20 }}>🔗</span>
+          <div style={{ flex:1, minWidth:0 }}>
+            <p style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:3 }}>Lien à envoyer aux jeunes inscrits</p>
+            <p style={{ fontSize:11, color:"#6b7280", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{vLink}</p>
+          </div>
+          <button
+            onClick={()=>{ navigator.clipboard.writeText(vLink); }}
+            style={{ background:"linear-gradient(135deg,#7c3aed,#3b82f6)", border:"none", borderRadius:10, padding:"8px 18px", color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
+            📋 Copier le lien
+          </button>
+        </div>
+      );
+    })()}
     <AdminLiveStream />
   </div>
 )}
@@ -785,6 +901,25 @@ const emptyPages={};
     <Swafy_Meet onNouvelleReunion={() => setActivePage("newlive")} />
   </div>
 )}
+
+{/* ══════════════════════════════════
+     ENQUETES PAGE  ✅ AJOUT
+══════════════════════════════════ */}
+{activePage === "enquetes" && (
+  <div
+    style={{
+      marginLeft: sidebarVisible ? 240 : 0,
+      transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+      minHeight: "100vh",
+      background: "linear-gradient(135deg,#b8a9e0,#9b89d0 20%,#8b7bc8 40%,#7c6cbf 60%,#9584cf 80%,#a897da)",
+      padding: "30px 40px 80px",
+      boxSizing: "border-box",
+    }}
+  >
+    <EnquetePage />
+  </div>
+)}
+
 {activePage === "archive" && (
   <>
     {archiveSplash && (
@@ -878,74 +1013,126 @@ const emptyPages={};
     <ParametreContact onBack={() => setActivePage("messages")} />
   </div>
 )}
-  
-{/* ══════════════════════════════════
-     P U B L I E R   P A G E ✅
-══════════════════════════════════ */}
+
+{activePage === "accueil" && (
+  <div style={{
+    marginLeft: sidebarVisible ? 240 : 0,
+    transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+    minHeight: "100vh",
+    padding: "20px 30px 80px",
+    boxSizing: "border-box",
+  }}>
+    <div style={{
+      background: "rgba(255,255,255,.93)", backdropFilter: "blur(10px)",
+      borderRadius: 18, border: "1px solid rgba(255,255,255,.5)",
+      padding: "32px 28px", marginBottom: 20, position: "relative", overflow: "hidden",
+      boxShadow: "0 4px 24px rgba(100,70,180,.1)",
+    }}>
+      <p style={{ fontSize:11, fontWeight:700, textTransform:"uppercase", letterSpacing:2, color:"#5a3fa0", marginBottom:8 }}>
+        Tableau de bord
+      </p>
+      <h1 style={{ fontFamily:"Poppins,sans-serif", fontSize:28, fontWeight:800, color:"#2d2555", marginBottom:8 }}>
+        Bonjour, <span style={{ background:"linear-gradient(90deg,#5a3fa0,#4fa3f7)", WebkitBackgroundClip:"text", WebkitTextFillColor:"transparent" }}>{user?.prenom_user || "Admin"}</span> 👋
+      </h1>
+      <p style={{ color:"#666", fontSize:14, lineHeight:1.6, maxWidth:420 }}>
+        Bienvenue dans l'espace admin — gérez, publiez, supervisez.
+      </p>
+    </div>
+
+    <div style={{ marginTop: 8 }}>
+      <h2 style={{ fontFamily:"Poppins,sans-serif", fontSize:18, fontWeight:800, color:"#fff", marginBottom:16, textShadow:"0 1px 4px rgba(0,0,0,.2)" }}>
+        Fil d'actualité
+      </h2>
+      {pubLoading ? (
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:14, padding:"60px 0", color:"rgba(255,255,255,.7)", fontSize:14 }}>
+          <div style={{ width:36, height:36, borderRadius:"50%", border:"3px solid rgba(255,255,255,.2)", borderTopColor:"#fff", animation:"spin .8s linear infinite" }} />
+          <p>Chargement…</p>
+        </div>
+      ) : publications.length === 0 ? (
+        <div style={{ background:"rgba(255,255,255,.93)", borderRadius:18, border:"1px solid rgba(255,255,255,.5)", padding:"60px 0", textAlign:"center", color:"#888", fontSize:14 }}>
+          <span style={{ fontSize:40 }}>✦</span>
+          <p style={{ marginTop:12 }}>Aucune publication pour le moment</p>
+        </div>
+      ) : (
+        publications.map(pub => (
+          <div key={pub.id_publication} id={`pub-${pub.id_publication}`}><PublicationCard publication={pub} onUpdate={fetchPublications} /></div>
+        ))
+      )}
+    </div>
+  </div>
+)}
 {activePage === "publier" && (
   <div
     style={{
       marginLeft: sidebarVisible ? 240 : 0,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
-      background: "#f8f7fc",
+      background: "linear-gradient(135deg, #f5f2ff 0%, #ede9ff 100%)",
     }}
   >
-    <PublierPage
-  onBack={() => setActivePage("dashboard")}
-  onSuccess={() => {
-    toast("✅ Publication créée avec succès !");
-    setActivePage("dashboard");
-  }}
-  onCancel={() => setActivePage("dashboard")}
-/>
+    <PublierPage onBack={() => setActivePage("dashboard")} />
   </div>
 )}
-  {activePage === "participant" && (
-      <div
-        style={{
-          marginLeft: sidebarVisible ? 240 : 0,
-          transition: "margin-left .5s",
-          minHeight: "100vh",
-          background: "#f8f7fc",
-          padding: "30px 40px",
-        }}
-      >
-        <Participants />
-      </div>
-    )}
- {/* ══════════════════════════════════
-          enquetes
-      ═════════════════════════════════ */}
 
-      {activePage === "enquetes" && (
-        <div
-          style={{
-            marginLeft: sidebarVisible ? 240 : 0,
-            transition: "margin-left .5s",
-            minHeight: "100vh",
-            background: "#f8f7fc"
-          }}
-        >
-          <AdminEnquete />
-        </div>
-      )}
-      {/* ══════════════════════════════════
-     NOTIFICATIONS 
-        ══════════════════════════════════ */}
-        {activePage === "notification" && (
-          <div
-            style={{
-              marginLeft: sidebarVisible ? 240 : 0,
-              transition: "margin-left .5s",
-              minHeight: "100vh",
-              background: "#f8f7fc",
-              padding: "30px 40px",
-            }}
-          >
-            <Notifications onBack={() => setActivePage("dashboard")} />
+{/* ══════ NOTIFICATION PAGE ══════ */}
+{activePage === "notification" && !isFullPage && (() => {
+  const BACK = (typeof API !== "undefined" && API.defaults?.baseURL?.split("/api")[0]) || "https://debat-jeune.onrender.com";
+  const getIcon = (type) => ({ new_post:"📢", publication_comment:"💬", publication_reaction:"❤️", debat_vote:"⚖️", comment_reaction:"👍" }[type] || "🔔");
+  const timeAgo = (date) => {
+    const d = Math.floor((Date.now() - new Date(date)) / 1000);
+    if (d < 60) return "À l'instant";
+    if (d < 3600) return `Il y a ${Math.floor(d/60)} min`;
+    if (d < 86400) return `Il y a ${Math.floor(d/3600)}h`;
+    return `Il y a ${Math.floor(d/86400)}j`;
+  };
+  return (
+    <div style={{ marginLeft: sidebarVisible ? 240 : 0, transition:"margin-left .5s cubic-bezier(.4,0,.2,1)", minHeight:"100vh", padding:"30px 40px 80px", boxSizing:"border-box" }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28, flexWrap:"wrap", gap:12 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+          <div style={{ width:48, height:48, borderRadius:14, background:"linear-gradient(135deg,#5a3fa0,#7c5cbf)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>🔔</div>
+          <div>
+            <h1 style={{ fontFamily:"Poppins,sans-serif", fontSize:22, fontWeight:800, color:"#fff", margin:0 }}>
+              Notifications {adminUnread > 0 && <span style={{ marginLeft:8, background:"#e74c3c", color:"#fff", fontSize:12, fontWeight:700, padding:"3px 10px", borderRadius:20 }}>{adminUnread}</span>}
+            </h1>
+            <p style={{ color:"rgba(255,255,255,.65)", fontSize:13, margin:0 }}>{adminUnread > 0 ? `${adminUnread} non lue(s)` : "Tout est à jour"}</p>
           </div>
-        )}
+        </div>
+        {adminUnread > 0 && <button onClick={markAllNotifsRead} style={{ padding:"10px 22px", borderRadius:12, border:"1.5px solid rgba(255,255,255,.3)", background:"rgba(255,255,255,.1)", color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", backdropFilter:"blur(8px)" }}>✓ Tout marquer lu</button>}
+      </div>
+      <div style={{ background:"rgba(255,255,255,.93)", borderRadius:20, overflow:"hidden", boxShadow:"0 4px 24px rgba(100,70,180,.12)", border:"1px solid rgba(255,255,255,.5)" }}>
+        {adminNotifs.length === 0 ? (
+          <div style={{ textAlign:"center", padding:"70px 20px", color:"#aaa" }}>
+            <div style={{ fontSize:52, marginBottom:12 }}>🔔</div>
+            <p style={{ fontSize:16, fontWeight:600, color:"#555" }}>Aucune notification</p>
+            <p style={{ fontSize:13, color:"#999", marginTop:6 }}>Vous serez notifié des nouvelles activités</p>
+          </div>
+        ) : adminNotifs.map((n, idx) => (
+          <div key={n.id_notification} onClick={() => { markNotifRead(n.id_notification); if (n.entity_id) { setActivePage("accueil"); setTimeout(() => { const el = document.getElementById(`pub-${n.entity_id}`); if (el) el.scrollIntoView({ behavior:"smooth", block:"center" }); }, 400); } }}
+            style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 22px", background: n.is_read == 0 ? "#f4f0ff" : "#fff", borderBottom: idx < adminNotifs.length-1 ? "1px solid #f0eef5" : "none", cursor:"pointer", transition:"background .2s" }}
+            onMouseEnter={e => e.currentTarget.style.background="#f8f5ff"}
+            onMouseLeave={e => e.currentTarget.style.background= n.is_read == 0 ? "#f4f0ff" : "#fff"}
+          >
+            <div style={{ position:"relative", flexShrink:0 }}>
+              <img src={n.photo_user ? `${BACK}/${n.photo_user}` : "https://randomuser.me/api/portraits/lego/1.jpg"} alt="user"
+                style={{ width:46, height:46, borderRadius:"50%", objectFit:"cover", border:"2px solid #e8e5f0" }}
+                onError={e => e.target.src="https://randomuser.me/api/portraits/lego/1.jpg"} />
+              <span style={{ position:"absolute", bottom:-2, right:-2, background:"#fff", borderRadius:"50%", width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, boxShadow:"0 1px 4px rgba(0,0,0,.15)" }}>{getIcon(n.type_notification)}</span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <p style={{ margin:0, fontSize:14, color:"#1a1a2e", lineHeight:1.45 }}>
+                {n.nom_user && <strong>{n.nom_user} {n.prenom_user} </strong>}
+                <span style={{ color:"#555" }}>{n.message}</span>
+              </p>
+              <span style={{ fontSize:12, color:"#999", marginTop:3, display:"block" }}>{timeAgo(n.created_at)}</span>
+            </div>
+            {n.is_read == 0 && <div style={{ width:10, height:10, borderRadius:"50%", background:"#7c5cbf", flexShrink:0 }} />}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+})()}
+
       {/* ══════════════════════════════════
            EMPTY PAGES
       ══════════════════════════════════ */}
@@ -962,11 +1149,7 @@ const emptyPages={};
          <p style={S.emptyP}>{t(`${activePage}_desc`)}</p>
         </div>
       )}
-     {activePage === "statistique" && (
-  <div style={{ marginLeft: sidebarVisible ? 240 : 0, transition:"margin-left .5s", minHeight:"100vh" }}>
-    <Suivi goDashboard={() => setActivePage("dashboard")} />
-  </div>
-  )}
+
       {/* ══════════════════════════════════
            M A I N  (dashboard)
       ══════════════════════════════════ */}
@@ -1006,22 +1189,11 @@ const emptyPages={};
               <span style={{ fontSize:13, fontWeight:600, color:"#fff" }}>{user?.nom_user || "Admin"}</span>
             </div>
           </div>
-         {activePage === "calendrier" && (
-          <div
-            style={{
-              width: "100%",
-              height: "calc(100vh - 100px)", // يخليها تملى الشاشة
-              background: "#f8f7fc",
-              borderRadius: "18px",
-              overflow: "hidden"
-            }}
-          >
-            <CalendarPage />
-          </div>
-        )}
+         
           {/* ── DASHBOARD ── */}
           {activePage === "dashboard" && (
             <div style={{ animation:"fadeUp .5s ease" }}>
+
               {/* ROW 1 */}
               <div style={S.row1}>
                 {firstChart && (() => {
@@ -1056,7 +1228,7 @@ const emptyPages={};
                           ))}
                         </div>
                       )}
-                    <div style={S.actions}>
+                      <div style={S.actions}>
                         <button style={S.actBtn} onClick={() => openEditChart(firstChart)}>✏️ Modifier</button>
                         <button style={{ ...S.actBtn, ...S.actDel }}
                           onClick={() => setConfirmDel({ open:true, id:firstChart.id, title:firstChart.title })}>
@@ -1069,12 +1241,13 @@ const emptyPages={};
                     </div>
                   );
                 })()}
+
                 <div style={S.statsCol}>
                   {statCards.map((s) => (
                     <div key={s.id} id={s.id}
                       style={{ ...cardStyle(s.id, s.keywords), ...S.statCard, background:s.gradient }}
                       onClick={() => openEditStat(s)}>
-                      <div style={S.statEdit}></div>
+                      <div style={S.statEdit}>✏️</div>
                       {s.autoSync && <div style={S.autoSync ? { ...S.autoTag } : {}}>🔄 Auto-sync</div>}
                       <div style={S.statLabel}>{s.label}</div>
                       <div style={S.statNum}>{s.value.toLocaleString()}</div>
@@ -1123,161 +1296,195 @@ const emptyPages={};
 
               {/* ADD CHART */}
               <div style={S.addSection}>
-              
+                <button style={S.addChartBtn} onClick={() => setAddChartModal(true)}>
+                  ➕ Nouveau Diagramme
+                </button>
+                <button style={S.pbiBtn} onClick={openPowerBI}>
+                  📊 Power BI
+                </button>
               </div>
+
             </div>
           )}
-         
-        </div>
-      )}
 
-     {/* ══════════════════════════════════
-           E D I T   M O D A L
-      ══════════════════════════════════ */}
-      {editModal.open && (
-        <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
-          <div style={S.modal}>
-            <div style={S.mHead}>
-              <h3 style={S.mTitle}>
-                {editModal.targetId === "chart-event" && editModal.mode === "add-data" 
-                  ? "➕ Ajouter un nouvel événement" 
-                  : (editModal.mode === "edit-stat" ? `✏️ ${editModal.data.label}` : `✏️ Modifier — ${editModal.data.title}`)}
-              </h3>
-              <button style={S.mClose} onClick={closeModal}>✕</button>
-            </div>
+          {/* ── EDIT / ADD DATA MODAL ── */}
+          {editModal.open && (
+            <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && closeModal()}>
+              <div style={S.modal}>
+                <div style={S.mHead}>
+                  <h3 style={S.mTitle}>
+                    {editModal.mode === "edit-stat" ? "✏️ Modifier la statistique"
+                      : editModal.mode === "add-data" ? "➕ Ajouter des données"
+                      : "✏️ Modifier le diagramme"}
+                  </h3>
+                  <button style={S.mClose} onClick={closeModal}>✕</button>
+                </div>
+                <div style={S.mBody}>
 
-            <div style={S.mBody}>
-              {/* 1. حالة تعديل الإحصائيات الفردية (Cards) */}
-              {editModal.mode === "edit-stat" && (
-                <>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Label</label>
-                    <input style={S.fi} value={editModal.data.label}
-                      onChange={(e) => updateModalData((d) => ({ ...d, label:e.target.value }))} />
-                  </div>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Valeur</label>
-                    <input style={S.fi} type="number" value={editModal.data.value}
-                      onChange={(e) => updateModalData((d) => ({ ...d, value:parseInt(e.target.value)||0 }))} />
-                  </div>
-                </>
-              )}
+                  {editModal.mode === "edit-stat" && (
+                    <>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Label</label>
+                        <input style={S.fi} value={editModal.data.label || ""}
+                          onChange={(e) => updateModalData((d) => ({ ...d, label:e.target.value }))} />
+                      </div>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Valeur</label>
+                        <input style={S.fi} type="number" value={editModal.data.value || 0}
+                          onChange={(e) => updateModalData((d) => ({ ...d, value:e.target.value }))} />
+                      </div>
+                    </>
+                  )}
 
-              {/* 2. حالة إضافة بيانات لجدول evenement (خاص بمخطط الولايات) */}
-              {editModal.targetId === "chart-event" && editModal.mode === "add-data" ? (
-                <>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Titre de l'événement</label>
-                    <input 
-                      style={S.fi} 
-                      placeholder="Ex: Conférence Jeunesse" 
-                      onChange={(e) => updateModalData(d => ({...d, titre_evenement: e.target.value}))} 
-                    />
-                  </div>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Gouvernorat</label>
-                    <select 
-                      style={S.fi} 
-                      onChange={(e) => updateModalData(d => ({...d, id_gouvernorat: parseInt(e.target.value)}))}
-                      defaultValue={1}
-                    >
-                      {charts[0].labels.map((gouv, i) => (
-                        <option key={i} value={i + 1}>{gouv}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div style={S.fg}>
-                    <label style={S.fl}>Date de l'événement</label>
-                    <input 
-                      type="date" 
-                      style={S.fi} 
-                      onChange={(e) => updateModalData(d => ({...d, date_evenement: e.target.value}))} 
-                    />
-                  </div>
-                </>
-              ) : (
-              
-                (editModal.mode === "edit-chart" || editModal.mode === "add-data") && editModal.data.type !== "doughnut" && (
-                  <>
-                    {editModal.mode === "edit-chart" && (
+                  {editModal.targetId === "chart-event" && editModal.mode === "add-data" && (
+                    <>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Titre de l'événement</label>
+                        <input style={S.fi} placeholder="Ex: Conférence Tunis"
+                          onChange={(e) => updateModalData(d => ({...d, titre_evenement: e.target.value}))} />
+                      </div>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Gouvernorat</label>
+                        <select style={S.fi}
+                          onChange={(e) => updateModalData(d => ({...d, id_gouvernorat: parseInt(e.target.value)}))}>
+                          {charts[0].labels.map((gouv, i) => (
+                            <option key={i} value={i + 1}>{gouv}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div style={S.fg}>
+                        <label style={S.fl}>Date de l'événement</label>
+                        <input 
+                          type="date" 
+                          style={S.fi} 
+                          onChange={(e) => updateModalData(d => ({...d, date_evenement: e.target.value}))} 
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {(editModal.mode === "edit-chart" || editModal.mode === "add-data") && editModal.data.type !== "doughnut" && editModal.targetId !== "chart-event" && (
+                    <>
+                      {editModal.mode === "edit-chart" && (
+                        <div style={S.fg}>
+                          <label style={S.fl}>Titre</label>
+                          <input style={S.fi} value={editModal.data.title}
+                            onChange={(e) => updateModalData((d) => ({ ...d, title:e.target.value }))} />
+                        </div>
+                      )}
+                      <div style={S.fg}>
+                        <label style={S.fl}>Points de données</label>
+                        <div style={S.tableHead}>
+                          <span style={{ flex:1, fontSize:11, fontWeight:700, color:"#888" }}>Label</span>
+                          {editModal.data.datasets.map((ds, di) => (
+                            <span key={di} style={{ flex:1, fontSize:11, fontWeight:700, color:"#888" }}>{ds.label}</span>
+                          ))}
+                          <span style={{ width:36 }} />
+                        </div>
+                        {editModal.data.labels.map((lbl, i) => (
+                          <div key={i} style={S.dRow}>
+                            <input style={{ ...S.fi, flex:1 }} value={lbl}
+                              onChange={(e) => updateModalData((d) => { const c=JSON.parse(JSON.stringify(d)); c.labels[i]=e.target.value; return c; })} />
+                            {editModal.data.datasets.map((ds, di) => (
+                              <input key={di} style={{ ...S.fi, flex:1 }} type="number" value={ds.data[i]}
+                                onChange={(e) => updateModalData((d) => { const c=JSON.parse(JSON.stringify(d)); c.datasets[di].data[i]=parseInt(e.target.value)||0; return c; })} />
+                            ))}
+                            <button style={S.rmBtn} onClick={() => removeRow(i)}>🗑</button>
+                          </div>
+                        ))}
+                        <button style={S.addRowBtn} onClick={addRow}>➕ Ajouter un point</button>
+                      </div>
+                    </>
+                  )}
+
+                  {(editModal.mode === "edit-chart" || editModal.mode === "add-data") && editModal.data.type === "doughnut" && (
+                    <>
                       <div style={S.fg}>
                         <label style={S.fl}>Titre</label>
                         <input style={S.fi} value={editModal.data.title}
                           onChange={(e) => updateModalData((d) => ({ ...d, title:e.target.value }))} />
                       </div>
-                    )}
-                    <div style={S.fg}>
-                      <label style={S.fl}>Points de données</label>
-                      <div style={S.tableHead}>
-                        <span style={{ flex:1, fontSize:11, fontWeight:700, color:"#888" }}>Label</span>
-                        {editModal.data.datasets.map((ds, di) => (
-                          <span key={di} style={{ flex:1, fontSize:11, fontWeight:700, color:"#888" }}>{ds.label}</span>
-                        ))}
-                        <span style={{ width:36 }} />
-                      </div>
-                      {editModal.data.labels.map((lbl, i) => (
-                        <div key={i} style={S.dRow}>
-                          <input style={{ ...S.fi, flex:1 }} value={lbl}
-                            onChange={(e) => updateModalData((d) => { const c=JSON.parse(JSON.stringify(d)); c.labels[i]=e.target.value; return c; })} />
-                          {editModal.data.datasets.map((ds, di) => (
-                            <input key={di} style={{ ...S.fi, flex:1 }} type="number" value={ds.data[i]}
-                              onChange={(e) => updateModalData((d) => { const c=JSON.parse(JSON.stringify(d)); c.datasets[di].data[i]=parseInt(e.target.value)||0; return c; })} />
-                          ))}
-                          <button style={S.rmBtn} onClick={() => removeRow(i)}>🗑</button>
-                        </div>
-                      ))}
-                      <button style={S.addRowBtn} onClick={addRow}>➕ Ajouter un point</button>
-                    </div>
-                  </>
-                )
-              )}
-              {(editModal.mode === "edit-chart" || editModal.mode === "add-data") && editModal.data.type === "doughnut" && (
-                <>
+                    </>
+                  )}
+                </div>
+
+                <div style={S.mFoot}>
+                  <button style={S.cancelBtn} onClick={closeModal}>Annuler</button>
+                  <button style={S.saveBtn} onClick={saveModal}>💾 Sauvegarder</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── ADD CHART MODAL ── */}
+          {addChartModal && (
+            <div style={S.overlay} onClick={(e) => e.target === e.currentTarget && setAddChartModal(false)}>
+              <div style={{ ...S.modal, maxWidth:480 }}>
+                <div style={S.mHead}>
+                  <h3 style={S.mTitle}>➕ Nouveau Diagramme</h3>
+                  <button style={S.mClose} onClick={() => setAddChartModal(false)}>✕</button>
+                </div>
+                <div style={S.mBody}>
                   <div style={S.fg}>
                     <label style={S.fl}>Titre</label>
-                    <input style={S.fi} value={editModal.data.title}
-                      onChange={(e) => updateModalData((d) => ({ ...d, title:e.target.value }))} />
+                    <input style={S.fi} placeholder="Ex : Revenus mensuels" value={newChart.title}
+                      onChange={(e) => setNewChart((p) => ({ ...p, title:e.target.value }))} />
                   </div>
-                  
-                </>
-              )}
+                  <div style={S.fg}>
+                    <label style={S.fl}>Type de diagramme</label>
+                    <div style={S.typeGrid}>
+                      {[{t:"line",ico:"📈",l:"Ligne"},{t:"bar",ico:"📊",l:"Barres"},{t:"doughnut",ico:"🍩",l:"Donut"}].map((o) => (
+                        <button key={o.t}
+                          style={{ ...S.typeBtn, ...(newChart.type===o.t?S.typeBtnOn:{}) }}
+                          onClick={() => setNewChart((p) => ({ ...p, type:o.t }))}>
+                          <span style={{ fontSize:30 }}>{o.ico}</span>
+                          <span style={{ fontSize:12, fontWeight:600 }}>{o.l}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={S.divider} />
+                  <button style={S.pbiModalBtn} onClick={() => { setAddChartModal(false); openPowerBI(); }}>
+                    📊 Ouvrir dans Power BI Desktop
+                  </button>
+                  <p style={{ fontSize:11, color:"#999", textAlign:"center", marginTop:6 }}>
+                    Nécessite Microsoft Power BI Desktop installé sur votre machine
+                  </p>
+                </div>
+                <div style={S.mFoot}>
+                  <button style={S.cancelBtn} onClick={() => setAddChartModal(false)}>Annuler</button>
+                  <button style={S.saveBtn}   onClick={createChart}>➕ Créer</button>
+                </div>
+              </div>
             </div>
+          )}
 
-            <div style={S.mFoot}>
-              <button style={S.cancelBtn} onClick={closeModal}>Annuler</button>
-              <button style={S.saveBtn} onClick={saveModal}>💾 Sauvegarder</button>
+          {/* ── CONFIRM DELETE ── */}
+          {confirmDel.open && (
+            <div style={S.overlay}
+              onClick={(e) => e.target===e.currentTarget && setConfirmDel({ open:false, id:null, title:"" })}>
+              <div style={{ ...S.modal, maxWidth:400, textAlign:"center", padding:"40px 30px" }}>
+                <div style={{ fontSize:52, marginBottom:14 }}>🗑️</div>
+                <h3 style={{ ...S.mTitle, textAlign:"center", marginBottom:8 }}>
+                  Supprimer « {confirmDel.title} » ?
+                </h3>
+                <p style={{ fontSize:13, color:"#888", marginBottom:28 }}>
+                  Cette action est irréversible. Toutes les données seront perdues.
+                </p>
+                <div style={{ ...S.mFoot, justifyContent:"center" }}>
+                  <button style={S.cancelBtn}
+                    onClick={() => setConfirmDel({ open:false, id:null, title:"" })}>
+                    Annuler
+                  </button>
+                  <button style={{ ...S.saveBtn, background:"linear-gradient(135deg,#ef4444,#dc2626)" }}
+                    onClick={deleteChart}>
+                    🗑 Supprimer
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
 
-     
-
-      {/* ══════════════════════════════════
-           CONFIRM DELETE
-      ══════════════════════════════════ */}
-      {confirmDel.open && (
-        <div style={S.overlay}
-          onClick={(e) => e.target===e.currentTarget && setConfirmDel({ open:false, id:null, title:"" })}>
-          <div style={{ ...S.modal, maxWidth:400, textAlign:"center", padding:"40px 30px" }}>
-            <div style={{ fontSize:52, marginBottom:14 }}>🗑️</div>
-            <h3 style={{ ...S.mTitle, textAlign:"center", marginBottom:8 }}>
-              Supprimer « {confirmDel.title} » ?
-            </h3>
-            <p style={{ fontSize:13, color:"#888", marginBottom:28 }}>
-              Cette action est irréversible. Toutes les données seront perdues.
-            </p>
-            <div style={{ ...S.mFoot, justifyContent:"center" }}>
-              <button style={S.cancelBtn}
-                onClick={() => setConfirmDel({ open:false, id:null, title:"" })}>
-                Annuler
-              </button>
-              <button style={{ ...S.saveBtn, background:"linear-gradient(135deg,#ef4444,#dc2626)" }}
-                onClick={deleteChart}>
-                🗑 Supprimer
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
