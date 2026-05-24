@@ -99,7 +99,7 @@ export default function AdminDashboard() {
       labels: ["etudiant","eleve","parent"],
       datasets: [{ data:[40,32,28], colors:["#4a5568","#7c5cbf","#ec4899"] }],
     },
-    {
+   {
   id: "chart-enquete-satisfaction",
   type: "line",
   title: "Évolution de la satisfaction (Enquête)",
@@ -110,7 +110,7 @@ export default function AdminDashboard() {
       label: "Satisfaction moyenne",
       data: [5, 4, 3, 4],
       color: "#7c5cbf",
-      dashed: false,
+      dashed: false,   // ← PAS de dashed:true ici non plus
     },
   ],
 },
@@ -221,7 +221,36 @@ const fetchGouvernoratStats = useCallback(async () => {
 
   // ── FETCH DES EVENEMENTS DEPUIS LA BASE DE DONNEES ──
   // ── Chargement des statistiques des événements par gouvernorat ──
- 
+// ✅ Enquête fetch CORRIGÉ
+const fetchEnqueteSatisfaction = useCallback(async () => {
+  console.log("🔥 fetchEnqueteSatisfaction CALLED");
+
+  setCharts((prev) => {
+    console.log("📊 prev charts:", prev.map(c => ({ id: c.id, datasets: c.datasets })));
+    
+    return prev.map((chart) => {
+      if (chart.id !== "chart-enquete-satisfaction") return chart;
+      
+      // ✅ TOUJOURS un tableau, JAMAIS null
+      const existingDatasets = chart.datasets == null ? [] : Array.isArray(chart.datasets) ? chart.datasets : [];
+      const ds0 = existingDatasets?.[0] ?? { data: [], color: "#7c5cbf", dashed: false, label: "Satisfaction" };
+      const ds1 = existingDatasets?.[1] ?? { data: [], color: "rgba(231,76,60,0.7)", dashed: true, label: "Nb réponses" };
+      
+      console.log("✅ existingDatasets:", existingDatasets);
+      console.log("✅ ds0:", ds0);
+      console.log("✅ ds1:", ds1);
+      
+      return {
+        ...chart,
+        labels: ["Jan", "Feb", "Mar", "Apr"],
+        datasets: [
+          { ...ds0, data: [5, 4, 3, 4] },
+          { ...ds1, data: [2, 3, 1, 4] },
+        ],
+      };
+    });
+  });
+}, []); 
 
 // ✅ fetch publications
 const fetchPublications = useCallback(async () => {
@@ -242,7 +271,10 @@ useEffect(() => {
   fetchGouvernoratStats();
 }, [fetchGouvernoratStats]);
 
-
+// ✅ enquête test
+useEffect(() => {
+  fetchEnqueteSatisfaction();
+}, [fetchEnqueteSatisfaction]);
 useEffect(() => {
   if (activePage !== "archive") return;
 
@@ -470,7 +502,9 @@ const buildData = (chart) => {
   if (!chart) return { labels: ["N/A"], datasets: [{ data: [0] }] };
   
   const type = chart.type;
-  const labels = chart.labels?.length ? chart.labels : [""];
+  const labels = (Array.isArray(chart.labels) && chart.labels.filter(l => l !== "").length > 0)
+  ? chart.labels
+  : ["—"];
   const datasets = chart.datasets || [];
   
   if (type === "line") {
@@ -677,6 +711,21 @@ const navItems = [
 ];
 
   const isFullPage = fullPages.includes(activePage);
+
+  // DEBUG TEMPORAIRE — à supprimer après fix
+useEffect(() => {
+  try {
+    charts.forEach(c => {
+      if (!c) return;
+      console.log(`[CHART CHECK] ${c.id}`, {
+        type: c.type,
+        labels: c.labels,
+        labelsLen: c.labels?.length,
+        datasets: c.datasets?.map(d => ({ data: d?.data, dataLen: d?.data?.length, dashed: d?.dashed, borderDash: d?.dashed ? [6,4] : [] }))
+      });
+    });
+  } catch(e) { console.error("CHART DEBUG ERROR", e); }
+}, [charts]);
 
   /* ════════════════════════════════════════
      R E N D E R
@@ -1252,8 +1301,12 @@ const navItems = [
           </div>
           {chart.subtitle && <p style={S.sub}>{chart.subtitle}</p>}
           <div style={{ height: chart.type === "doughnut" ? 200 : 250 }}>
-            <C data={buildData(chart)} options={chartOptions} />
-          </div>
+  {(chart.type === "doughnut" || (Array.isArray(chart.labels) && chart.labels.some(l => l !== "")))
+    ? <C data={buildData(chart)} options={chartOptions} />
+    : <div style={{ height:"100%", display:"flex", alignItems:"center",
+        justifyContent:"center", color:"#bbb", fontSize:13 }}>Chargement…</div>
+  }
+</div>
           <div style={S.actions}>
             <button style={S.actBtn} onClick={() => openEditChart(chart)}>✏️ Modifier</button>
             <button style={{ ...S.actBtn, ...S.actDel }}
