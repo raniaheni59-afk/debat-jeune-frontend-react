@@ -13,19 +13,10 @@ import {
   Legend,
 } from "chart.js";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
-import React from "react";
 import API from "../services/api";
 import PublierPage from "./PublierPage";
 import PublicationCard from "../components/PublicationCard";
-import AdminContact    from "./AdminContact";
-import CalendarPage    from "./CalendarPage";
-import AdminLiveStream from "./AdminLiveStream";
-import Swafy_Meet      from "./Swafy_Meet";
-import NewLive         from "./NewLive";
-import ArchivePage     from "./ArchivePage";
-import EnquetePage     from "./EnquetePage";      
-import ParametrePage   from "./ParametrePage";    
-import ParametreContact from "./ParametreContact";
+
 
 
 ChartJS.register(
@@ -34,7 +25,7 @@ ChartJS.register(
 );
 
 export default function AdminDashboard() {
-  const user = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}") || {}; } catch { return {}; } })();
+  const user = JSON.parse(localStorage.getItem("user"));
   const navigate = useNavigate();
   const t = (key) => key;
  
@@ -59,62 +50,7 @@ export default function AdminDashboard() {
   const markNotifRead = () => {};
   const markAllNotifsRead = () => {};
 
-  // ── Unread messages (socket) ──
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const socketRef = useRef(null);
-
-  const BACKEND_URL =
-    typeof import.meta !== "undefined"
-      ? (import.meta.env?.VITE_BACKEND_URL || "https://debat-jeune.onrender.com")
-      : "https://debat-jeune.onrender.com";
-
-  // ✅ Fetch unread count depuis l'API au chargement
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const res = await API.get("/messenger/unread-count");
-      setUnreadMessages(res.data?.count || 0);
-    } catch { setUnreadMessages(0); }
-  }, []);
-
-  useEffect(() => {
-    fetchUnreadCount();
-
-    if (socketRef.current) return;
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    import("socket.io-client").then(({ io }) => {
-      const s = io(BACKEND_URL, {
-        auth: { token },
-        transports: ["websocket"],
-        reconnectionAttempts: 5,
-        reconnectionDelay: 3000,
-      });
-      socketRef.current = s;
-
-      // ✅ Incrémenter badge si on n'est PAS sur la page messages
-      s.on("newMessage", () => {
-        setActivePage((cur) => {
-          if (cur !== "messages") setUnreadMessages((n) => n + 1);
-          return cur;
-        });
-      });
-      s.on("newGroupMessage", () => {
-        setActivePage((cur) => {
-          if (cur !== "messages") setUnreadMessages((n) => n + 1);
-          return cur;
-        });
-      });
-
-      s.emit("joinGroup");
-      s.on("connect_error", (e) => console.error("AdminDashboard socket:", e.message));
-    }).catch(() => {});
-
-    return () => {
-      socketRef.current?.disconnect();
-      socketRef.current = null;
-    };
-  }, [fetchUnreadCount]); // eslint-disable-line
+  // ── Socket géré dans App.jsx ──
   const [addChartModal, setAddChartModal] = useState(false);
   const [confirmDel, setConfirmDel] = useState({ open: false, id: null, title: "" });
   const [newChart, setNewChart] = useState({ type: "line", title: "" });
@@ -242,7 +178,7 @@ const fetchGouvernoratStats = useCallback(async () => {
   useEffect(() => {
     const sync = async () => {
       try {
-       const res = await API.get("/admin/stats/jeune-count");
+       const res = await API.get("/users/count/jeune-profiles");
         if (res.data?.count != null) {
           setStatCards((p) =>
             p.map((c) => c.id === "stat-participant" ? { ...c, value: res.data.count } : c)
@@ -358,8 +294,6 @@ useEffect(() => {
     setActivePage(page);
     setSearchQuery("");
     setHighlightedCard(null);
-    // ✅ Reset badge messages quand on ouvre la page
-    if (page === "messages") setUnreadMessages(0);
   };
 
   const logout = () => {
@@ -574,13 +508,12 @@ const openAddData = (chart) => {
       };
     }
     return {
-  labels: chart.labels,
-  datasets: [{
-    data: chart.datasets?.[0]?.data || [],
-    backgroundColor: chart.datasets?.[0]?.colors || [],
-    borderWidth: 3, borderColor: "#fff", hoverOffset: 10,
-  }],
-};
+      labels: chart.labels,
+      datasets: [{
+        data: chart.datasets[0].data, backgroundColor: chart.datasets[0].colors,
+        borderWidth: 3, borderColor: "#fff", hoverOffset: 10,
+      }],
+    };
   };
 
   const opts = {
@@ -645,7 +578,7 @@ const openAddData = (chart) => {
 const navItems = [
   { key:"accueil",      label: t("accueil") },
   { key:"dashboard",    label: t("dashboard") },
-  { key:"messages",     label: t("messages"), badge: unreadMessages || null },
+  { key:"messages",     label: t("messages") },
   { key:"publier",      label: t("publier") },
   { key:"calendrier",   label: t("calendrier") },
   { key:"swafyMeet",    label: "Swafy Meet" },
@@ -824,10 +757,7 @@ const navItems = [
         <div style={{
           marginLeft: sidebarVisible ? 240 : 0,
           transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
+          minHeight: "100vh",
         }}>
          <AdminContact setActivePage={setActivePage} />
         </div>
@@ -868,25 +798,6 @@ const navItems = [
       padding: "30px 40px",
     }}
   >
-    {/* ✅ Copy live viewer link for admin to share with jeunes */}
-    {(() => {
-      const vLink = localStorage.getItem("currentLiveViewerLink");
-      if (!vLink) return null;
-      return (
-        <div style={{ background:"#fff", border:"1px solid #e5e7eb", borderRadius:14, padding:"14px 18px", marginBottom:20, display:"flex", alignItems:"center", gap:12, boxShadow:"0 2px 8px rgba(0,0,0,.06)" }}>
-          <span style={{ fontSize:20 }}>🔗</span>
-          <div style={{ flex:1, minWidth:0 }}>
-            <p style={{ fontSize:12, fontWeight:700, color:"#374151", marginBottom:3 }}>Lien à envoyer aux jeunes inscrits</p>
-            <p style={{ fontSize:11, color:"#6b7280", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{vLink}</p>
-          </div>
-          <button
-            onClick={()=>{ navigator.clipboard.writeText(vLink); }}
-            style={{ background:"linear-gradient(135deg,#7c3aed,#3b82f6)", border:"none", borderRadius:10, padding:"8px 18px", color:"#fff", fontWeight:700, fontSize:12, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
-            📋 Copier le lien
-          </button>
-        </div>
-      );
-    })()}
     <AdminLiveStream />
   </div>
 )}
@@ -1072,7 +983,10 @@ const navItems = [
       background: "linear-gradient(135deg, #f5f2ff 0%, #ede9ff 100%)",
     }}
   >
-    <PublierPage onBack={() => setActivePage("dashboard")} />
+    <PublierPage onBack={async () => {
+      await fetchPublications(); // refresh le feed
+      setActivePage("accueil");  // retour à accueil (moch dashboard)
+    }} />
   </div>
 )}
 
@@ -1187,6 +1101,19 @@ const navItems = [
               )}
             </div>
             <div style={S.userArea}>
+              <button
+                title="Actualiser"
+                onClick={()=>{ fetchPublications(); toast("🔄 Données actualisées !"); }}
+                style={{background:"rgba(255,255,255,0.12)",border:"1px solid rgba(255,255,255,0.2)",cursor:"pointer",color:"#fff",display:"flex",alignItems:"center",padding:"8px 14px",borderRadius:10,fontSize:13,fontWeight:600,gap:6,transition:"background .2s"}}
+                onMouseEnter={e=>e.currentTarget.style.background="rgba(255,255,255,0.2)"}
+                onMouseLeave={e=>e.currentTarget.style.background="rgba(255,255,255,0.12)"}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+                </svg>
+                Actualiser
+              </button>
               <div style={S.avatar}>{user?.nom_user?.charAt(0)?.toUpperCase() || "A"}</div>
               <span style={{ fontSize:13, fontWeight:600, color:"#fff" }}>{user?.nom_user || "Admin"}</span>
             </div>
@@ -1639,4 +1566,4 @@ const S = {
   typeBtnOn:{ borderColor:"#7c5cbf", background:"#f0ebff", boxShadow:"0 0 0 3px rgba(124,92,191,.15)" },
   divider:{ height:1, background:"#e8e5f0", margin:"24px 0" },
   pbiModalBtn:{ width:"100%", padding:"14px", borderRadius:12, border:"2px solid #e0dce8", background:"#fff", color:"#5a3fa0", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
-}; 
+};

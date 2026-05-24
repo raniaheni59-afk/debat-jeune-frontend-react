@@ -4,13 +4,13 @@ import { io } from "socket.io-client";
 import API from "../services/api";
 import "./JeuneLayout.css";
 import PublicationCard from "../components/PublicationCard";
+import PublierPage from "./PublierPage";
 
 // Import conditionnel — adapte les chemins selon ta structure
-let JeuneContact, LiveBanner, JeuneEnquete, LiveSection;
+let JeuneContact, LiveBanner, JeuneEnquete;
 try { JeuneContact  = require("./JeuneContact").default;  } catch { JeuneContact  = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Messages — bientôt disponible</div>; }
 try { LiveBanner    = require("../components/LiveBanner").default; } catch { LiveBanner = () => null; }
 try { JeuneEnquete  = require("./JeuneEnquete").default;  } catch { JeuneEnquete  = () => <div style={{padding:40,textAlign:"center",color:"#aaa"}}>Enquêtes — bientôt disponible</div>; }
-try { LiveSection   = require("./Livesection").default;  } catch { LiveSection = () => <div style={{padding:40,textAlign:"center",color:"#777"}}>Section Live bientôt disponible</div>; }
 
 
 
@@ -254,26 +254,7 @@ const JeuneLayout = () => {
     });
 
     socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
-
-    // ✅ FIX: écouter "newMessage" (nom exact émis par le backend)
-    socketRef.current.on("newMessage", (m) => {
-      // N'incrémenter que si la page messages n'est pas active
-      setActivePage((current) => {
-        if (current !== PAGES.MESSAGES) setUnreadMessages((n) => n + 1);
-        return current;
-      });
-    });
-
-    // ✅ Aussi les messages de groupe
-    socketRef.current.on("newGroupMessage", (m) => {
-      setActivePage((current) => {
-        if (current !== PAGES.MESSAGES) setUnreadMessages((n) => n + 1);
-        return current;
-      });
-    });
-
-    // ✅ Rejoindre le groupe au démarrage
-    socketRef.current.emit("joinGroup");
+    socketRef.current.on("new_message", () => setUnreadMessages((n) => n + 1));
 
     return () => {
       socketRef.current?.disconnect();
@@ -328,8 +309,6 @@ const JeuneLayout = () => {
   const goTo = (page) => {
     setActivePage(page);
     setMobileOpen(false);
-    // ✅ Reset badge messages quand on ouvre la page messages
-    if (page === PAGES.MESSAGES) setUnreadMessages(0);
   };
 
   const markNotifRead = async (id) => {
@@ -348,8 +327,8 @@ const JeuneLayout = () => {
         visibilite          : pubVis,
       });
       setPubTitle(""); setPubBody(""); setPubCat(""); setPubVis("public");
-      await fetchPublications();
-      goTo(PAGES.HOME);
+      goTo(PAGES.HOME); // ← va à HOME
+      await fetchPublications(); // ← refresh le feed (moch navigate lel dashboard)
     } catch (err) { console.error(err); }
     finally { setPubBusy(false); }
   };
@@ -426,57 +405,12 @@ const JeuneLayout = () => {
       /* ── PUBLIER ── */
       case PAGES.PUBLIER:
         return (
-          <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="pencil" size={18}/> Nouvelle publication</h2>
-            <div className="jl-form-card">
-              <form onSubmit={handlePublier}>
-                <div className="jl-fg">
-                  <label className="jl-fl">Titre</label>
-                  <input className="jl-fi" placeholder="Un titre accrocheur…"
-                    value={pubTitle} onChange={(e) => setPubTitle(e.target.value)} required/>
-                </div>
-                <div className="jl-fg">
-                  <label className="jl-fl">Contenu</label>
-                  <textarea className="jl-fi jl-fi-ta" placeholder="Partagez vos idées, opinions ou expériences…"
-                    value={pubBody} onChange={(e) => setPubBody(e.target.value)} required/>
-                </div>
-                <div className="jl-form-row">
-                  <div className="jl-fg">
-                    <label className="jl-fl">Catégorie</label>
-                    <select className="jl-fi" value={pubCat} onChange={(e) => setPubCat(e.target.value)}>
-                      <option value="">Sélectionner…</option>
-                      <option value="education">Éducation</option>
-                      <option value="environnement">Environnement</option>
-                      <option value="culture">Culture</option>
-                      <option value="politique">Politique</option>
-                      <option value="sante">Santé</option>
-                      <option value="technologie">Technologie</option>
-                    </select>
-                  </div>
-                  <div className="jl-fg">
-                    <label className="jl-fl">Visibilité</label>
-                    <select className="jl-fi" value={pubVis} onChange={(e) => setPubVis(e.target.value)}>
-                      <option value="public">Public</option>
-                      <option value="membres">Membres seulement</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="jl-media-row">
-                  <button type="button" className="jl-media-btn"><Icon name="photo" size={14}/>Photo</button>
-                  <button type="button" className="jl-media-btn"><Icon name="video" size={14}/>Vidéo</button>
-                  <button type="button" className="jl-media-btn"><Icon name="link"  size={14}/>Lien</button>
-                </div>
-                <button type="submit" className="jl-submit-btn" disabled={pubBusy}>
-                  <Icon name="send" size={16}/>
-                  {pubBusy ? "Publication en cours…" : "Publier maintenant"}
-                </button>
-              </form>
-            </div>
-            <h2 className="jl-section-title" style={{ marginTop:6 }}>Publications récentes</h2>
-            {publications.slice(0,2).map((pub) => (
-              <PublicationCard key={pub.id_publication} publication={pub} onUpdate={fetchPublications}/>
-            ))}
-          </div>
+          <PublierPage
+            onBack={async () => {
+              await fetchPublications(); // refresh le feed sans navigate
+              goTo(PAGES.HOME);          // retour HOME dans le layout
+            }}
+          />
         );
 
       /* ── CALENDAR ── */
@@ -502,14 +436,39 @@ const JeuneLayout = () => {
           </div>
         );
 
-      /* ── LIVE ── ✅ Uses Livesection with correct API + viewer link */
+      /* ── LIVE ── */
       case PAGES.LIVE:
         return (
-          <div className="jl-page" style={{ background:"#ffffff", minHeight:"100%" }}>
-            <h2 className="jl-section-title" style={{ color:"#1f2937" }}>
-              <Icon name="radio" size={18}/> Sessions Live
-            </h2>
-            <LiveSection />
+          <div className="jl-page">
+            <h2 className="jl-section-title"><Icon name="radio" size={18}/> Sessions Live</h2>
+            <LiveBanner />
+            <div className="jl-live-banner">
+              <div className="jl-live-top">
+                <span className="jl-live-badge">● LIVE</span>
+                <span className="jl-live-desc">Débat : L'avenir de la jeunesse tunisienne</span>
+              </div>
+              <div className="jl-live-screen">
+                <div style={{ textAlign:"center" }}>
+                  <div style={{ fontSize:44, marginBottom:8 }}>🎙️</div>
+                  <p style={{ fontSize:12, color:"rgba(255,255,255,0.72)" }}>342 spectateurs en direct</p>
+                </div>
+              </div>
+              <button className="jl-submit-btn"><Icon name="play" size={16}/>Rejoindre le Live</button>
+            </div>
+            <h2 className="jl-section-title" style={{ marginTop:8 }}>Prochains lives</h2>
+            {[
+              { title:"Santé mentale des jeunes",    date:"Demain · 19h00" },
+              { title:"Entrepreneuriat & Innovation", date:"Jeudi · 20h00" },
+            ].map((l, i) => (
+              <div key={i} className="jl-event-item" style={{ animationDelay:`${i*0.08}s` }}>
+                <div className="jl-event-dot"><Icon name="mic" size={22}/></div>
+                <div>
+                  <p className="jl-event-title">{l.title}</p>
+                  <p className="jl-event-meta"><Icon name="clock" size={12}/>{l.date}</p>
+                </div>
+                <button className="jl-event-btn">Rappel</button>
+              </div>
+            ))}
           </div>
         );
 
@@ -702,24 +661,34 @@ const JeuneLayout = () => {
           }}>
             <Icon name="menu" size={20}/>
           </button>
-          <span className="jl-topbar-title">Swafy</span>
-          <div className="jl-topbar-avatar" onClick={() => openModal("profile")}>
-            <img src={getAvatar(user?.photo_user, user?.sexe)} alt="avatar"
-              onError={(e) => { e.target.src="https://randomuser.me/api/portraits/men/44.jpg"; }}/>
+          <span className="jl-topbar-title" style={{cursor:"pointer"}} onClick={()=>{
+            goTo(PAGES.HOME);
+            fetchPublications();
+            fetchNotifications();
+          }}>Swafy</span>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <button
+              title="Actualiser"
+              onClick={()=>{ fetchPublications(); fetchNotifications(); }}
+              style={{background:"none",border:"none",cursor:"pointer",color:"#9080b8",display:"flex",alignItems:"center",padding:"6px",borderRadius:"50%",transition:"background .2s"}}
+              onMouseEnter={e=>e.currentTarget.style.background="rgba(90,63,160,0.1)"}
+              onMouseLeave={e=>e.currentTarget.style.background="none"}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+              </svg>
+            </button>
+            <div className="jl-topbar-avatar" onClick={() => openModal("profile")}>
+              <img src={getAvatar(user?.photo_user, user?.sexe)} alt="avatar"
+                onError={(e) => { e.target.src="https://randomuser.me/api/portraits/men/44.jpg"; }}/>
+            </div>
           </div>
         </div>
 
         {/* Content */}
         {activePage === PAGES.MESSAGES ? (
-          <div style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            height: "calc(100vh - 56px)", /* 56px = hauteur topbar */
-          }}>
-            <JeuneContact/>
-          </div>
+          <div className="jl-messages-full"><JeuneContact/></div>
         ) : (
           <div className="jl-scroll">{renderContent()}</div>
         )}

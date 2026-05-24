@@ -193,7 +193,7 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
         form,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-      onSaved();
+      onSaved({ titre_publication: titre, contenu: contenu, contenu_publication: contenu, medias });
       onClose();
     } catch(e) {
       const raw = e?.response?.data;
@@ -316,7 +316,7 @@ const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
         `/publications/${pubId}/comments/${comment.id_commentaire}`,
         { contenu_commentaire: t, contenu: t }
       );
-      onSaved();
+      onSaved(t); // ← passe le nouveau texte
       onClose();
     } catch(e) {
       const raw = e?.response?.data;
@@ -407,6 +407,7 @@ const DotsMenu = ({ items }) => {
 
 /* ─── Comment ───────────────────────────────────────────────── */
 const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
+  const [localText,    setLocalText]    = useState(comment.contenu_commentaire||comment.contenu||"");
   const [replyOpen,    setReplyOpen]    = useState(false);
   const [replyText,    setReplyText]    = useState("");
   const [replySending, setReplySending] = useState(false);
@@ -492,7 +493,7 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
             <div className="pc-cmt-bubble">
               <span className="pc-cmt-nm">{comment.prenom_user} {comment.nom_user}</span>
               {(() => {
-                const txt = comment.contenu_commentaire||comment.contenu||"";
+                const txt = localText;
                 const onlyEmoji = /^[\p{Emoji}\s]{1,6}$/u.test(txt) && txt.trim().length <= 6;
                 return onlyEmoji
                   ? <p className="pc-cmt-sticker">{txt}</p>
@@ -562,10 +563,13 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
 
       {editOpen && (
         <EditCommentModal
-          comment={comment}
+          comment={{...comment, contenu_commentaire: localText, contenu: localText}}
           pubId={pubId}
           onClose={()=>setEditOpen(false)}
-          onSaved={onRefresh}/>
+          onSaved={(newText)=>{
+            if(newText) setLocalText(newText); // mise à jour immédiate
+            onRefresh(); // refresh en arrière-plan
+          }}/>
       )}
     </>
   );
@@ -575,6 +579,7 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
    MAIN CARD
 ═══════════════════════════════════════════════════════════════ */
 export default function PublicationCard({ publication, onUpdate, defaultShowComments=false }) {
+  const [localPub,   setLocalPub]   = useState(publication); // ← local copy for instant updates
   const [showCmts,   setShowCmts]   = useState(defaultShowComments);
   const [comments,   setComments]   = useState([]);
   const [cmtLoading, setCmtLoading] = useState(false);
@@ -595,7 +600,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const [editOpen,   setEditOpen]   = useState(false);
 
   const currentUser = getCurrentUser();
-  const pub         = publication;
+  const pub         = localPub;
   const picRef      = useRef(null);
   const inputRef    = useRef(null);
   const stkRef      = useRef(null);
@@ -674,12 +679,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 
   const getSrcSafe = (m) => {
     const s = getSrc(m);
-    if (!s) return null;
-    // Reject URLs that have no real path after /uploads/
-    const clean = s.replace(/\\/g, "/");
-    const parts  = clean.split("/uploads/");
-    if (parts.length > 1 && parts[parts.length - 1].trim() === "") return null;
-    return s;
+    return s && s !== BACKEND + "/uploads/" ? s : null;
   };
 
   /* split media — skip medias without valid src */
@@ -763,12 +763,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
           <div key={`vid-${i}`} className="pc-vid-wrap">
             <video src={getSrcSafe(m)} controls playsInline preload="metadata"
               style={{width:"100%",display:"block",maxHeight:"260px",background:"#000"}}
-              onError={e=>{
-                const wrap=e.target.closest(".pc-vid-wrap");
-                if(wrap){
-                  wrap.innerHTML='<div style="width:100%;padding:40px 0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#1a1a2e;border-radius:8px;color:#9080b8;font-size:13px;font-weight:600;">🎥<br/>Vidéo indisponible</div>';
-                }
-              }}/>
+              onError={e=>{ e.target.closest(".pc-vid-wrap").style.display="none"; }}/>
           </div>
         ))}
 
@@ -784,17 +779,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
                     src={src}
                     alt=""
                     loading="lazy"
-                    onError={e=>{
-                      e.target.style.display="none";
-                      const item=e.target.closest(".pc-media-item");
-                      if(item&&!item.querySelector(".pc-img-fallback")){
-                        const fb=document.createElement("div");
-                        fb.className="pc-img-fallback";
-                        fb.style.cssText="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:38px;background:#ede9ff;color:#9080b8;";
-                        fb.textContent="🖼️";
-                        item.appendChild(fb);
-                      }
-                    }}
+                    onError={e=>{ const item=e.target.closest(".pc-media-item"); if(item) item.style.display="none"; }}
                   />
                   {more && <div className="pc-media-more">+{imgMedias.length-4}</div>}
                 </div>
@@ -910,7 +895,10 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
         <EditPublicationModal
           publication={pub}
           onClose={()=>setEditOpen(false)}
-          onSaved={()=>{ if(onUpdate) onUpdate(); }}/>
+          onSaved={(updatedFields)=>{
+            if(updatedFields) setLocalPub(p=>({...p, ...updatedFields})); // update immédiat
+            if(onUpdate) onUpdate(); // refresh en arrière-plan
+          }}/>
       )}
     </>
   );

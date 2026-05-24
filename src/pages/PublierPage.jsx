@@ -108,10 +108,9 @@ const handleSubmit = async (e) => {
     await api.post("/publications", dataToSend);
     finishProgress();
     setTimeout(() => {
-      alert("Publication créée avec succès !");
       if (onBack) onBack();
       else navigate("/jeune");
-    }, 500);
+    }, 300);
   } catch (err) {
     clearInterval(progressIntervalRef.current);
     setUploadProgress(0);
