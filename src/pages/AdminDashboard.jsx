@@ -497,74 +497,55 @@ const openAddData = (chart) => {
     setTimeout(() => toast("⚠️ Si Power BI ne s'est pas ouvert, installez-le depuis le Microsoft Store.", "warning"), 3000);
   };
 
-  // ── Chart builders ──
+ // ── Chart builders ──
 const buildData = (chart) => {
-  // ✅ Guard complet — gérer null/undefined
-  if (!chart || !chart.datasets || !Array.isArray(chart.datasets) || chart.datasets.length === 0) {
-    return { labels: ["..."], datasets: [{ data: [0] }] };
-  }
-
-  if (chart.type === "line") {
-    const labels = chart.labels?.length ? chart.labels : ["..."];
+  if (!chart) return { labels: ["N/A"], datasets: [{ data: [0] }] };
+  
+  const type = chart.type;
+  const labels = chart.labels?.length ? chart.labels : [""];
+  const datasets = chart.datasets || [];
+  
+  if (type === "line") {
     return {
       labels,
-      datasets: chart.datasets.map((ds) => {
-        // ✅ Vérifier si ds et ds.data existent et ont des données
-        const data = (ds?.data && Array.isArray(ds.data) && ds.data.length > 0) 
-          ? ds.data 
-          : new Array(labels.length).fill(0);
-          
-        return {
-          label: ds?.label || "",
-          data,
-          borderColor: ds?.color || "#7c5cbf",
-          backgroundColor: ds?.dashed ? "transparent" : `${ds?.color || "#7c5cbf"}12`,
-          tension: 0.4,
-          fill: !ds?.dashed,
-          borderWidth: ds?.dashed ? 2 : 2.5,
-          borderDash: ds?.dashed ? [6, 4] : [],
-          pointRadius: data.length > 0 ? 4 : 0,
-          pointBackgroundColor: ds?.color || "#7c5cbf",
-          pointBorderColor: "#fff",
-          pointBorderWidth: 2,
-          pointHoverRadius: 7,
-        };
-      }),
+      datasets: datasets.length > 0 ? datasets.map(ds => ({
+        label: ds?.label || "",
+        data: ds?.data?.length ? ds.data : [0],
+        borderColor: ds?.color || "#7c5cbf",
+        backgroundColor: ds?.dashed ? "transparent" : `${ds?.color || "#7c5cbf"}12`,
+        tension: 0.4,
+        fill: !ds?.dashed,
+        borderWidth: ds?.dashed ? 2 : 2.5,
+        borderDash: ds?.dashed ? [6, 4] : [],
+        pointRadius: (ds?.data?.length || 0) > 0 ? 4 : 0,
+        pointBackgroundColor: ds?.color || "#7c5cbf",
+        pointBorderColor: "#fff",
+        pointBorderWidth: 2,
+        pointHoverRadius: 7,
+      })) : [{ data: [0] }]
     };
   }
 
-  if (chart.type === "bar") {
-    const labels = chart.labels?.length ? chart.labels : ["..."];
+  if (type === "bar") {
     return {
       labels,
-      datasets: chart.datasets.map((ds) => {
-        const data = (ds?.data && Array.isArray(ds.data) && ds.data.length > 0)
-          ? ds.data
-          : new Array(labels.length).fill(0);
-        return {
-          label: ds?.label || "",
-          data,
-          backgroundColor: ds?.color || "#7c5cbf",
-          borderRadius: 6,
-          borderSkipped: false,
-        };
-      }),
+      datasets: datasets.length > 0 ? datasets.map((ds) => ({
+        label: ds?.label || "",
+        data: ds?.data?.length ? ds.data : new Array(labels.length).fill(0),
+        backgroundColor: ds?.color || "#7c5cbf",
+        borderRadius: 6,
+        borderSkipped: false,
+      })) : [{ data: new Array(labels.length).fill(0) }]
     };
   }
 
   // doughnut
-  const ds0 = chart.datasets[0];
-  // ✅ Vérifier si ds0, ds0.data et ds0.colors existent
-  const data = (ds0?.data && Array.isArray(ds0.data) && ds0.data.length > 0) 
-    ? ds0.data 
-    : [1];
-  const colors = (ds0?.colors && Array.isArray(ds0.colors) && ds0.colors.length > 0) 
-    ? ds0.colors 
-    : ["#7c5cbf"];
-  const labels = chart.labels?.length ? chart.labels : data.map((_, i) => `Cat ${i+1}`);
+  const ds0 = datasets[0];
+  const data = (ds0?.data?.length || 0) > 0 ? ds0.data : [1];
+  const colors = (ds0?.colors?.length || 0) > 0 ? ds0.colors : ["#7c5cbf"];
   
   return {
-    labels,
+    labels: chart.labels?.length ? chart.labels : data.map((_, i) => `Cat ${i+1}`),
     datasets: [{
       data,
       backgroundColor: colors,
@@ -575,43 +556,64 @@ const buildData = (chart) => {
   };
 };
 
-  const opts = {
-    line: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: {
-          beginAtZero: true,
-          suggestedMax: 10,
-          ticks: { stepSize: 1, precision: 0, font: { size: 11 }, color: "#aaa" },
-          grid: { color: "rgba(0,0,0,0.04)" },
-        },
-        x: {
-          ticks: { font: { size: 10 }, color: "#aaa" },
-          grid: { display: false },
-        },
+const opts = {
+  line: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: {
+        beginAtZero: true,
+        suggestedMax: 10,
+        ticks: { stepSize: 1, precision: 0, font: { size: 11 }, color: "#aaa" },
+        grid: { color: "rgba(0,0,0,0.04)" },
       },
-      interaction: { intersect: false, mode: "index" },
-    },
-    bar: {
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{ display:false } },
-      scales:{
-        y: {
-          type: "linear", min: 1, max: 10, beginAtZero: false,
-          ticks: { stepSize: 1, precision: 0, font: { size: 11 }, color: "#aaa" },
-          title: { display: true, text: "Nombre d'événements / an" },
-          grid: { color: "rgba(0,0,0,0.04)" }
-        },
-        x:{ ticks:{ font:{size:10}, color:"#aaa" }, grid:{ display:false } },
+      x: {
+        ticks: { font: { size: 10 }, color: "#aaa" },
+        grid: { display: false },
       },
     },
-    doughnut: {
-      responsive:true, maintainAspectRatio:false, cutout:"60%",
-      plugins:{ legend:{ position:"bottom", labels:{ padding:16, usePointStyle:true, pointStyle:"circle", font:{size:12} } } },
+    interaction: { intersect: false, mode: "index" },
+  },
+  bar: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: {
+        type: "linear",
+        min: 1,
+        max: 10,
+        beginAtZero: false,
+        ticks: { stepSize: 1, precision: 0, font: { size: 11 }, color: "#aaa" },
+        title: { display: true, text: "Nombre d'événements / an" },
+        grid: { color: "rgba(0,0,0,0.04)" }
+      },
+      x: {
+        ticks: { font: { size: 10 }, color: "#aaa" },
+        grid: { display: false }
+      },
     },
-  };
+  },
+  doughnut: {
+    responsive: true,
+    maintainAspectRatio: false,
+    cutout: "60%",
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: {
+          padding: 16,
+          usePointStyle: true,
+          pointStyle: "circle",
+          font: { size: 12 }
+        }
+      }
+    },
+  },
+};
+
+
 
   const eventLineOpts = {
     responsive: true,
@@ -1249,44 +1251,49 @@ const navItems = [
               </div>
 
               {/* GRID */}
-              {restCharts.length > 0 && (
-                <div style={S.grid}>
-                  {restCharts.map((chart) => {
-                    const C = Comp[chart.type];
-                    if (!C) return null;
-                    return (
-                      <div key={chart.id} id={chart.id}
-                        style={cardStyle(chart.id, chart.keywords, { padding:24 })}>
-                        <div style={S.hdr}>
-                          <span style={S.hdrTitle}>{chart.title}</span>
-                          {chart.type === "doughnut" && (
-                            <button style={S.reportBtn} onClick={() => toast("📄 Rapport généré !")}>
-                              View Report
-                            </button>
-                          )}
-                        </div>
-                        {chart.subtitle && <p style={S.sub}>{chart.subtitle}</p>}
-                        <div style={{ height: chart.type === "doughnut" ? 200 : 250 }}>
-                          {(chart.labels?.length > 0 || chart.type === "doughnut")
-                            ? <C data={buildData(chart)} options={opts[chart.type]} />
-                            : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13}}>Chargement…</div>
-                          }
-                        </div>
-                        <div style={S.actions}>
-                          <button style={S.actBtn} onClick={() => openEditChart(chart)}>✏️ Modifier</button>
-                          <button style={{ ...S.actBtn, ...S.actDel }}
-                            onClick={() => setConfirmDel({ open:true, id:chart.id, title:chart.title })}>
-                            🗑 Supprimer
-                          </button>
-                          <button style={{ ...S.actBtn, ...S.actAdd }} onClick={() => openAddData(chart)}>
-                            ➕ Ajouter
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+{restCharts.length > 0 && (
+  <div style={S.grid}>
+    {restCharts.map((chart) => {
+      // ✅ Guard: vérifier que chart existe
+      if (!chart) return null;
+      
+      const chartType = chart.type;
+      const chartOptions = opts[chartType] || opts.line;
+      const C = Comp[chartType] || Line;
+      
+      return (
+        <div
+          key={chart.id}
+          id={chart.id}
+          style={cardStyle(chart.id, chart.keywords, { padding: 24 })}
+        >
+          <div style={S.hdr}>
+            <span style={S.hdrTitle}>{chart.title}</span>
+            {chart.type === "doughnut" && (
+              <button style={S.reportBtn} onClick={() => toast("📄 Rapport généré !")}>
+                View Report
+              </button>
+            )}
+          </div>
+          {chart.subtitle && <p style={S.sub}>{chart.subtitle}</p>}
+          <div style={{ height: chart.type === "doughnut" ? 200 : 250 }}>
+            <C data={buildData(chart)} options={chartOptions} />
+          </div>
+          <div style={S.actions}>
+            <button style={S.actBtn} onClick={() => openEditChart(chart)}>✏️ Modifier</button>
+            <button style={{ ...S.actBtn, ...S.actDel }}
+              onClick={() => setConfirmDel({ open: true, id: chart.id, title: chart.title })}>
+              🗑 Supprimer
+            </button>
+            <button style={{ ...S.actBtn, ...S.actAdd }} onClick={() => openAddData(chart)}>
+              ➕ Ajouter
+            </button>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+)}
 
               {/* ADD CHART */}
               <div style={S.addSection}>
