@@ -99,17 +99,20 @@ export default function AdminDashboard() {
       labels: ["etudiant","eleve","parent"],
       datasets: [{ data:[40,32,28], colors:["#4a5568","#7c5cbf","#ec4899"] }],
     },
-    {
+   {
   id: "chart-enquete-satisfaction",
   type: "line",
   title: "Évolution de la satisfaction (Enquête)",
   keywords: "enquete satisfaction evolution",
-  labels: ["..."],     // ← placeholder, remplacé par fetchEnqueteSatisfaction
-  labels: ["—"],
-datasets: [
-  { label: "Satisfaction moyenne", data: [0], color: "#7c5cbf", dashed: false },
-  { label: "Nb réponses",          data: [0], color: "rgba(231,76,60,0.7)", dashed: true },
-],
+  labels: ["Jan", "Feb", "Mar", "Apr"],
+  datasets: [
+    {
+      label: "Satisfaction moyenne",
+      data: [5, 4, 3, 4],
+      color: "#7c5cbf",
+      dashed: false,   // ← PAS de dashed:true ici non plus
+    },
+  ],
 },
 
   ]);
