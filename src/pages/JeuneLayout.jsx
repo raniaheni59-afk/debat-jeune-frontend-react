@@ -5,6 +5,7 @@ import API from "../services/api";
 import "./JeuneLayout.css";
 import PublicationCard from "../components/PublicationCard";
 import PublierPage from "./PublierPage";
+import AdminContact from "./AdminContact";
 
 // Import conditionnel — adapte les chemins selon ta structure
 let JeuneContact, LiveBanner, JeuneEnquete;
