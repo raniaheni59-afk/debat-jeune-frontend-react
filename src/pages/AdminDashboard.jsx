@@ -709,6 +709,21 @@ const navItems = [
 
   const isFullPage = fullPages.includes(activePage);
 
+  // DEBUG TEMPORAIRE — à supprimer après fix
+useEffect(() => {
+  try {
+    charts.forEach(c => {
+      if (!c) return;
+      console.log(`[CHART CHECK] ${c.id}`, {
+        type: c.type,
+        labels: c.labels,
+        labelsLen: c.labels?.length,
+        datasets: c.datasets?.map(d => ({ data: d?.data, dataLen: d?.data?.length, dashed: d?.dashed, borderDash: d?.dashed ? [6,4] : [] }))
+      });
+    });
+  } catch(e) { console.error("CHART DEBUG ERROR", e); }
+}, [charts]);
+
   /* ════════════════════════════════════════
      R E N D E R
   ════════════════════════════════════════ */
