@@ -105,10 +105,11 @@ export default function AdminDashboard() {
   title: "Évolution de la satisfaction (Enquête)",
   keywords: "enquete satisfaction evolution",
   labels: ["..."],     // ← placeholder, remplacé par fetchEnqueteSatisfaction
-  datasets: [
-    { label: "Satisfaction moyenne", data: [0], color: "#7c5cbf", dashed: false },
-    { label: "Nb réponses",          data: [0], color: "rgba(231,76,60,0.7)", dashed: true },
-  ],
+  labels: ["—"],
+datasets: [
+  { label: "Satisfaction moyenne", data: [0], color: "#7c5cbf", dashed: false },
+  { label: "Nb réponses",          data: [0], color: "rgba(231,76,60,0.7)", dashed: true },
+],
 },
 
   ]);
@@ -498,7 +499,9 @@ const buildData = (chart) => {
   if (!chart) return { labels: ["N/A"], datasets: [{ data: [0] }] };
   
   const type = chart.type;
-  const labels = chart.labels?.length ? chart.labels : [""];
+  const labels = (Array.isArray(chart.labels) && chart.labels.filter(l => l !== "").length > 0)
+  ? chart.labels
+  : ["—"];
   const datasets = chart.datasets || [];
   
   if (type === "line") {
@@ -512,7 +515,7 @@ const buildData = (chart) => {
         tension: 0.4,
         fill: !ds?.dashed,
         borderWidth: ds?.dashed ? 2 : 2.5,
-        borderDash: ds?.dashed ? [6, 4] : [],
+        ...(ds?.dashed ? { borderDash: [6, 4] } : {}),
         pointRadius: (ds?.data?.length || 0) > 0 ? 4 : 0,
         pointBackgroundColor: ds?.color || "#7c5cbf",
         pointBorderColor: "#fff",
@@ -1280,9 +1283,10 @@ const navItems = [
           </div>
           {chart.subtitle && <p style={S.sub}>{chart.subtitle}</p>}
           <div style={{ height: chart.type === "doughnut" ? 200 : 250 }}>
-  {(chart.labels?.length > 0 || chart.type === "doughnut")
+  {(chart.type === "doughnut" || (Array.isArray(chart.labels) && chart.labels.some(l => l !== "")))
     ? <C data={buildData(chart)} options={chartOptions} />
-    : <div style={{ height:"100%", display:"flex", alignItems:"center", justifyContent:"center", color:"#bbb", fontSize:13 }}>Chargement…</div>
+    : <div style={{ height:"100%", display:"flex", alignItems:"center",
+        justifyContent:"center", color:"#bbb", fontSize:13 }}>Chargement…</div>
   }
 </div>
           <div style={S.actions}>
