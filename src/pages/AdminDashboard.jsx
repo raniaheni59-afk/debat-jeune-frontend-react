@@ -573,12 +573,13 @@ const openAddData = (chart) => {
       };
     }
     return {
-      labels: chart.labels,
-      datasets: [{
-        data: chart.datasets[0].data, backgroundColor: chart.datasets[0].colors,
-        borderWidth: 3, borderColor: "#fff", hoverOffset: 10,
-      }],
-    };
+  labels: chart.labels,
+  datasets: [{
+    data: chart.datasets?.[0]?.data || [],
+    backgroundColor: chart.datasets?.[0]?.colors || [],
+    borderWidth: 3, borderColor: "#fff", hoverOffset: 10,
+  }],
+};
   };
 
   const opts = {
@@ -1637,4 +1638,4 @@ const S = {
   typeBtnOn:{ borderColor:"#7c5cbf", background:"#f0ebff", boxShadow:"0 0 0 3px rgba(124,92,191,.15)" },
   divider:{ height:1, background:"#e8e5f0", margin:"24px 0" },
   pbiModalBtn:{ width:"100%", padding:"14px", borderRadius:12, border:"2px solid #e0dce8", background:"#fff", color:"#5a3fa0", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'Poppins',sans-serif", display:"flex", alignItems:"center", justifyContent:"center", gap:8 },
-};
+}; 
