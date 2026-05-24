@@ -235,7 +235,13 @@ const fetchPublications = useCallback(async () => {
 
 useEffect(() => {
   fetchPublications();
-}, [fetchPublications]);
+
+  const interval = setInterval(() => {
+    fetchPublications();
+  }, 3000);
+
+  return () => clearInterval(interval);
+}, []);
 
 // ✅ events من DB
 useEffect(() => {

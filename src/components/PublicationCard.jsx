@@ -193,7 +193,13 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
         form,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
-      onSaved({ titre_publication: titre, contenu: contenu, contenu_publication: contenu, medias });
+      onSaved({
+  ...publication,
+  titre_publication: titre,
+  contenu: contenu,
+  contenu_publication: contenu,
+  medias: medias,
+});
       onClose();
     } catch(e) {
       const raw = e?.response?.data;
@@ -316,7 +322,11 @@ const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
         `/publications/${pubId}/comments/${comment.id_commentaire}`,
         { contenu_commentaire: t, contenu: t }
       );
-      onSaved(t); // ← passe le nouveau texte
+      onSaved({
+  ...comment,
+  contenu_commentaire: t,
+  contenu: t
+});
       onClose();
     } catch(e) {
       const raw = e?.response?.data;
@@ -562,15 +572,24 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
       </div>
 
       {editOpen && (
-        <EditCommentModal
-          comment={{...comment, contenu_commentaire: localText, contenu: localText}}
-          pubId={pubId}
-          onClose={()=>setEditOpen(false)}
-          onSaved={(newText)=>{
-            if(newText) setLocalText(newText); // mise à jour immédiate
-            onRefresh(); // refresh en arrière-plan
-          }}/>
-      )}
+  <EditCommentModal
+    comment={{
+      ...comment,
+      contenu_commentaire: localText,
+      contenu: localText
+    }}
+    pubId={pubId}
+    onClose={() => setEditOpen(false)}
+    onSaved={(updatedComment) => {
+      if (updatedComment) {
+        setLocalText(
+          updatedComment.contenu_commentaire ||
+          updatedComment.contenu
+        );
+      }
+    }}
+  />
+)}
     </>
   );
 };
@@ -605,13 +624,16 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const inputRef    = useRef(null);
   const stkRef      = useRef(null);
 
-  const isAdmin = currentUser?.role === "admin";
-  const isOwner = currentUser && (
-    currentUser.id_user === pub.user_id  ||
-    currentUser.id      === pub.user_id  ||
-    currentUser.id_user === pub.id_user  ||
-    currentUser.id      === pub.id_user  ||
-    isAdmin
+ const isAdmin = currentUser?.role === "admin";
+
+const isOwner =
+  isAdmin &&
+  currentUser &&
+  (
+    currentUser.id_user === pub.user_id ||
+    currentUser.id === pub.user_id ||
+    currentUser.id_user === pub.id_user ||
+    currentUser.id === pub.id_user
   );
 
   useEffect(()=>{
@@ -892,14 +914,15 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 
       {/* ── edit publication modal ── */}
       {editOpen && (
-        <EditPublicationModal
-          publication={pub}
-          onClose={()=>setEditOpen(false)}
-          onSaved={(updatedFields)=>{
-            if(updatedFields) setLocalPub(p=>({...p, ...updatedFields})); // update immédiat
-            if(onUpdate) onUpdate(); // refresh en arrière-plan
-          }}/>
-      )}
+  <EditPublicationModal
+    publication={pub}
+    onClose={() => setEditOpen(false)}
+    onSaved={(updatedPub) => {
+      setLocalPub(updatedPub);
+      if (onUpdate) onUpdate();
+    }}
+  />
+)}
     </>
   );
 }
