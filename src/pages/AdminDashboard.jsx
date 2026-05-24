@@ -5,10 +5,9 @@ import AdminLiveStream from "./AdminLiveStream";
 import Swafy_Meet from "./Swafy_Meet";
 import ArchivePage from "./ArchivePage";
 import ParametrePage from "./ParametrePage";
-import { useLang } from "../i18n/LanguageContext";
 import ParametreContact from "./ParametreContact";
 import PublierPage from "./PublierPage";
-import AdminEnquete from "./EnquetePage";
+import EnquetePage from "./EnquetePage";
 import Suivi from "./suivi";
 import Participants from "../pages/Participants";
 import { useNavigate } from "react-router-dom";
@@ -38,7 +37,7 @@ ChartJS.register(
 );
 
 export default function AdminDashboard() {
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = (() => { try { return JSON.parse(localStorage.getItem("user") || "{}") || {}; } catch { return {}; } })();
   const navigate = useNavigate();
   const t = (key) => key;
  
