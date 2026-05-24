@@ -120,7 +120,11 @@ export default function AdminContact() {
   const fRef    = useRef(null);
 
   // ── ID courant — Number() garanti pour éviter string vs int
-  const ME = Number(JSON.parse(localStorage.getItem("user")||"{}").id_user||0);
+  const ME = (() => {
+  try {
+    return Number(JSON.parse(localStorage.getItem("user") || "{}").id_user || 0);
+  } catch { return 0; }
+})();
 
   // ── Socket ─────────────────────────────────────────────────────────
   useEffect(() => {

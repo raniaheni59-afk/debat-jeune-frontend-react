@@ -131,9 +131,11 @@ export default function JeuneContact() {
   const selRef    = useRef(null);
   const fileRef   = useRef(null);
 
-  // ✅ myId calculé UNE seule fois — Number() garanti
-  const rawUser = JSON.parse(localStorage.getItem("user") || "{}");
-  const myId    = Number(rawUser.id_user);
+ const myId = (() => {
+  try {
+    return Number(JSON.parse(localStorage.getItem("user") || "{}").id_user || 0);
+  } catch { return 0; }
+})();
 
   // ── Socket ──────────────────────────────────────────────────
   useEffect(() => {
