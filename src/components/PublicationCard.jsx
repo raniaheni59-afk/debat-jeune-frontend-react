@@ -17,7 +17,9 @@ const BACKEND = (() => {
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
+  // normalise backslashes and leading slashes
   const clean = p.split("\\").join("/").replace(/^\/+/, "");
+  // avoid double /uploads/uploads/
   if (clean.startsWith("uploads/")) return BACKEND + "/" + clean;
   return BACKEND + "/uploads/" + clean;
 };
@@ -374,7 +376,7 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
     const t=(textOverride||replyText).trim(); if(!t||replySending) return;
     setReplySending(true);
     try {
-      await API.post(`/publications/${pubId}/comments`,{contenu_commentaire:t,parent_id:comment.id_commentaire});
+      await API.post(`/publications/${pubId}/comments`,{contenu_commentaire:t,contenu:t,parent_id:comment.id_commentaire});
       setReplyText(""); setReplyOpen(false); setShowReplies(true); onRefresh();
     } catch(e){ console.error("reply:",e?.response?.data||e.message); }
     finally { setReplySending(false); }
@@ -580,7 +582,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
     const t=(text_override||cmtText).trim(); if(!t||cmtSending) return;
     setCmtSending(true);
     try {
-      await API.post(`/publications/${pub.id_publication}/comments`,{contenu_commentaire:t});
+      await API.post(`/publications/${pub.id_publication}/comments`,{contenu_commentaire:t, contenu:t});
       setCmtText(""); await loadComments();
     } catch(e){ console.error("comment:",e?.response?.status,e?.response?.data||e.message); }
     finally{ setCmtSending(false); }

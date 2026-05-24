@@ -202,7 +202,7 @@ const DebateBlock = ({ publication }) => {
         top.map(c => ({
           ...c,
           replies: flat
-            .filter(r => r.parent_id === c.id_commentaire)
+            .filter(r => String(r.parent_id) === String(c.id_commentaire))
             .map(r => ({ ...r, debat_side: r.debat_side || c.debat_side })),
         }))
       );
