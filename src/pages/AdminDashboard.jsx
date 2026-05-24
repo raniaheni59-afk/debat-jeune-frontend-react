@@ -492,65 +492,82 @@ const openAddData = (chart) => {
   };
 
   // ── Chart builders ──
-  const buildData = (chart) => {
-    // ✅ Guard complet — jamais de data vide vers Chart.js
-    if (!chart?.datasets?.length) return { labels: ["..."], datasets: [{ data: [0] }] };
+const buildData = (chart) => {
+  // ✅ Guard complet — gérer null/undefined
+  if (!chart || !chart.datasets || !Array.isArray(chart.datasets) || chart.datasets.length === 0) {
+    return { labels: ["..."], datasets: [{ data: [0] }] };
+  }
 
-    if (chart.type === "line") {
-      const labels = chart.labels?.length ? chart.labels : ["..."];
-      return {
-        labels,
-        datasets: chart.datasets.map((ds) => {
-          const data = ds.data?.length ? ds.data : new Array(labels.length).fill(0);
-          return {
-            label: ds.label || "",
-            data,
-            borderColor: ds.color || "#7c5cbf",
-            backgroundColor: ds.dashed ? "transparent" : `${ds.color || "#7c5cbf"}12`,
-            tension: 0.4,
-            fill: !ds.dashed,
-            borderWidth: ds.dashed ? 2 : 2.5,
-            borderDash: ds.dashed ? [6, 4] : [],
-            pointRadius: data.length > 0 ? 4 : 0,
-            pointBackgroundColor: ds.color || "#7c5cbf",
-            pointBorderColor: "#fff",
-            pointBorderWidth: 2,
-            pointHoverRadius: 7,
-          };
-        }),
-      };
-    }
-
-    if (chart.type === "bar") {
-      const labels = chart.labels?.length ? chart.labels : ["..."];
-      return {
-        labels,
-        datasets: chart.datasets.map((ds) => ({
-          label: ds.label || "",
-          data: ds.data?.length ? ds.data : new Array(labels.length).fill(0),
-          backgroundColor: ds.color || "#7c5cbf",
-          borderRadius: 6,
-          borderSkipped: false,
-        })),
-      };
-    }
-
-    // doughnut
-    const ds0 = chart.datasets[0] || {};
-    const data = ds0.data?.length ? ds0.data : [1];
-    const colors = ds0.colors?.length ? ds0.colors : ["#7c5cbf"];
-    const labels = chart.labels?.length ? chart.labels : data.map((_, i) => `Cat ${i+1}`);
+  if (chart.type === "line") {
+    const labels = chart.labels?.length ? chart.labels : ["..."];
     return {
       labels,
-      datasets: [{
-        data,
-        backgroundColor: colors,
-        borderWidth: 3,
-        borderColor: "#fff",
-        hoverOffset: 10,
-      }],
+      datasets: chart.datasets.map((ds) => {
+        // ✅ Vérifier si ds et ds.data existent et ont des données
+        const data = (ds?.data && Array.isArray(ds.data) && ds.data.length > 0) 
+          ? ds.data 
+          : new Array(labels.length).fill(0);
+          
+        return {
+          label: ds?.label || "",
+          data,
+          borderColor: ds?.color || "#7c5cbf",
+          backgroundColor: ds?.dashed ? "transparent" : `${ds?.color || "#7c5cbf"}12`,
+          tension: 0.4,
+          fill: !ds?.dashed,
+          borderWidth: ds?.dashed ? 2 : 2.5,
+          borderDash: ds?.dashed ? [6, 4] : [],
+          pointRadius: data.length > 0 ? 4 : 0,
+          pointBackgroundColor: ds?.color || "#7c5cbf",
+          pointBorderColor: "#fff",
+          pointBorderWidth: 2,
+          pointHoverRadius: 7,
+        };
+      }),
     };
+  }
+
+  if (chart.type === "bar") {
+    const labels = chart.labels?.length ? chart.labels : ["..."];
+    return {
+      labels,
+      datasets: chart.datasets.map((ds) => {
+        const data = (ds?.data && Array.isArray(ds.data) && ds.data.length > 0)
+          ? ds.data
+          : new Array(labels.length).fill(0);
+        return {
+          label: ds?.label || "",
+          data,
+          backgroundColor: ds?.color || "#7c5cbf",
+          borderRadius: 6,
+          borderSkipped: false,
+        };
+      }),
+    };
+  }
+
+  // doughnut
+  const ds0 = chart.datasets[0];
+  // ✅ Vérifier si ds0, ds0.data et ds0.colors existent
+  const data = (ds0?.data && Array.isArray(ds0.data) && ds0.data.length > 0) 
+    ? ds0.data 
+    : [1];
+  const colors = (ds0?.colors && Array.isArray(ds0.colors) && ds0.colors.length > 0) 
+    ? ds0.colors 
+    : ["#7c5cbf"];
+  const labels = chart.labels?.length ? chart.labels : data.map((_, i) => `Cat ${i+1}`);
+  
+  return {
+    labels,
+    datasets: [{
+      data,
+      backgroundColor: colors,
+      borderWidth: 3,
+      borderColor: "#fff",
+      hoverOffset: 10,
+    }],
   };
+};
 
   const opts = {
     line: {
