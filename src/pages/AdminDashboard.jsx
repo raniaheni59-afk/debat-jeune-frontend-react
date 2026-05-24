@@ -413,21 +413,21 @@ const fetchGouvernoratStats = useCallback(async () => {
  
 
 // ✅ fetch publications
-const fetchPublications = useCallback(async () => {
+const fetchPublications = useCallback(async (silent = false) => {
   try {
-    setPubLoading(true);
+    if (!silent) setPubLoading(true);
     const res = await API.get("/publications");
     setPublications(Array.isArray(res.data) ? res.data : []);
   } catch { setPublications([]); }
-  finally { setPubLoading(false); }
+  finally { if (!silent) setPubLoading(false); }
 }, []);
 
 useEffect(() => {
-  fetchPublications();
+  fetchPublications(false); // first load shows spinner
 
   const interval = setInterval(() => {
-    fetchPublications();
-  }, 3000);
+    fetchPublications(true); // background refresh — no spinner
+  }, 30000); // 30s is enough
 
   return () => clearInterval(interval);
 }, []);
@@ -1158,6 +1158,7 @@ const navItems = [
     minHeight: "100vh",
     padding: "20px 30px 80px",
     boxSizing: "border-box",
+    background: "linear-gradient(135deg,#b8a9e0,#9b89d0 20%,#8b7bc8 40%,#7c6cbf 60%,#9584cf 80%,#a897da)",
   }}>
     <div style={{
       background: "rgba(255,255,255,.93)", backdropFilter: "blur(10px)",
@@ -1176,7 +1177,7 @@ const navItems = [
       </p>
     </div>
 
-    <div style={{ marginTop: 8 }}>
+    <div style={{ marginTop: 8, maxWidth: 700, margin: "8px auto 0" }}>
       <h2 style={{ fontFamily:"Poppins,sans-serif", fontSize:18, fontWeight:800, color:"#fff", marginBottom:16, textShadow:"0 1px 4px rgba(0,0,0,.2)" }}>
         Fil d'actualité
       </h2>
@@ -1192,7 +1193,9 @@ const navItems = [
         </div>
       ) : (
         publications.map(pub => (
-          <div key={pub.id_publication} id={`pub-${pub.id_publication}`}><PublicationCard publication={pub} onUpdate={fetchPublications} /></div>
+          <div key={pub.id_publication} id={`pub-${pub.id_publication}`} style={{ marginBottom: 0 }}>
+            <PublicationCard publication={pub} onUpdate={() => fetchPublications(true)} />
+          </div>
         ))
       )}
     </div>
