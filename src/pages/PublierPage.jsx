@@ -18,6 +18,7 @@ export default function PublierPage({ onBack }) {
 
   const [uploadProgress, setUploadProgress] = useState(0);
 const progressIntervalRef = React.useRef(null);
+const fileInputRef = React.useRef(null);
 
 const startFakeProgress = () => {
   setUploadProgress(0);
@@ -97,7 +98,7 @@ const handleSubmit = async (e) => {
     dataToSend.append("titre_publication", formData.titre_publication || "");
   }
 
-  const fileInput = document.getElementById("fileInput");
+  const fileInput = fileInputRef.current;
   if (fileInput && fileInput.files.length > 0) {
     Array.from(fileInput.files).forEach((file) => {
       dataToSend.append("files", file);
@@ -107,10 +108,11 @@ const handleSubmit = async (e) => {
   try {
     await api.post("/publications", dataToSend);
     finishProgress();
+    setSuccess(true);
     setTimeout(() => {
       if (onBack) onBack();
       else navigate("/jeune");
-    }, 300);
+    }, 1200);
   } catch (err) {
     clearInterval(progressIntervalRef.current);
     setUploadProgress(0);
@@ -203,6 +205,7 @@ const handleSubmit = async (e) => {
               activeType === "debat") && (
               <div className="upload-zone">
                 <input
+                  ref={fileInputRef}
                   type="file"
                   id="fileInput"
                   multiple={activeType === "photo" || activeType === "debat"}

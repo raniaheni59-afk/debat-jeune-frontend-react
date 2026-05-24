@@ -575,13 +575,13 @@ const JeuneLayout = () => {
   }, []); // ✅ dependency array vide = une seule fois
 
   /* ── FETCH ── */
-  const fetchPublications = useCallback(async () => {
+  const fetchPublications = useCallback(async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await API.get("/publications");
       setPublications(Array.isArray(res.data) ? res.data : []);
     } catch { setPublications([]); }
-    finally   { setLoading(false); }
+    finally   { if (!silent) setLoading(false); }
   }, []);
 
   const fetchNotifications = useCallback(async () => {
@@ -719,8 +719,8 @@ const JeuneLayout = () => {
         return (
           <PublierPage
             onBack={async () => {
-              await fetchPublications(); // refresh le feed sans navigate
-              goTo(PAGES.HOME);          // retour HOME dans le layout
+              goTo(PAGES.HOME);              // go HOME first (instant)
+              await fetchPublications(true); // then silent refresh
             }}
           />
         );
@@ -849,7 +849,7 @@ const JeuneLayout = () => {
               <div key={pub.id_publication}
                 id={`pub-${pub.id_publication}`}
                 className={highlightedPub===pub.id_publication ? "jl-highlighted" : ""}>
-                <PublicationCard publication={pub} onUpdate={fetchPublications}/>
+                <PublicationCard publication={pub} onUpdate={()=>fetchPublications(true)}/>
               </div>
             ))}
           </div>

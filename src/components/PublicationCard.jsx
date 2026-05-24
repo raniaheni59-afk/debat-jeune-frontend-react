@@ -17,9 +17,7 @@ const BACKEND = (() => {
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  // normalise backslashes and strip leading slashes
   const clean = p.split("\\").join("/").replace(/^\/+/, "");
-  // strip duplicate uploads/ prefix
   const nodup = clean.replace(/^(uploads\/)+/, "");
   return BACKEND + "/uploads/" + nodup;
 };
@@ -593,8 +591,8 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const sendComment = async(text_override)=>{
     const t=(text_override||cmtText).trim(); if(!t||cmtSending) return;
     setCmtSending(true);
-    setCmtText(""); // clear immediately for better UX
-    // Optimistic: show comment right away
+    setCmtText("");
+    // optimistic — show comment right away
     const me = getCurrentUser();
     const optimistic = {
       id_commentaire: `tmp-${Date.now()}`,
@@ -613,10 +611,9 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
       await API.post(`/publications/${pub.id_publication}/comments`,{
         contenu_commentaire:t, contenu:t
       });
-      await loadComments(); // refresh to get real IDs
+      await loadComments();
     } catch(e){
       console.error("comment:",e?.response?.status,e?.response?.data||e.message);
-      // rollback optimistic
       setComments(prev=>prev.filter(c=>c.id_commentaire!==optimistic.id_commentaire));
       setCmtCount(c=>Math.max(0,c-1));
       setCmtText(t);
