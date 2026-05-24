@@ -17,9 +17,7 @@ const BACKEND = (() => {
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  // normalise backslashes and leading slashes
   const clean = p.split("\\").join("/").replace(/^\/+/, "");
-  // avoid double /uploads/uploads/
   if (clean.startsWith("uploads/")) return BACKEND + "/" + clean;
   return BACKEND + "/uploads/" + clean;
 };
@@ -41,7 +39,13 @@ const getSrc = (m) => getMediaUrl(m?.url_media || m?.chemin_fichier || m?.url ||
 const isImg  = (m) => { const s=getSrc(m)||""; return m?.type_media==="image"||/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(s); };
 const isVid  = (m) => { const s=getSrc(m)||""; return m?.type_media==="video"||/\.(mp4|webm|ogg|mov|avi)(\?|$)/i.test(s); };
 const isPdf  = (m) => { const s=getSrc(m)||""; return m?.type_media==="pdf"||/\.pdf(\?|$)/i.test(s); };
-const getSrcSafe = (m) => { const s=getSrc(m); return s&&!s.endsWith("/uploads/")?s:null; };
+const getSrcSafe = (m) => {
+  const s = getSrc(m);
+  if (!s) return null;
+  if (s.endsWith("/uploads/") || s.endsWith("/uploads")) return null;
+  if (s === BACKEND + "/uploads/") return null;
+  return s;
+};
 
 /* ─── constants ─────────────────────────────────────────────────── */
 const REACTIONS = [
@@ -375,10 +379,16 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const sendReply = async (textOverride) => {
     const t=(textOverride||replyText).trim(); if(!t||replySending) return;
     setReplySending(true);
+    setReplyText(""); setReplyOpen(false); setShowReplies(true);
     try {
-      await API.post(`/publications/${pubId}/comments`,{contenu_commentaire:t,contenu:t,parent_id:comment.id_commentaire});
-      setReplyText(""); setReplyOpen(false); setShowReplies(true); onRefresh();
-    } catch(e){ console.error("reply:",e?.response?.data||e.message); }
+      await API.post(`/publications/${pubId}/comments`,{
+        contenu_commentaire:t, contenu:t, parent_id:comment.id_commentaire
+      });
+      onRefresh(); // refresh to get real data
+    } catch(e){
+      console.error("reply:",e?.response?.data||e.message);
+      setReplyText(t); setReplyOpen(true);
+    }
     finally { setReplySending(false); }
   };
 
@@ -581,10 +591,32 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const sendComment = async(text_override)=>{
     const t=(text_override||cmtText).trim(); if(!t||cmtSending) return;
     setCmtSending(true);
+    // Optimistic: add comment immediately
+    const currentUser2 = getCurrentUser();
+    const optimistic = {
+      id_commentaire: `tmp-${Date.now()}`,
+      contenu_commentaire: t,
+      contenu: t,
+      prenom_user: currentUser2?.prenom_user||currentUser2?.prenom||"",
+      nom_user: currentUser2?.nom_user||currentUser2?.nom||"",
+      photo_user: currentUser2?.photo_user||null,
+      id_user: currentUser2?.id_user||currentUser2?.id,
+      user_id: currentUser2?.id_user||currentUser2?.id,
+      created_at: new Date().toISOString(),
+      reaction_counts:{}, my_reaction:null, replies:[],
+    };
+    setComments(prev=>[...prev, optimistic]);
+    setCmtCount(c=>c+1);
+    setCmtText("");
     try {
       await API.post(`/publications/${pub.id_publication}/comments`,{contenu_commentaire:t, contenu:t});
-      setCmtText(""); await loadComments();
-    } catch(e){ console.error("comment:",e?.response?.status,e?.response?.data||e.message); }
+      await loadComments(); // refresh to get real ID
+    } catch(e){
+      console.error("comment:",e?.response?.status,e?.response?.data||e.message);
+      setComments(prev=>prev.filter(c=>c.id_commentaire!==optimistic.id_commentaire));
+      setCmtCount(c=>Math.max(0,c-1));
+      setCmtText(t);
+    }
     finally{ setCmtSending(false); }
   };
 
