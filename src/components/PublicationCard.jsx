@@ -209,13 +209,7 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
   };
 
   // prevent body scroll
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "auto"; // On remet en 'auto' au lieu de vide
-      document.body.style.height = "auto";
-    };
-  }, []);
+  useEffect(()=>{ document.body.style.overflow="hidden"; return()=>{ document.body.style.overflow=""; }; },[]);
 
   return (
     <div className="pc-modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -336,12 +330,7 @@ const EditCommentModal = ({ comment, pubId, onClose, onSaved }) => {
     }
   };
 
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "auto";
-    };
-  }, []);
+  useEffect(()=>{ document.body.style.overflow="hidden"; return()=>{ document.body.style.overflow=""; }; },[]);
 
   return (
     <div className="pc-modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
@@ -685,7 +674,12 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
 
   const getSrcSafe = (m) => {
     const s = getSrc(m);
-    return s && s !== BACKEND + "/uploads/" ? s : null;
+    if (!s) return null;
+    // Reject URLs that have no real path after /uploads/
+    const clean = s.replace(/\\/g, "/");
+    const parts  = clean.split("/uploads/");
+    if (parts.length > 1 && parts[parts.length - 1].trim() === "") return null;
+    return s;
   };
 
   /* split media — skip medias without valid src */
@@ -769,7 +763,12 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
           <div key={`vid-${i}`} className="pc-vid-wrap">
             <video src={getSrcSafe(m)} controls playsInline preload="metadata"
               style={{width:"100%",display:"block",maxHeight:"260px",background:"#000"}}
-              onError={e=>{ e.target.closest(".pc-vid-wrap").style.display="none"; }}/>
+              onError={e=>{
+                const wrap=e.target.closest(".pc-vid-wrap");
+                if(wrap){
+                  wrap.innerHTML='<div style="width:100%;padding:40px 0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;background:#1a1a2e;border-radius:8px;color:#9080b8;font-size:13px;font-weight:600;">🎥<br/>Vidéo indisponible</div>';
+                }
+              }}/>
           </div>
         ))}
 
@@ -785,7 +784,17 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
                     src={src}
                     alt=""
                     loading="lazy"
-                    onError={e=>{ const item=e.target.closest(".pc-media-item"); if(item) item.style.display="none"; }}
+                    onError={e=>{
+                      e.target.style.display="none";
+                      const item=e.target.closest(".pc-media-item");
+                      if(item&&!item.querySelector(".pc-img-fallback")){
+                        const fb=document.createElement("div");
+                        fb.className="pc-img-fallback";
+                        fb.style.cssText="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:38px;background:#ede9ff;color:#9080b8;";
+                        fb.textContent="🖼️";
+                        item.appendChild(fb);
+                      }
+                    }}
                   />
                   {more && <div className="pc-media-more">+{imgMedias.length-4}</div>}
                 </div>
