@@ -91,18 +91,25 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false, hand=
   const ownRef = useRef(null);
   const vRef   = isLocal ? localRef : ownRef;
 
-  // ✅ KEY FIX: assign srcObject whenever stream changes
+  // ✅ Assign srcObject robustly — retry if not mounted yet
   useEffect(() => {
-    const el = vRef?.current;
-    if (!el) return;
-    if (stream && el.srcObject !== stream) {
-      el.srcObject = stream;
-    }
-  }, [stream, vRef]);
+    const assign = () => {
+      const el = vRef?.current;
+      if (!el) return;
+      if (stream && el.srcObject !== stream) {
+        el.srcObject = stream;
+        el.play().catch(() => {}); // autoplay policy
+      }
+    };
+    assign();
+    const t = setTimeout(assign, 200); // retry after mount
+    return () => clearTimeout(t);
+  }, [stream]);  // intentionally omit vRef — stable ref
 
   const init    = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const isHost  = role === "host";
-  const showCam = !camOff && (stream || isLocal);
+  // ✅ Afficher cam si: pas coupée ET (stream dispo OU c'est notre tile locale)
+  const showCam = !camOff && (stream != null || isLocal);
 
   return (
     <div style={{
@@ -228,16 +235,7 @@ export default function MeetRoom() {
   const timerRef  = useRef(null);
 
   const { live: subtitle, saved: transcript } = useSubtitles(subsOn, subLang);
-  // ✅ FIX: viewerLink — priorité : localStorage → reconstruire depuis l'URL
-  // Le lien doit pointer vers /meet/:roomCode?vt=... (PUBLIC, pas ProtectedRoute)
-  const viewerLink = (() => {
-    const stored = localStorage.getItem("currentLiveViewerLink") || "";
-    if (stored && stored.includes(roomCode) && stored.includes("vt=")) return stored;
-    // Fallback: si l'admin est dans la salle, reconstruire un lien depuis l'URL
-    // vtToken est indisponible pour l'admin (il a at=), donc on utilise ce qui est en DB
-    // → sera mis à jour par socket live-started avec le bon viewerLink
-    return stored;
-  })();
+  const viewerLink = localStorage.getItem("currentLiveViewerLink") || "";
 
   /* ─── toast helper ─── */
   const showToast = useCallback((msg, color="#1a73e8", icon="") => {
@@ -251,72 +249,128 @@ export default function MeetRoom() {
   };
 
   /* ─── timer ─── */
-  useEffect(()=>{
-    timerRef.current = setInterval(()=>setDuration(d=>d+1),1000);
-    return ()=>clearInterval(timerRef.current);
-  },[]);
+  useEffect(() => {
+    timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
+    return () => clearInterval(timerRef.current);
+  }, []);
 
-  /* ─── WebRTC helper ─── */
-  const createPeer = useCallback((sid)=>{
-    const pc = new RTCPeerConnection({ iceServers:[
-      {urls:"stun:stun.l.google.com:19302"},
-      {urls:"stun:stun1.l.google.com:19302"},
+  /* ✅ Ré-assigner la vidéo locale quand le status change à "ok"
+     (le <video ref={localVid}> est dans le DOM seulement après status=ok) */
+  useEffect(() => {
+    if (status !== "ok") return;
+    const assign = () => {
+      if (localVid.current && localStr.current) {
+        localVid.current.srcObject = localStr.current;
+        localVid.current.play().catch(() => {});
+      }
+    };
+    assign();
+    const t1 = setTimeout(assign, 100);
+    const t2 = setTimeout(assign, 500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [status]);
+
+  /* ─── WebRTC helpers ───
+     ✅ FIX ROOT CAUSE: ne pas ajouter les tracks ici car localStr.current
+     peut être null au moment où createPeer est créé (useCallback []).
+     Les tracks sont ajoutés APRÈS dans addLocalTracks() appelé explicitement. */
+  const createPeer = useCallback((sid) => {
+    const pc = new RTCPeerConnection({ iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:stun2.l.google.com:19302" },
     ]});
-    pc.onicecandidate = e => e.candidate && sockRef.current?.emit("ice-candidate",{target:sid,candidate:e.candidate});
+    pc.onicecandidate = e => {
+      if (e.candidate) sockRef.current?.emit("ice-candidate", { target: sid, candidate: e.candidate });
+    };
     pc.ontrack = e => {
-      const stream = e.streams[0];
-      setPeers(prev=>{
-        const ex = prev.find(p=>p.id===sid);
-        if (ex) return prev.map(p=>p.id===sid?{...p,stream}:p);
-        return [...prev,{id:sid,stream,name:nameMap.current[sid]||"?",role:roleMap.current[sid]||"guest"}];
+      // ✅ Utiliser streams[0] si disponible, sinon créer un nouveau MediaStream
+      const stream = e.streams?.[0] || (() => {
+        const ms = new MediaStream();
+        ms.addTrack(e.track);
+        return ms;
+      })();
+      setPeers(prev => {
+        const ex = prev.find(p => p.id === sid);
+        if (ex) {
+          // ✅ Ajouter le track au stream existant si pas de streams[0]
+          if (!e.streams?.[0] && ex.stream) { ex.stream.addTrack(e.track); return [...prev]; }
+          return prev.map(p => p.id === sid ? { ...p, stream } : p);
+        }
+        return [...prev, { id: sid, stream, name: nameMap.current[sid] || "?", role: roleMap.current[sid] || "guest" }];
       });
     };
-    if (localStr.current) localStr.current.getTracks().forEach(t=>pc.addTrack(t,localStr.current));
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === "failed") {
+        console.warn("ICE failed for", sid, "— restarting ICE");
+        pc.restartIce?.();
+      }
+    };
+    // ⚠️ NE PAS ajouter localStr ici — fait dans addLocalTracks après getUserMedia
     return pc;
-  },[]);
+  }, []);
+
+  /* ✅ Ajouter les tracks locaux à tous les PeerConnections existants */
+  const addLocalTracks = useCallback((stream) => {
+    if (!stream) return;
+    Object.entries(pcMap.current).forEach(([sid, pc]) => {
+      // Éviter les doublons
+      const senders = pc.getSenders().map(s => s.track?.id);
+      stream.getTracks().forEach(track => {
+        if (!senders.includes(track.id)) {
+          pc.addTrack(track, stream);
+        }
+      });
+    });
+  }, []);
 
   /* ─── INIT ─── */
   useEffect(()=>{
     if (!token) { setErrMsg("Token d'accès manquant."); setStatus("error"); return; }
     let alive = true;
 
-    (async()=>{
-      /* ── 1. Media access ── */
+    (async () => {
+      /* ── 1. Media access — AVANT de créer le socket ──
+         ✅ On attend d'avoir le stream local AVANT tout WebRTC
+         pour que les tracks soient disponibles quand on crée les PeerConnections */
       try {
-        if (myRole==="host") {
-          // Admin: camera + mic
-          const s = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
-          if (!alive){ s.getTracks().forEach(t=>t.stop()); return; }
-          localStr.current = s;
-          // ✅ FIX: assign srcObject with small delay so ref is mounted
-          requestAnimationFrame(()=>{
-            if (localVid.current) localVid.current.srcObject = s;
-          });
-        } else {
-          // ✅ Jeune: caméra + micro — micro coupé par défaut, caméra ACTIVE
-          // La caméra du jeune est transmise via WebRTC mais affichée différemment
-          try {
-            const s = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
-            if (!alive){ s.getTracks().forEach(t=>t.stop()); return; }
-            s.getAudioTracks().forEach(t=>{ t.enabled = false; }); // micro coupé par défaut
-            localStr.current = s;
-            requestAnimationFrame(()=>{
-              if (localVid.current) localVid.current.srcObject = s;
-            });
-          } catch {
-            // Pas de caméra ? micro seulement
-            try {
-              const s = await navigator.mediaDevices.getUserMedia({video:false, audio:true});
-              if (!alive){ s.getTracks().forEach(t=>t.stop()); return; }
-              s.getAudioTracks().forEach(t=>{ t.enabled = false; });
-              localStr.current = s;
-              setCamOn(false);
-            } catch { setMicOn(false); setCamOn(false); }
+        // ✅ Admin ET jeune demandent caméra + micro
+        // Jeune: micro coupé par défaut, caméra active (on peut couper après)
+        const constraints = myRole === "host"
+          ? { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }, audio: true }
+          : { video: { width: { ideal: 640 }, height: { ideal: 480 } }, audio: true };
+
+        const s = await navigator.mediaDevices.getUserMedia(constraints).catch(async () => {
+          // Fallback: essayer sans vidéo si caméra refusée/indisponible
+          return navigator.mediaDevices.getUserMedia({ video: false, audio: true }).catch(() => null);
+        });
+
+        if (!s) { setMicOn(false); setCamOn(false); }
+        else {
+          if (!alive) { s.getTracks().forEach(t => t.stop()); return; }
+
+          // ✅ Jeune: micro coupé par défaut (mais stream prêt)
+          if (myRole !== "host") {
+            s.getAudioTracks().forEach(t => { t.enabled = false; });
+            // Vérifier si on a vraiment la vidéo
+            if (!s.getVideoTracks().length) setCamOn(false);
           }
+
+          localStr.current = s;
+
+          // ✅ Afficher la caméra locale immédiatement
+          const assignVideo = () => {
+            if (localVid.current && localStr.current) {
+              localVid.current.srcObject = localStr.current;
+            }
+          };
+          assignVideo();
+          requestAnimationFrame(assignVideo);
+          setTimeout(assignVideo, 100);
         }
-      } catch {
-        if (myRole==="host") setCamOn(false);
-        setMicOn(false);
+      } catch (err) {
+        console.warn("getUserMedia error:", err);
+        setCamOn(false); setMicOn(false);
       }
 
       setStatus("ok");
@@ -331,14 +385,21 @@ export default function MeetRoom() {
         });
       });
 
-      sock.on("all-users", async users=>{
-        for (const u of users){
-          nameMap.current[u.socketId]=u.userName;
-          roleMap.current[u.socketId]=u.role;
-          const pc=createPeer(u.socketId); pcMap.current[u.socketId]=pc;
-          const offer=await pc.createOffer();
+      sock.on("all-users", async users => {
+        for (const u of users) {
+          nameMap.current[u.socketId] = u.userName;
+          roleMap.current[u.socketId] = u.role;
+          const pc = createPeer(u.socketId);
+          pcMap.current[u.socketId] = pc;
+          // ✅ CRUCIAL: ajouter les tracks locaux AVANT createOffer
+          if (localStr.current) {
+            localStr.current.getTracks().forEach(t => {
+              pc.addTrack(t, localStr.current);
+            });
+          }
+          const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
           await pc.setLocalDescription(offer);
-          sock.emit("offer",{target:u.socketId,sdp:offer});
+          sock.emit("offer", { target: u.socketId, sdp: offer });
         }
       });
 
@@ -347,13 +408,20 @@ export default function MeetRoom() {
         showToast(`👋 ${n} a rejoint`,"#34a853");
       });
 
-      sock.on("offer",async({caller,sdp})=>{
-        let pc=pcMap.current[caller];
-        if (!pc){ pc=createPeer(caller); pcMap.current[caller]=pc; }
+      sock.on("offer", async ({ caller, sdp }) => {
+        let pc = pcMap.current[caller];
+        if (!pc) { pc = createPeer(caller); pcMap.current[caller] = pc; }
+        // ✅ CRUCIAL: ajouter les tracks locaux AVANT setRemoteDescription
+        if (localStr.current) {
+          const existingSenders = pc.getSenders().map(s => s.track?.id);
+          localStr.current.getTracks().forEach(t => {
+            if (!existingSenders.includes(t.id)) pc.addTrack(t, localStr.current);
+          });
+        }
         await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-        const ans=await pc.createAnswer();
+        const ans = await pc.createAnswer();
         await pc.setLocalDescription(ans);
-        sock.emit("answer",{target:caller,sdp:ans});
+        sock.emit("answer", { target: caller, sdp: ans });
       });
 
       sock.on("answer",async({responder,sdp})=>{
@@ -429,12 +497,12 @@ export default function MeetRoom() {
     emit("toggle-media",{roomCode,type:"audio",enabled:t.enabled});
   };
 
-  // ✅ Caméra disponible pour ADMIN et JEUNE
-  const toggleCam=()=>{
-    const t=localStr.current?.getVideoTracks()[0];
-    if(!t){ showToast("Caméra non disponible","#ea4335"); return; }
-    t.enabled=!t.enabled; setCamOn(t.enabled);
-    emit("toggle-media",{roomCode,type:"video",enabled:t.enabled});
+  // ✅ Caméra pour TOUT LE MONDE (admin et jeune)
+  const toggleCam = () => {
+    const t = localStr.current?.getVideoTracks()[0];
+    if (!t) { showToast("Caméra non disponible", "#ea4335"); return; }
+    t.enabled = !t.enabled; setCamOn(t.enabled);
+    emit("toggle-media", { roomCode, type: "video", enabled: t.enabled });
   };
 
   const toggleHand=()=>{
@@ -481,15 +549,15 @@ export default function MeetRoom() {
     emit("send-message",{roomCode,message:chatInput}); setChatInput("");
   };
 
-  const copyLink=async()=>{
-    // ✅ Admin: copie le viewerLink. Jeune: copie l'URL courante de la salle
-    const lnk = myRole==="host"
+  // ✅ Admin copie viewerLink, Jeune copie son URL courante
+  const copyLink = async () => {
+    const lnk = myRole === "host"
       ? viewerLink
-      : `${window.location.origin}/meet/${roomCode}?vt=${vtToken}`;
-    if(!lnk || lnk.endsWith("vt=")){ showToast("Lien non disponible","#ea4335","❌"); return; }
-    await navigator.clipboard.writeText(lnk).catch(()=>{});
-    setCopied(true); setTimeout(()=>setCopied(false),2500);
-    showToast("✅ Lien copié ! Partagez-le pour rejoindre","#34a853");
+      : `${window.location.origin}/meet/${roomCode}?vt=${vtToken||""}`;
+    if (!lnk || lnk.endsWith("vt=")) { showToast("Lien non disponible","#ea4335","❌"); return; }
+    await navigator.clipboard.writeText(lnk).catch(() => {});
+    setCopied(true); setTimeout(() => setCopied(false), 2500);
+    showToast("✅ Lien copié !", "#34a853");
   };
 
   const adminMute=(sid,type)=>{
@@ -528,14 +596,13 @@ export default function MeetRoom() {
   };
 
   /* ─── Grid layout ─── */
-  // ✅ Calcul des tuiles visibles
   // Admin : voit TOUT LE MONDE en grille
-  // Jeune : voit l'admin EN GRAND (hero) + les autres jeunes en barre du bas
-  const hostPeer   = peers.find(p=>(ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id])==="host");
-  const guestPeers = peers.filter(p=>(ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id])!=="host");
-  // Pour la grille admin: tout le monde
-  const visiblePeers = peers;
-  const gridCount = 1 + visiblePeers.length;
+  // Jeune : voit l'admin EN GRAND + sa propre cam + autres jeunes en barre du bas
+  const hostPeer   = peers.find(p => (ptcps.find(x => x.socketId === p.id)?.role || roleMap.current[p.id]) === "host");
+  const guestPeers = peers.filter(p => (ptcps.find(x => x.socketId === p.id)?.role || roleMap.current[p.id]) !== "host");
+  // Pour l'admin: grille avec lui + tout le monde
+  const allPeers  = peers;
+  const gridCount = 1 + allPeers.length;
   const cols = gridCount<=1?1:gridCount<=4?2:gridCount<=9?3:4;
 
   /* ─── Render states ─── */
@@ -602,16 +669,16 @@ export default function MeetRoom() {
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           <span style={{background:"rgba(255,255,255,.07)",color:"#9aa0a6",padding:"4px 10px",borderRadius:20,fontSize:12}}>{ptcps.length} 👥</span>
-          {/* ✅ Admin: bouton inviter */}
-          {myRole==="host"&&(
+          {/* ✅ Admin: bouton inviter + partager lien */}
+          {myRole==="host" && (
             <button className="cbtn" onClick={()=>setLinkOpen(o=>!o)} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",color:"#e8eaed",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:500}}>
               🔗 Inviter les jeunes
             </button>
           )}
-          {/* ✅ Jeune: bouton copier son lien pour partager */}
-          {myRole==="guest"&&(
+          {/* ✅ Jeune: copier et partager le lien de la salle */}
+          {myRole==="guest" && (
             <button className="cbtn" onClick={copyLink} style={{background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",color:"#e8eaed",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:500}}>
-              {copied?"✅ Copié !":"🔗 Partager ce lien"}
+              {copied ? "✅ Copié !" : "🔗 Partager ce live"}
             </button>
           )}
         </div>
@@ -641,18 +708,22 @@ export default function MeetRoom() {
       {/* ═══ BODY ═══ */}
       <div style={{flex:1,display:"flex",overflow:"hidden",gap:8,padding:8,minHeight:0}}>
 
-        {/* ═══ VIDEO ZONE ═══
-             Admin : grille de tout le monde
-             Jeune : admin en hero plein écran + barre du bas (sa cam + autres jeunes) */}
-        {myRole==="host" ? (
-          /* ── ADMIN : grille complète ── */
-          <div style={{flex:1,display:"grid",gap:8,alignContent:"center",overflow:"hidden",minWidth:0,gridTemplateColumns:`repeat(${cols},1fr)`}}>
-            {/* Admin local */}
+        {/* ═══════════════ VIDEO ZONE ═══════════════
+             ADMIN : grille, lui en premier + tous les participants
+             JEUNE : admin EN GRAND (hero) + barre du bas (sa cam + autres jeunes)
+             ✅ Les deux ont leur propre <video> pour afficher leur caméra        */}
+
+        {myRole === "host" ? (
+
+          /* ── ADMIN: grille complète ── */
+          <div style={{flex:1,display:"grid",gap:8,alignContent:"center",overflow:"hidden",minWidth:0,
+                       gridTemplateColumns:`repeat(${cols},1fr)`}}>
+            {/* Admin: sa caméra locale en premier */}
             <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn}/>
             {/* Tous les participants distants */}
-            {visiblePeers.map(p=>(
+            {allPeers.map(p=>(
               <Tile key={p.id} stream={p.stream}
-                name={nameMap.current[p.id]||p.name||"Invité"}
+                name={nameMap.current[p.id]||p.name||"Participant"}
                 role={ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id]||"guest"}
                 camOff={pState[p.id]?.video===false}
                 hand={pState[p.id]?.hand}
@@ -661,37 +732,44 @@ export default function MeetRoom() {
               />
             ))}
           </div>
+
         ) : (
-          /* ── JEUNE : admin en grand + barre du bas ── */
+
+          /* ── JEUNE: admin en hero + barre du bas ── */
           <div style={{flex:1,display:"flex",flexDirection:"column",gap:8,overflow:"hidden",minWidth:0}}>
-            {/* Admin en hero (ou placeholder si pas encore arrivé) */}
-            <div style={{flex:1,overflow:"hidden",borderRadius:14,background:"#000",minHeight:0}}>
+
+            {/* Admin EN GRAND — plein écran */}
+            <div style={{flex:1,minHeight:0,overflow:"hidden",borderRadius:14}}>
               {hostPeer ? (
-                <Tile stream={hostPeer.stream}
+                <Tile
+                  stream={hostPeer.stream}
                   name={nameMap.current[hostPeer.id]||"Admin"}
                   role="host"
                   camOff={pState[hostPeer.id]?.video===false}
-                  hand={false}
                   screenShare={pState[hostPeer.id]?.screen}
                   muted={false}
                 />
               ) : (
                 /* Admin pas encore arrivé */
-                <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12,color:"#5f6368"}}>
-                  <div style={{width:48,height:48,border:"3px solid rgba(255,255,255,.08)",borderTopColor:"#8ab4f8",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
-                  <p style={{fontSize:13}}>En attente de l'hôte…</p>
+                <div style={{height:"100%",background:"#111",borderRadius:14,display:"flex",
+                             alignItems:"center",justifyContent:"center",flexDirection:"column",gap:12}}>
+                  <div style={{width:48,height:48,border:"3px solid rgba(255,255,255,.08)",
+                               borderTopColor:"#8ab4f8",borderRadius:"50%",animation:"spin .8s linear infinite"}}/>
+                  <p style={{color:"#9aa0a6",fontSize:13}}>En attente de l'hôte…</p>
                 </div>
               )}
             </div>
-            {/* Barre du bas : ma caméra + autres jeunes */}
+
+            {/* Barre du bas : ma caméra (jeune) + autres jeunes */}
             <div style={{height:130,display:"flex",gap:8,flexShrink:0,overflowX:"auto",alignItems:"stretch"}}>
-              {/* Ma propre caméra */}
-              <div style={{width:200,flexShrink:0,height:"100%"}}>
-                <Tile localRef={localVid} isLocal muted name={myName} role="guest" camOff={!camOn}/>
+              {/* Ma caméra locale */}
+              <div style={{width:200,flexShrink:0}}>
+                <Tile localRef={localVid} isLocal muted name={myName} role="guest"
+                      camOff={!camOn}/>
               </div>
               {/* Autres jeunes */}
               {guestPeers.map(p=>(
-                <div key={p.id} style={{width:200,flexShrink:0,height:"100%"}}>
+                <div key={p.id} style={{width:200,flexShrink:0}}>
                   <Tile stream={p.stream}
                     name={nameMap.current[p.id]||"Participant"}
                     role="guest"
@@ -702,6 +780,7 @@ export default function MeetRoom() {
                 </div>
               ))}
             </div>
+
           </div>
         )}
 
@@ -883,11 +962,9 @@ export default function MeetRoom() {
       {/* ══ CONTROLS BAR ══ */}
       <div style={{background:"#2d2f31",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,flexWrap:"wrap",borderTop:"1px solid rgba(255,255,255,.05)"}}>
 
-        {/* Left: mic + cam */}
+        {/* ✅ Gauche : micro + caméra pour TOUT LE MONDE */}
         <div style={{display:"flex",gap:5}}>
-          {/* ✅ Micro disponible pour TOUT LE MONDE */}
           <Btn icon={micOn?"🎤":"🔇"} label={micOn?"Micro":"Muet"} onClick={toggleMic} active={micOn}/>
-          {/* ✅ Caméra disponible pour ADMIN et JEUNE */}
           <Btn icon={camOn?"📷":"🚫"} label={camOn?"Caméra":"Off"} onClick={toggleCam} active={camOn}/>
         </div>
 
@@ -897,7 +974,7 @@ export default function MeetRoom() {
           {myRole==="guest"&&<Btn icon="✋" label={hand?"Baisser":"Main"} onClick={toggleHand} active={!hand} pulse={hand}/>}
           <Btn icon="😄" label="Réactions" onClick={()=>setEmojiOpen(o=>!o)} active/>
           <Btn icon="💬" label="Chat" onClick={()=>{setChatOpen(o=>!o);setUnread(0);setPartOpen(false);setAiOpen(false);}} active badge={unread}/>
-          {/* ✅ Membres visible pour tout le monde */}
+          {/* ✅ Membres visible pour les DEUX */}
           <Btn icon="👥" label={`Membres (${ptcps.length})`} onClick={()=>{setPartOpen(o=>!o);setChatOpen(false);setAiOpen(false);}} active/>
         </div>
 
