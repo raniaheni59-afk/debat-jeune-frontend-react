@@ -103,171 +103,36 @@ const Toggle = ({ on, onToggle }) => (
   </div>
 );
 
-const ModalProfile = ({ onSaved }) => {
-  const storedUser = (() => { try { return JSON.parse(localStorage.getItem("user")) || {}; } catch { return {}; } })();
-  const [form, setForm]       = useState({
-    prenom_user   : storedUser.prenom_user   || "",
-    nom_user      : storedUser.nom_user      || "",
-    email_user    : storedUser.email_user    || "",
-    bio           : storedUser.bio           || "",
-    gouvernorat   : storedUser.gouvernorat   || "",
-    delegation    : storedUser.delegation    || "",
-    ville         : storedUser.ville         || "",
-    etablissement : storedUser.etablissement || "",
-    statut        : storedUser.statut        || "",
-    sexe          : storedUser.sexe          || "",
-  });
-  const [saving,  setSaving]  = useState(false);
-  const [saved,   setSaved]   = useState(false);
-  const [error,   setError]   = useState("");
-  const [photoFile, setPhotoFile] = useState(null);
-  const [photoPreview, setPhotoPreview] = useState(null);
-  const fileInputRef = useRef(null);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm(p => ({ ...p, [name]: value }));
-    setSaved(false); setError("");
-  };
-
-  const handlePhoto = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
-  };
-
-  const handleSave = async () => {
-    setSaving(true); setError(""); setSaved(false);
-    try {
-      const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
-      if (photoFile) fd.append("photo", photoFile);
-
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${BACKEND}/api/profile/update`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Erreur sauvegarde");
-
-      // Mettre à jour le localStorage
-      const updated = { ...storedUser, ...form };
-      if (data.photo_user) updated.photo_user = data.photo_user;
-      localStorage.setItem("user", JSON.stringify(updated));
-
-      setSaved(true);
-      if (onSaved) onSaved(updated);
-    } catch (err) {
-      setError(err.message || "Erreur réseau. Réessayez.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const avatarSrc = photoPreview || (storedUser.photo_user
-    ? (storedUser.photo_user.startsWith("http") ? storedUser.photo_user : `${BACKEND}/${storedUser.photo_user}`)
-    : (storedUser.sexe === "femme"
-        ? "https://randomuser.me/api/portraits/women/44.jpg"
-        : "https://randomuser.me/api/portraits/men/44.jpg"));
-
-  return (
-    <>
-      {/* Avatar */}
-      <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
-        <img src={avatarSrc}
-          style={{ width:58, height:58, borderRadius:"50%", border:"3px solid rgba(90,63,160,0.22)", objectFit:"cover" }} alt="avatar"/>
-        <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-          <button
-            style={{ padding:"8px 16px", borderRadius:10, background:"#f4f0ff", color:"#5a3fa0", border:"1.5px solid rgba(90,63,160,0.2)", fontSize:12, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}
-            onClick={() => fileInputRef.current?.click()}>
-            <Icon name="photo" size={14}/> Changer la photo
-          </button>
-          {photoPreview && <span style={{ fontSize:11, color:"#10b981" }}>✓ Nouvelle photo sélectionnée</span>}
-        </div>
-        <input ref={fileInputRef} type="file" accept="image/*" style={{ display:"none" }} onChange={handlePhoto}/>
-      </div>
-
-      {/* Infos de base */}
-      <div className="jl-m-row">
-        <div className="jl-m-fg">
-          <label className="jl-m-fl">Prénom</label>
-          <input className="jl-m-fi" name="prenom_user" value={form.prenom_user} onChange={handleChange}/>
-        </div>
-        <div className="jl-m-fg">
-          <label className="jl-m-fl">Nom</label>
-          <input className="jl-m-fi" name="nom_user" value={form.nom_user} onChange={handleChange}/>
-        </div>
-      </div>
-      <div className="jl-m-row">
-        <div className="jl-m-fg">
-          <label className="jl-m-fl">Email</label>
-          <input className="jl-m-fi" name="email_user" value={form.email_user} onChange={handleChange} type="email"/>
-        </div>
-        <div className="jl-m-fg">
-          <label className="jl-m-fl">Sexe</label>
-          <select className="jl-m-fi" name="sexe" value={form.sexe} onChange={handleChange}>
-            <option value="">—</option>
-            <option value="homme">Homme</option>
-            <option value="femme">Femme</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Localisation */}
-      <div className="jl-m-row">
-        <div className="jl-m-fg">
-          <label className="jl-m-fl">Gouvernorat</label>
-          <input className="jl-m-fi" name="gouvernorat" value={form.gouvernorat} onChange={handleChange} placeholder="Ex: Tunis, Sfax..."/>
-        </div>
-        <div className="jl-m-fg">
-          <label className="jl-m-fl">Délégation</label>
-          <input className="jl-m-fi" name="delegation" value={form.delegation} onChange={handleChange} placeholder="Ex: Carthage..."/>
-        </div>
-      </div>
-      <div className="jl-m-row">
-        <div className="jl-m-fg">
-          <label className="jl-m-fl">Ville</label>
-          <input className="jl-m-fi" name="ville" value={form.ville} onChange={handleChange} placeholder="Ex: La Marsa..."/>
-        </div>
-        <div className="jl-m-fg">
-          <label className="jl-m-fl">Statut</label>
-          <select className="jl-m-fi" name="statut" value={form.statut} onChange={handleChange}>
-            <option value="">—</option>
-            <option value="college">Collège</option>
-            <option value="lycee">Lycée</option>
-            <option value="etudiant">Étudiant</option>
-            <option value="diplome">Diplômé</option>
-            <option value="autre">Autre</option>
-          </select>
-        </div>
-      </div>
-      <div className="jl-m-fg">
-        <label className="jl-m-fl">Établissement</label>
-        <input className="jl-m-fi" name="etablissement" value={form.etablissement} onChange={handleChange} placeholder="Nom de ton école / université..."/>
-      </div>
-      <div className="jl-m-fg">
-        <label className="jl-m-fl">Bio</label>
-        <textarea className="jl-m-fi" name="bio" value={form.bio} onChange={handleChange}
-          placeholder="Parlez de vous…" style={{ resize:"vertical", minHeight:72, lineHeight:1.55 }}/>
-      </div>
-
-      {/* Feedback */}
-      {error  && <div style={{ background:"#fee2e2", color:"#b91c1c", padding:"10px 14px", borderRadius:10, fontSize:13, marginTop:8 }}>❌ {error}</div>}
-      {saved  && <div style={{ background:"#d1fae5", color:"#065f46", padding:"10px 14px", borderRadius:10, fontSize:13, marginTop:8 }}>✅ Profil mis à jour avec succès !</div>}
-
-      {/* Save button */}
-      <button
-        style={{ marginTop:16, width:"100%", padding:"11px 0", borderRadius:12, background:"linear-gradient(135deg,#5a3fa0,#7c5cbf)", color:"#fff", fontSize:14, fontWeight:700, border:"none", cursor: saving ? "not-allowed":"pointer", opacity: saving ? 0.7 : 1, display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"opacity .2s" }}
-        onClick={handleSave}
-        disabled={saving}>
-        {saving ? "⏳ Enregistrement..." : <><Icon name="check" size={16}/> Enregistrer les modifications</>}
+const ModalProfile = () => (
+  <>
+    <div style={{ display:"flex", alignItems:"center", gap:14, marginBottom:20 }}>
+      <img src="https://randomuser.me/api/portraits/men/44.jpg"
+        style={{ width:58, height:58, borderRadius:"50%", border:"3px solid rgba(90,63,160,0.22)" }} alt="avatar"/>
+      <button style={{ padding:"8px 16px", borderRadius:10, background:"#f4f0ff", color:"#5a3fa0", border:"1.5px solid rgba(90,63,160,0.2)", fontSize:12, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
+        <Icon name="photo" size={14}/> Changer la photo
       </button>
-    </>
-  );
-};
+    </div>
+    <div className="jl-m-row">
+      <div className="jl-m-fg">
+        <label className="jl-m-fl">Prénom</label>
+        <input className="jl-m-fi" defaultValue="Ahmed"/>
+      </div>
+      <div className="jl-m-fg">
+        <label className="jl-m-fl">Nom</label>
+        <input className="jl-m-fi" defaultValue="Ben Ali"/>
+      </div>
+    </div>
+    <div className="jl-m-fg">
+      <label className="jl-m-fl">Email</label>
+      <input className="jl-m-fi" defaultValue="ahmed.benali@swafy.tn"/>
+    </div>
+    <div className="jl-m-fg">
+      <label className="jl-m-fl">Bio</label>
+      <textarea className="jl-m-fi" placeholder="Parlez de vous…"
+        style={{ resize:"vertical", minHeight:72, lineHeight:1.55 }}/>
+    </div>
+  </>
+);
 
 const ModalToggles = ({ items, initState }) => {
   const [states, setStates] = useState(initState || items.map(() => true));
@@ -326,7 +191,7 @@ const ModalSecurity = () => (
 );
 
 const MODAL_MAP = {
-  profile : { title:"Mon profil",      Body: ModalProfile,    hasFoot: false },
+  profile : { title:"Mon profil",      Body: ModalProfile,    hasFoot: true },
   notif   : { title:"Notifications",   Body: () => <ModalToggles items={[{label:"Nouvelles publications",sub:"Quand un membre publie"},{label:"Commentaires",sub:"Sur vos publications"},{label:"Messages",sub:"Nouveaux messages"},{label:"Live",sub:"Alertes avant les sessions"}]} initState={[true,true,false,true]}/>, hasFoot:true },
   priv    : { title:"Confidentialité", Body: () => <ModalToggles items={[{label:"Profil public"},{label:"Afficher mes publications"},{label:"Autoriser les messages"},{label:"Indexation dans la recherche"}]} initState={[true,true,true,false]}/>, hasFoot:true },
   app     : { title:"Apparence",       Body: ModalAppearance, hasFoot: true },
@@ -674,9 +539,12 @@ const JeuneLayout = () => {
   const [pubVis,   setPubVis]   = useState("public");
   const [pubBusy,  setPubBusy]  = useState(false);
 
+  /* chatbot */
   const [cbInput, setCbInput] = useState("");
   const [cbMsgs,  setCbMsgs]  = useState([
-    { from:"bot", text:"👋 Salam ! Je suis l'assistant Swafy. Posez-moi vos questions sur la plateforme, les événements, ou tout autre sujet !" },
+    { from:"bot", text:"Bonjour ! Comment puis-je vous aider ?" },
+    { from:"user",text:"Les lives cette semaine ?" },
+    { from:"bot", text:"3 débats live sont programmés cette semaine !" },
   ]);
   const cbEndRef = useRef(null);
 
@@ -699,6 +567,16 @@ const JeuneLayout = () => {
 
     socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
     socketRef.current.on("new_message", () => setUnreadMessages((n) => n + 1));
+
+    // Real-time: new publication from any user → refresh feed silently
+    socketRef.current.on("new_publication", () => {
+      fetchPublications(true);
+    });
+
+    // Real-time: publication updated → refresh silently
+    socketRef.current.on("update_publication", () => {
+      fetchPublications(true);
+    });
 
     return () => {
       socketRef.current?.disconnect();
@@ -777,31 +655,14 @@ const JeuneLayout = () => {
     finally { setPubBusy(false); }
   };
 
-  const [cbLoading, setCbLoading] = useState(false);
-
-  const sendCb = async () => {
-    const text = cbInput.trim();
-    if (!text || cbLoading) return;
-
-    const userMsg = { from:"user", text };
+  const sendCb = () => {
+    if (!cbInput.trim()) return;
+    const userMsg = { from:"user", text:cbInput.trim() };
     setCbMsgs((m) => [...m, userMsg]);
     setCbInput("");
-    setCbLoading(true);
-
-    // Construire l'historique pour le contexte (exclure le msg de bienvenue initial)
-    const history = cbMsgs
-      .filter(m => m.from === "user" || m.from === "bot")
-      .map(m => ({ sender: m.from === "user" ? "user" : "bot", text: m.text }));
-
-    try {
-      const res = await API.post("/chatbot", { message: text, history });
-      const reply = res.data.reply || "Je n'ai pas compris. Pouvez-vous reformuler ?";
-      setCbMsgs((m) => [...m, { from:"bot", text: reply }]);
-    } catch {
-      setCbMsgs((m) => [...m, { from:"bot", text:"❌ Erreur de connexion. Réessayez dans un instant." }]);
-    } finally {
-      setCbLoading(false);
-    }
+    setTimeout(() => {
+      setCbMsgs((m) => [...m, { from:"bot", text:"Je traite votre demande, un instant…" }]);
+    }, 700);
   };
 
   /* ── NAV ── */
@@ -868,8 +729,8 @@ const JeuneLayout = () => {
         return (
           <PublierPage
             onBack={async () => {
-              goTo(PAGES.HOME);              // go HOME first (instant)
-              await fetchPublications(true); // then silent refresh
+              goTo(PAGES.HOME);              // go HOME immediately
+              await fetchPublications(true); // silent refresh in background
             }}
           />
         );
@@ -1131,6 +992,30 @@ const JeuneLayout = () => {
               </span>
             </div>
 
+            {/* Quick stats */}
+            <div className="jl-q-stats">
+              <div className="jl-q-sc"><p className="jl-q-num">24</p><p className="jl-q-lbl">Posts</p></div>
+              <div className="jl-q-sc"><p className="jl-q-num">142</p><p className="jl-q-lbl">Amis</p></div>
+              <div className="jl-q-sc"><p className="jl-q-num">8</p><p className="jl-q-lbl">Événements</p></div>
+            </div>
+
+            {/* Upcoming event / Live widget */}
+            <LiveEvWidget goToLive={() => goTo(PAGES.LIVE)} />
+
+            {/* Trending */}
+            <p className="jl-sec-label">Tendances</p>
+            {[
+              { num:1, txt:"Éducation",    cnt:"342 posts" },
+              { num:2, txt:"Environnement",cnt:"218 posts" },
+              { num:3, txt:"Santé mentale",cnt:"195 posts" },
+            ].map((t, i) => (
+              <div key={i} className="jl-tr-item">
+                <span className="jl-tr-num">{t.num}</span>
+                <span className="jl-tr-txt">{t.txt}</span>
+                <span className="jl-tr-cnt">{t.cnt}</span>
+              </div>
+            ))}
+
             {/* Chatbot */}
             <div className="jl-cb">
               <div className="jl-cb-head">
@@ -1143,26 +1028,17 @@ const JeuneLayout = () => {
               </div>
               <div className="jl-cb-msgs">
                 {cbMsgs.map((m, i) => (
-                  <div key={i} className={`jl-cb-msg ${m.from==="bot" ? "jl-cb-bot" : "jl-cb-user"}`}
-                    style={{ whiteSpace:"pre-wrap" }}>
+                  <div key={i} className={`jl-cb-msg ${m.from==="bot" ? "jl-cb-bot" : "jl-cb-user"}`}>
                     {m.text}
                   </div>
                 ))}
-                {cbLoading && (
-                  <div className="jl-cb-msg jl-cb-bot jl-cb-typing">
-                    <span/><span/><span/>
-                  </div>
-                )}
                 <div ref={cbEndRef}/>
               </div>
               <div className="jl-cb-bar">
                 <input className="jl-cb-input" placeholder="Écrire…"
                   value={cbInput} onChange={(e) => setCbInput(e.target.value)}
-                  onKeyDown={(e) => e.key==="Enter" && sendCb()}
-                  disabled={cbLoading}/>
-                <button className="jl-cb-send" onClick={sendCb} aria-label="Envoyer"
-                  disabled={cbLoading || !cbInput.trim()}
-                  style={{ opacity: (cbLoading || !cbInput.trim()) ? 0.5 : 1 }}>
+                  onKeyDown={(e) => e.key==="Enter" && sendCb()}/>
+                <button className="jl-cb-send" onClick={sendCb} aria-label="Envoyer">
                   <Icon name="send" size={13}/>
                 </button>
               </div>

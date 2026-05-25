@@ -18,6 +18,7 @@ const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
   const clean = p.split("\\").join("/").replace(/^\/+/, "");
+  // strip duplicate uploads/ prefix (e.g. "uploads/uploads/file.jpg")
   const nodup = clean.replace(/^(uploads\/)+/, "");
   return BACKEND + "/uploads/" + nodup;
 };
@@ -202,6 +203,7 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
       medias.forEach(m=>{ const id=m.id_media??m.id??""; if(id!=="") form.append("kept_media_ids[]",String(id)); });
       newFiles.forEach(f=>form.append("medias",f.file));
       await API.patch(`/publications/${publication.id_publication}`, form);
+      // Note: axios sets Content-Type + boundary automatically for FormData
       onSaved({ titre_publication:titre, contenu, contenu_publication:contenu, medias });
       onClose();
     } catch(e) {
@@ -582,6 +584,67 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
     finally  { setCmtLoading(false); }
   },[pub.id_publication]);
 
+  // ── Socket.IO real-time: listen for new/updated comments on THIS publication ──
+  useEffect(()=>{
+    let socket = null;
+    try {
+      const { io } = require("socket.io-client");
+      const BACKEND_URL = BACKEND || "https://debat-jeune.onrender.com";
+      const token = localStorage.getItem("token");
+      socket = io(BACKEND_URL, {
+        auth: { token },
+        transports: ["websocket"],
+        reconnectionAttempts: 5,
+      });
+
+      socket.on("new_comment", (data)=>{
+        if (String(data.id_publication) !== String(pub.id_publication)) return;
+        // Only update if the comment is from someone else (we already have optimistic)
+        const me = getCurrentUser();
+        const isMe = me && (String(data.comment?.id_user) === String(me.id_user||me.id));
+        if (!isMe) {
+          setComments(prev=>{
+            if (!data.parent_id) {
+              // top-level comment
+              const exists = prev.some(c=>String(c.id_commentaire)===String(data.comment.id_commentaire));
+              if (exists) return prev;
+              return [...prev, {...data.comment, replies:[]}];
+            } else {
+              // reply — add to parent
+              return prev.map(c=>{
+                if (String(c.id_commentaire)!==String(data.parent_id)) return c;
+                const repExists = (c.replies||[]).some(r=>String(r.id_commentaire)===String(data.comment.id_commentaire));
+                if (repExists) return c;
+                return {...c, replies:[...(c.replies||[]), data.comment]};
+              });
+            }
+          });
+          setCmtCount(n=>n+1);
+        } else {
+          // It's our comment — replace tmp optimistic with real data
+          loadComments();
+        }
+      });
+
+      socket.on("update_comment", (data)=>{
+        if (String(data.id_publication) !== String(pub.id_publication)) return;
+        setComments(prev=>prev.map(c=>{
+          if (String(c.id_commentaire)===String(data.id_commentaire))
+            return {...c, contenu:data.contenu, contenu_commentaire:data.contenu_commentaire||data.contenu};
+          return {...c, replies:(c.replies||[]).map(r=>
+            String(r.id_commentaire)===String(data.id_commentaire)
+              ? {...r, contenu:data.contenu, contenu_commentaire:data.contenu_commentaire||data.contenu}
+              : r
+          )};
+        }));
+      });
+    } catch(e) {
+      // socket.io-client not available or connection failed — silent fail
+    }
+
+    return () => { try { socket?.disconnect(); } catch {} };
+  }, [pub.id_publication]);
+
   const toggleCmts = ()=>{
     if(!showCmts) loadComments();
     setShowCmts(o=>!o);
@@ -592,10 +655,11 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
     const t=(text_override||cmtText).trim(); if(!t||cmtSending) return;
     setCmtSending(true);
     setCmtText("");
-    // optimistic — show comment right away
+    // Optimistic — show immediately without waiting server
     const me = getCurrentUser();
+    const tmpId = `tmp-${Date.now()}`;
     const optimistic = {
-      id_commentaire: `tmp-${Date.now()}`,
+      id_commentaire: tmpId,
       contenu_commentaire: t, contenu: t,
       prenom_user: me?.prenom_user||me?.prenom||"",
       nom_user: me?.nom_user||me?.nom||"",
@@ -611,10 +675,12 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
       await API.post(`/publications/${pub.id_publication}/comments`,{
         contenu_commentaire:t, contenu:t
       });
+      // Socket will fire loadComments via new_comment event
+      // But also reload to get real IDs
       await loadComments();
     } catch(e){
       console.error("comment:",e?.response?.status,e?.response?.data||e.message);
-      setComments(prev=>prev.filter(c=>c.id_commentaire!==optimistic.id_commentaire));
+      setComments(prev=>prev.filter(c=>c.id_commentaire!==tmpId));
       setCmtCount(c=>Math.max(0,c-1));
       setCmtText(t);
     }
