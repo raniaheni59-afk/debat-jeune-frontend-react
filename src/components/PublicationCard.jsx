@@ -348,6 +348,7 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const [editOpen,     setEditOpen]     = useState(false);
   const picRef  = useRef(null);
   const inpRef  = useRef(null);
+  const stkRef  = useRef(null);
 
   const currentUser = getCurrentUser();
   const isOwner = currentUser && (
@@ -449,13 +450,15 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
                   onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendReply();}}}
                   autoFocus/>
                 <div className="pc-reply-acts">
-                  <button className="pc-cmt-emoji-btn" type="button" onClick={()=>setStkOpen(o=>!o)}>😊</button>
+                  <div className="pc-stk-wrap" ref={stkRef}>
+                    <button className="pc-cmt-emoji-btn" type="button" onClick={()=>setStkOpen(o=>!o)}>😊</button>
+                    {stkOpen && <StickerPicker onPick={s=>{setStkOpen(false);!replyText.trim()?sendReply(s):setReplyText(t=>t+s);}} onClose={()=>setStkOpen(false)}/>}
+                  </div>
                   <button className="pc-send-btn" onClick={()=>sendReply()} disabled={!replyText.trim()||replySending} type="button">
                     {replySending?<div className="pc-btn-spin"/>:<SendIcon/>}
                   </button>
                 </div>
               </div>
-              {stkOpen && <StickerPicker onPick={s=>{setStkOpen(false);!replyText.trim()?sendReply(s):setReplyText(t=>t+s);}} onClose={()=>setStkOpen(false)}/>}
             </div>
           )}
 
@@ -719,7 +722,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const gridClass = imgMedias.length===1?"pc-media-1":imgMedias.length===2?"pc-media-2":imgMedias.length===3?"pc-media-3":"pc-media-4";
 
   const pubMenuItems = [];
-  if(isOwner) {
+  if(isOwner || isAdmin) {
     pubMenuItems.push({ icon:"✏️", label:"Modifier", onClick:()=>setEditOpen(true) });
     pubMenuItems.push({ icon:"🗑️", label:"Supprimer", danger:true, onClick:deletePub });
   }

@@ -1131,29 +1131,7 @@ const JeuneLayout = () => {
               </span>
             </div>
 
-            {/* Quick stats */}
-            <div className="jl-q-stats">
-              <div className="jl-q-sc"><p className="jl-q-num">24</p><p className="jl-q-lbl">Posts</p></div>
-              <div className="jl-q-sc"><p className="jl-q-num">142</p><p className="jl-q-lbl">Amis</p></div>
-              <div className="jl-q-sc"><p className="jl-q-num">8</p><p className="jl-q-lbl">Événements</p></div>
-            </div>
-
-            {/* Upcoming event / Live widget */}
-            <LiveEvWidget goToLive={() => goTo(PAGES.LIVE)} />
-
-            {/* Trending */}
-            <p className="jl-sec-label">Tendances</p>
-            {[
-              { num:1, txt:"Éducation",    cnt:"342 posts" },
-              { num:2, txt:"Environnement",cnt:"218 posts" },
-              { num:3, txt:"Santé mentale",cnt:"195 posts" },
-            ].map((t, i) => (
-              <div key={i} className="jl-tr-item">
-                <span className="jl-tr-num">{t.num}</span>
-                <span className="jl-tr-txt">{t.txt}</span>
-                <span className="jl-tr-cnt">{t.cnt}</span>
-              </div>
-            ))}
+        
 
             {/* Chatbot */}
             <div className="jl-cb">
