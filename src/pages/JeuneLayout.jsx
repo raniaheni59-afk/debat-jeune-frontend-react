@@ -568,12 +568,12 @@ const JeuneLayout = () => {
     socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
     socketRef.current.on("new_message", () => setUnreadMessages((n) => n + 1));
 
-    // Real-time: new publication from any user → refresh feed silently
+    // Real-time: nouvelle publication → refresh feed silencieusement
     socketRef.current.on("new_publication", () => {
       fetchPublications(true);
     });
 
-    // Real-time: publication updated → refresh silently
+    // Real-time: publication modifiée → refresh silencieusement
     socketRef.current.on("update_publication", () => {
       fetchPublications(true);
     });
@@ -590,7 +590,7 @@ const JeuneLayout = () => {
       if (!silent) setLoading(true);
       const res = await API.get("/publications");
       setPublications(Array.isArray(res.data) ? res.data : []);
-    } catch { setPublications([]); }
+    } catch { if (!silent) setPublications([]); }
     finally   { if (!silent) setLoading(false); }
   }, []);
 
@@ -729,8 +729,8 @@ const JeuneLayout = () => {
         return (
           <PublierPage
             onBack={async () => {
-              goTo(PAGES.HOME);              // go HOME immediately
-              await fetchPublications(true); // silent refresh in background
+              goTo(PAGES.HOME);              // go HOME first (instant)
+              await fetchPublications(true); // then silent refresh
             }}
           />
         );
