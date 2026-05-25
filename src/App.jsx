@@ -120,7 +120,7 @@ export default function App() {
 
         {/* ══ MEET / LIVE (jeune + admin) ════════════ */}
         <Route path="/meet"           element={<ProtectedRoute><Swafy_Meet /></ProtectedRoute>} />
-        <Route path="/meet/:roomCode" element={<ProtectedRoute><MeetRoom /></ProtectedRoute>} />
+        <Route path="/meet/:roomCode" element={<MeetRoom />} />
         <Route path="/calendar"       element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
 
         {/* ══ ESPACE ADMIN ═══════════════════════════ */}
