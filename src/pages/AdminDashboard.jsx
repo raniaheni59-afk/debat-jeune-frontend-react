@@ -806,12 +806,11 @@ const navItems = [
   { key:"publier",      label: t("publier") },
   { key:"calendrier",   label: t("calendrier") },
   { key:"swafyMeet",    label: "Swafy Meet" },
-  { key:"live",         label: t("live"), isLive:true },
-  { key:"enquetes",     label: "Enquêtes", icon: "📋" }, // ✅ AJOUT
+  { key:"enquetes",     label: "Enquêtes", icon: "📋" }, 
   { key:"participant",  label: t("participants") },
   { key:"notification", label: t("notifications"), badge: adminUnread || null },
   { key:"archive",      label: t("archive") },
-  { key:"parametre",    label: t("parametre") },
+  
 ];
 
   // ── Empty pages ──
