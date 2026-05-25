@@ -2,8 +2,10 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { io } from "socket.io-client";
 
-const SOCKET_URL = "https://debat-jeune.onrender.com";
-const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
+const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
+// ✅ FIX CORS: Ne JAMAIS appeler api.anthropic.com directement depuis le browser
+// Toutes les requêtes IA passent par le backend
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
 
 /* ─── CSS ─── */
 const CSS = `
@@ -28,12 +30,11 @@ html,body{overflow:hidden}
 video{background:#000}
 `;
 
-/* ─── ICE Servers (STUN + free TURN) ─── */
+/* ─── ICE Servers ─── */
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
-  { urls: "stun:stun3.l.google.com:19302" },
   {
     urls: "turn:openrelay.metered.ca:80",
     username: "openrelayproject",
@@ -47,7 +48,7 @@ const ICE_SERVERS = [
 ];
 
 /* ══ SUBTITLES HOOK ══ */
-function useSubtitles(on, lang) {
+function useSubtitles(on) {
   const [live, setLive] = useState("");
   const [saved, setSaved] = useState([]);
   useEffect(() => {
@@ -56,7 +57,7 @@ function useSubtitles(on, lang) {
     if (!SR) return;
     const r = new SR();
     r.continuous = true; r.interimResults = true;
-    r.lang = lang === "ar" ? "ar-TN" : lang === "en" ? "en-US" : "fr-FR";
+    r.lang = "fr-FR";
     r.onresult = e => {
       setLive(Array.from(e.results).map(x => x[0].transcript).join(" "));
       const finals = Array.from(e.results).filter(r => r.isFinal).map(r => r[0].transcript);
@@ -65,7 +66,7 @@ function useSubtitles(on, lang) {
     r.onerror = () => {};
     r.start();
     return () => { try { r.stop(); } catch {} };
-  }, [on, lang]);
+  }, [on]);
   return { live, saved };
 }
 
@@ -76,7 +77,6 @@ function Tile({ stream, muted = false, name = "?", role = "guest", camOff = fals
   const ownRef = useRef(null);
   const vRef = isLocal ? localRef : ownRef;
 
-  /* ✅ FIX CRITIQUE: assign srcObject à chaque changement de stream */
   useEffect(() => {
     const el = vRef?.current;
     if (!el || !stream) return;
@@ -88,7 +88,6 @@ function Tile({ stream, muted = false, name = "?", role = "guest", camOff = fals
 
   const init = (name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
   const isHost = role === "host";
-  // Pour le tile local admin: afficher vidéo même sans stream (srcObject déjà set)
   const showCam = isLocal ? !camOff : (!camOff && !!stream);
 
   return (
@@ -99,14 +98,12 @@ function Tile({ stream, muted = false, name = "?", role = "guest", camOff = fals
         : isHost ? "0 0 0 2px rgba(26,115,232,.5)"
           : "0 2px 12px rgba(0,0,0,.4)"
     }}>
-      {/* ✅ Video toujours dans le DOM pour admin local */}
       <video ref={vRef} autoPlay playsInline muted={muted}
         style={{
           width: "100%", height: "100%", objectFit: "cover",
           display: (isLocal && !camOff) || showCam ? "block" : "none"
         }} />
 
-      {/* Avatar quand cam off */}
       {((isLocal && camOff) || (!isLocal && !showCam)) && (
         <div style={{
           position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
@@ -121,7 +118,6 @@ function Tile({ stream, muted = false, name = "?", role = "guest", camOff = fals
         </div>
       )}
 
-      {/* Badges */}
       <div style={{ position: "absolute", bottom: 8, left: 8, display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
         {isHost && <span style={{ background: "rgba(26,115,232,.9)", color: "#fff", fontSize: 9, fontWeight: 800, padding: "2px 8px", borderRadius: 20 }}>👑 HOST</span>}
         {screenShare && <span style={{ background: "rgba(52,168,83,.9)", color: "#fff", fontSize: 9, padding: "2px 8px", borderRadius: 8 }}>🖥️ Écran</span>}
@@ -178,12 +174,12 @@ export default function MeetRoom() {
   /* ─── State ─── */
   const [status, setStatus] = useState("loading");
   const [errMsg, setErrMsg] = useState("");
+  // ✅ FIX: host a mic et cam ON par défaut, guest a mic OFF
   const [micOn, setMicOn] = useState(myRole === "host");
-  const [camOn, setCamOn] = useState(true);
+  const [camOn, setCamOn] = useState(myRole === "host");
   const [hand, setHand] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
   const [subsOn, setSubsOn] = useState(false);
-  const [transLang, setTransLang] = useState("fr");
   const [chatOpen, setChatOpen] = useState(false);
   const [partOpen, setPartOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
@@ -192,36 +188,33 @@ export default function MeetRoom() {
   const [msgs, setMsgs] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [unread, setUnread] = useState(0);
-  const [peers, setPeers] = useState([]); // [{id, stream, name, role}]
-  const [pState, setPState] = useState({}); // {[sid]:{audio,video,hand,screen}}
+  const [peers, setPeers] = useState([]);
+  const [pState, setPState] = useState({});
   const [ptcps, setPtcps] = useState([]);
   const [floats, setFloats] = useState([]);
   const [toast, setToast] = useState(null);
   const [duration, setDuration] = useState(0);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiText, setAiText] = useState("");
-  const [translations, setTranslations] = useState({});
-  const [translating, setTranslating] = useState({});
   const [kickTarget, setKickTarget] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [guestLinkCopied, setGuestLinkCopied] = useState(false);
   const [mediaError, setMediaError] = useState("");
+  const [permissionDenied, setPermissionDenied] = useState(false);
 
   /* ─── Refs ─── */
   const sockRef = useRef(null);
-  const localVid = useRef(null);  // <video> pour admin camera
-  const localStr = useRef(null);  // MediaStream local
+  const localVid = useRef(null);
+  const localStr = useRef(null);
   const screenStr = useRef(null);
-  const pcMap = useRef({});       // {[sid]: RTCPeerConnection}
+  const pcMap = useRef({});
   const nameMap = useRef({});
   const roleMap = useRef({});
   const chatEnd = useRef(null);
   const timerRef = useRef(null);
-  const localStreamRef = useRef(null); // stable ref pour createPeer
+  const localStreamRef = useRef(null);
 
-  const { live: subtitle, saved: transcript } = useSubtitles(subsOn, "fr");
+  const { live: subtitle, saved: transcript } = useSubtitles(subsOn);
 
-  /* Viewer link pour le partage */
   const viewerLink = myRole === "host"
     ? (localStorage.getItem("currentLiveViewerLink") || "")
     : window.location.href;
@@ -238,34 +231,27 @@ export default function MeetRoom() {
       : `${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}`;
   };
 
-  /* ─── Timer ─── */
   useEffect(() => {
     timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
     return () => clearInterval(timerRef.current);
   }, []);
 
-  /* ═══════════════════════════════════════════════
-     ✅ FIX CRITIQUE: assign srcObject quand stream
-        local est prêt ET que le ref est monté
-  ═══════════════════════════════════════════════ */
+  /* ✅ FIX: assigner le stream local à la vidéo */
   const assignLocalVideo = useCallback((stream) => {
     localStr.current = stream;
     localStreamRef.current = stream;
-    // Essayer immédiatement
-    if (localVid.current) {
-      localVid.current.srcObject = stream;
-      localVid.current.play().catch(() => {});
-      return;
-    }
-    // Attendre que le DOM soit prêt
-    const timer = setInterval(() => {
+    const tryAssign = () => {
       if (localVid.current) {
         localVid.current.srcObject = stream;
         localVid.current.play().catch(() => {});
-        clearInterval(timer);
+        return true;
       }
-    }, 50);
-    setTimeout(() => clearInterval(timer), 3000);
+      return false;
+    };
+    if (!tryAssign()) {
+      const timer = setInterval(() => { if (tryAssign()) clearInterval(timer); }, 50);
+      setTimeout(() => clearInterval(timer), 5000);
+    }
   }, []);
 
   /* ─── WebRTC createPeer ─── */
@@ -273,42 +259,25 @@ export default function MeetRoom() {
     const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
 
     pc.onicecandidate = e => {
-      if (e.candidate) {
-        sockRef.current?.emit("ice-candidate", { target: sid, candidate: e.candidate });
-      }
+      if (e.candidate) sockRef.current?.emit("ice-candidate", { target: sid, candidate: e.candidate });
     };
 
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === "failed") {
-        pc.restartIce();
-      }
+      if (pc.iceConnectionState === "failed") pc.restartIce();
     };
 
-    /* ✅ FIX: ontrack → créer stream stable */
     pc.ontrack = e => {
       const stream = e.streams[0];
       if (!stream) return;
       setPeers(prev => {
         const existing = prev.find(p => p.id === sid);
-        if (existing) {
-          return prev.map(p => p.id === sid ? { ...p, stream } : p);
-        }
-        return [...prev, {
-          id: sid,
-          stream,
-          name: nameMap.current[sid] || "Invité",
-          role: roleMap.current[sid] || "guest"
-        }];
+        if (existing) return prev.map(p => p.id === sid ? { ...p, stream } : p);
+        return [...prev, { id: sid, stream, name: nameMap.current[sid] || "Invité", role: roleMap.current[sid] || "guest" }];
       });
     };
 
-    /* ✅ Ajouter les tracks locaux */
     const stream = localStreamRef.current;
-    if (stream) {
-      stream.getTracks().forEach(t => {
-        try { pc.addTrack(t, stream); } catch {}
-      });
-    }
+    if (stream) stream.getTracks().forEach(t => { try { pc.addTrack(t, stream); } catch {} });
 
     return pc;
   }, []);
@@ -323,46 +292,67 @@ export default function MeetRoom() {
     (async () => {
       /* ── 1. Accès média ── */
       if (myRole === "host") {
-        /* ✅ FIX: demander camera+mic avec retry */
+        // ✅ FIX CRITIQUE: demander explicitement les permissions camera+mic
+        // Le navigateur doit avoir accordé les permissions sur ce domaine
+        let mediaStream = null;
+
+        // Tentative 1: vidéo HD + audio
         try {
-          const s = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
-            audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 44100 }
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              width: { ideal: 1280, min: 320 },
+              height: { ideal: 720, min: 240 },
+              facingMode: "user",
+              frameRate: { ideal: 30 }
+            },
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              sampleRate: 48000
+            }
           });
-          if (!alive) { s.getTracks().forEach(t => t.stop()); return; }
-          assignLocalVideo(s);
-        } catch (err) {
-          // Retry avec contraintes simples
+        } catch (err1) {
+          console.warn("HD getUserMedia failed:", err1.name);
+
+          // Tentative 2: contraintes minimales
           try {
-            const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-            if (!alive) { s.getTracks().forEach(t => t.stop()); return; }
-            assignLocalVideo(s);
+            mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           } catch (err2) {
-            // Camera refusée → essayer audio seulement
+            console.warn("Basic getUserMedia failed:", err2.name);
+
+            // Tentative 3: audio seulement
             try {
-              const s = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-              if (!alive) { s.getTracks().forEach(t => t.stop()); return; }
-              localStreamRef.current = s;
-              localStr.current = s;
+              mediaStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
               setCamOn(false);
-              setMediaError("Caméra non disponible — audio seulement");
-            } catch {
-              setMediaError("Micro/caméra refusés par le navigateur");
+              setMediaError("Caméra non disponible — micro seulement");
+            } catch (err3) {
+              console.error("All media failed:", err3.name, err3.message);
+              setPermissionDenied(true);
+              setMediaError(`Permissions refusées (${err3.name}). Cliquez sur l'icône 🔒 dans la barre d'adresse et autorisez Caméra + Micro.`);
               setMicOn(false);
               setCamOn(false);
             }
           }
         }
+
+        if (!alive) { mediaStream?.getTracks().forEach(t => t.stop()); return; }
+
+        if (mediaStream) {
+          assignLocalVideo(mediaStream);
+          // S'assurer que les tracks sont activés
+          mediaStream.getAudioTracks().forEach(t => { t.enabled = true; });
+          mediaStream.getVideoTracks().forEach(t => { t.enabled = true; });
+        }
       } else {
-        /* Jeune: mic seulement, muet par défaut */
+        /* Jeune: seulement audio muet par défaut */
         try {
           const s = await navigator.mediaDevices.getUserMedia({
             video: false,
             audio: { echoCancellation: true, noiseSuppression: true }
           });
           if (!alive) { s.getTracks().forEach(t => t.stop()); return; }
-          // Muet par défaut mais track prêt pour WebRTC
-          s.getAudioTracks().forEach(t => { t.enabled = false; });
+          s.getAudioTracks().forEach(t => { t.enabled = false; }); // muet par défaut
           localStr.current = s;
           localStreamRef.current = s;
         } catch {
@@ -376,20 +366,18 @@ export default function MeetRoom() {
       const sock = io(SOCKET_URL, {
         transports: ["websocket"],
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 2000,
       });
       sockRef.current = sock;
 
       sock.on("connect", () => {
-        sock.emit("join-room", {
-          roomCode, userName: myName, role: myRole, accessToken: token
-        }, (ack) => {
-          if (ack && !ack.ok) {
-            setErrMsg(ack.message || "Accès refusé.");
-            setStatus("error");
-          }
+        sock.emit("join-room", { roomCode, userName: myName, role: myRole, accessToken: token }, (ack) => {
+          if (ack && !ack.ok) { setErrMsg(ack.message || "Accès refusé."); setStatus("error"); }
         });
       });
+
+      sock.on("connect_error", (err) => console.error("Socket error:", err.message));
 
       /* ── Signaling WebRTC ── */
       sock.on("all-users", async users => {
@@ -415,10 +403,7 @@ export default function MeetRoom() {
 
       sock.on("offer", async ({ caller, sdp }) => {
         let pc = pcMap.current[caller];
-        if (!pc) {
-          pc = createPeer(caller);
-          pcMap.current[caller] = pc;
-        }
+        if (!pc) { pc = createPeer(caller); pcMap.current[caller] = pc; }
         try {
           await pc.setRemoteDescription(new RTCSessionDescription(sdp));
           const ans = await pc.createAnswer();
@@ -428,15 +413,11 @@ export default function MeetRoom() {
       });
 
       sock.on("answer", async ({ responder, sdp }) => {
-        try {
-          await pcMap.current[responder]?.setRemoteDescription(new RTCSessionDescription(sdp));
-        } catch {}
+        try { await pcMap.current[responder]?.setRemoteDescription(new RTCSessionDescription(sdp)); } catch {}
       });
 
       sock.on("ice-candidate", async ({ from, candidate }) => {
-        try {
-          await pcMap.current[from]?.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch {}
+        try { await pcMap.current[from]?.addIceCandidate(new RTCIceCandidate(candidate)); } catch {}
       });
 
       sock.on("user-left", ({ socketId }) => {
@@ -473,7 +454,7 @@ export default function MeetRoom() {
         const trk = type === "audio"
           ? localStr.current?.getAudioTracks()[0]
           : localStr.current?.getVideoTracks()[0];
-        if (trk) { trk.enabled = false; }
+        if (trk) trk.enabled = false;
         if (type === "audio") setMicOn(false);
         else setCamOn(false);
         showToast(`Hôte a coupé votre ${type === "audio" ? "micro" : "caméra"}`, "#ea4335", "🔇");
@@ -494,9 +475,15 @@ export default function MeetRoom() {
       sock.on("screen-share-stopped", ({ socketId }) =>
         setPState(prev => ({ ...prev, [socketId]: { ...prev[socketId], screen: false } })));
 
-      /* ✅ Autorisation micro depuis admin */
       sock.on("mic-allowed", ({ targetSocketId }) => {
+        if (targetSocketId === sock.id) showToast("L'hôte vous autorise à parler", "#34a853", "🎤");
+      });
+
+      // ✅ FIX: allow-mic event
+      sock.on("allow-mic", ({ targetSocketId }) => {
         if (targetSocketId === sock.id) {
+          const audioTrack = localStr.current?.getAudioTracks()[0];
+          if (audioTrack) { audioTrack.enabled = true; setMicOn(true); }
           showToast("L'hôte vous autorise à parler", "#34a853", "🎤");
         }
       });
@@ -520,11 +507,11 @@ export default function MeetRoom() {
 
   const emit = (ev, d) => sockRef.current?.emit(ev, d);
 
-  /* ✅ FIX: toggleMic fonctionne correctement */
+  /* ✅ FIX: toggleMic */
   const toggleMic = () => {
     const tracks = localStr.current?.getAudioTracks();
-    if (!tracks || !tracks.length) {
-      showToast("Micro non disponible", "#ea4335", "🔇");
+    if (!tracks?.length) {
+      showToast("Micro non disponible — vérifiez les permissions", "#ea4335", "🔇");
       return;
     }
     const newState = !micOn;
@@ -533,11 +520,11 @@ export default function MeetRoom() {
     emit("toggle-media", { roomCode, type: "audio", enabled: newState });
   };
 
-  /* ✅ FIX: toggleCam réassigne srcObject après */
+  /* ✅ FIX: toggleCam réassigne srcObject */
   const toggleCam = () => {
     if (myRole !== "host") return;
     const tracks = localStr.current?.getVideoTracks();
-    if (!tracks || !tracks.length) {
+    if (!tracks?.length) {
       showToast("Caméra non disponible", "#ea4335", "📷");
       return;
     }
@@ -545,7 +532,6 @@ export default function MeetRoom() {
     tracks.forEach(t => { t.enabled = newState; });
     setCamOn(newState);
     emit("toggle-media", { roomCode, type: "video", enabled: newState });
-    // Réassigner srcObject pour forcer le refresh
     if (newState && localVid.current && localStr.current) {
       setTimeout(() => {
         if (localVid.current) {
@@ -560,8 +546,7 @@ export default function MeetRoom() {
     if (myRole === "host") return;
     const r = !hand; setHand(r);
     emit("raise-hand", { roomCode, raised: r });
-    r ? showToast("Main levée — hôte notifié", "#fbbc04", "✋")
-      : showToast("Main baissée", "#5f6368");
+    r ? showToast("Main levée — hôte notifié", "#fbbc04", "✋") : showToast("Main baissée", "#5f6368");
   };
 
   const toggleScreen = async () => {
@@ -618,13 +603,6 @@ export default function MeetRoom() {
     showToast("✅ Lien copié !", "#34a853");
   };
 
-  const copyGuestLink = async () => {
-    await navigator.clipboard.writeText(window.location.href).catch(() => {});
-    setGuestLinkCopied(true);
-    setTimeout(() => setGuestLinkCopied(false), 2500);
-    showToast("✅ Lien copié — partagez-le !", "#34a853");
-  };
-
   const adminMute = (sid, type) => {
     if (myRole !== "host") return;
     emit("admin-mute", { roomCode, targetSocketId: sid, type });
@@ -652,45 +630,32 @@ export default function MeetRoom() {
     showToast("Tous les micros coupés", "#fbbc04", "🔇");
   };
 
+  /* ✅ FIX CORS: Appeler l'IA via le backend, PAS directement api.anthropic.com */
   const genConclusion = async () => {
     setAiLoading(true);
     try {
       const chat = msgs.map(m => `${m.user}: ${m.text}`).join("\n");
-      const res = await fetch(ANTHROPIC_URL, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const res = await fetch(`${BACKEND_URL}/api/chatbot`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("token") || ""}`
+        },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `Résume cette réunion "${roomCode}":\nTranscription: ${transcript.join(" ") || "(aucune)"}\nChat:\n${chat || "(aucun)"}\nParticipants: ${ptcps.length}, Durée: ${fmt(duration)}\n\nConclusion professionnelle avec: 📋 Points principaux, 💡 Idées clés, ✅ Consensus, 🎯 Actions.`
-          }]
+          message: `Résume cette réunion "${roomCode}":\nTranscription: ${transcript.join(" ") || "(aucune)"}\nChat:\n${chat || "(aucun)"}\nParticipants: ${ptcps.length}, Durée: ${fmt(duration)}\n\nConclusion professionnelle avec: 📋 Points principaux, 💡 Idées clés, ✅ Consensus, 🎯 Actions.`
         })
       });
       const d = await res.json();
-      setAiText(d.content?.[0]?.text || "Erreur.");
-    } catch { setAiText("Erreur connexion IA."); }
-    finally { setAiLoading(false); }
-  };
-
-  const doTranslate = async (id, text) => {
-    setTranslating(p => ({ ...p, [id]: true }));
-    try {
-      const map = { fr: "français", ar: "arabe", en: "anglais", es: "espagnol" };
-      const res = await fetch(ANTHROPIC_URL, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 300,
-          messages: [{ role: "user", content: `Traduis en ${map[transLang] || transLang}. UNIQUEMENT la traduction:\n"${text}"` }]
-        })
-      });
-      const d = await res.json();
-      setTranslations(p => ({ ...p, [id]: d.content?.[0]?.text?.trim() || text }));
-    } catch {}
-    setTranslating(p => ({ ...p, [id]: false }));
+      setAiText(d.reply || d.message || d.content || "Erreur de génération.");
+    } catch (e) {
+      setAiText("Erreur connexion — vérifiez votre connexion.");
+      console.error("Chatbot error:", e);
+    }
+    setAiLoading(false);
   };
 
   /* ─── Grid layout ─── */
-  // ✅ Jeune voit UNIQUEMENT le tile host
+  // ✅ Jeune voit UNIQUEMENT le tile host (flux vidéo de l'admin)
   const hostPeer = peers.find(p =>
     (ptcps.find(x => x.socketId === p.id)?.role || roleMap.current[p.id]) === "host"
   );
@@ -705,6 +670,7 @@ export default function MeetRoom() {
       <div style={{ textAlign: "center" }}>
         <div style={{ width: 48, height: 48, border: "3px solid rgba(255,255,255,.1)", borderTopColor: "#8ab4f8", borderRadius: "50%", animation: "spin .8s linear infinite", margin: "0 auto 16px" }} />
         <p style={{ color: "#9aa0a6", fontSize: 14 }}>Connexion à la salle…</p>
+        <p style={{ color: "#5f6368", fontSize: 11, marginTop: 8 }}>Autoriser Caméra + Micro dans la fenêtre du navigateur</p>
       </div>
     </div>
   );
@@ -733,10 +699,17 @@ export default function MeetRoom() {
         </div>
       )}
 
+      {/* ✅ PERMISSION DENIED BANNER */}
+      {permissionDenied && (
+        <div style={{ background: "rgba(234,67,53,.2)", borderBottom: "2px solid rgba(234,67,53,.5)", padding: "12px 20px", color: "#ea4335", fontSize: 13, textAlign: "center", lineHeight: 1.5 }}>
+          🔒 <strong>Accès Caméra/Micro refusé</strong> — Cliquez sur l'icône 🔒 dans la barre d'adresse → Autorisez Caméra et Microphone → Rechargez la page
+        </div>
+      )}
+
       {/* MEDIA ERROR Banner */}
-      {mediaError && (
+      {mediaError && !permissionDenied && (
         <div style={{ background: "rgba(234,67,53,.15)", borderBottom: "1px solid rgba(234,67,53,.3)", padding: "8px 20px", color: "#ea4335", fontSize: 12, textAlign: "center" }}>
-          ⚠️ {mediaError} — Vérifiez les permissions de votre navigateur
+          ⚠️ {mediaError}
         </div>
       )}
 
@@ -775,12 +748,6 @@ export default function MeetRoom() {
               🔗 Inviter les jeunes
             </button>
           )}
-          {myRole === "guest" && (
-            <button className="cbtn" onClick={copyGuestLink}
-              style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", color: "#e8eaed", padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 500 }}>
-              {guestLinkCopied ? "✅ Copié !" : "🔗 Partager ce live"}
-            </button>
-          )}
         </div>
       </div>
 
@@ -810,11 +777,11 @@ export default function MeetRoom() {
         {/* VIDEO GRID */}
         <div style={{ flex: 1, display: "grid", gap: 8, alignContent: "center", overflow: "hidden", minWidth: 0, gridTemplateColumns: `repeat(${cols},1fr)` }}>
 
-          {/* LOCAL TILE */}
+          {/* LOCAL TILE - Admin */}
           {myRole === "host" ? (
             <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} />
           ) : (
-            /* Jeune local: avatar + état micro */
+            /* Jeune local: avatar */
             <div style={{ position: "relative", background: "#111", borderRadius: 14, overflow: "hidden", aspectRatio: "16/9", minHeight: 110 }}>
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 10, background: "radial-gradient(circle at 35% 30%,#1e1e1e,#0d0d0d)" }}>
                 <div style={{ width: 68, height: 68, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, fontWeight: 800, color: "#fff", background: "linear-gradient(135deg,#34a853,#1a6e38)" }}>
@@ -848,9 +815,10 @@ export default function MeetRoom() {
 
           {/* Message d'attente pour jeune si admin pas encore là */}
           {myRole === "guest" && visiblePeers.length === 0 && (
-            <div style={{ gridColumn: "1/-1", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, opacity: .5 }}>
+            <div style={{ gridColumn: "1/-1", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: 12, opacity: .6 }}>
               <div style={{ width: 40, height: 40, border: "3px solid rgba(255,255,255,.1)", borderTopColor: "#8ab4f8", borderRadius: "50%", animation: "spin .8s linear infinite" }} />
               <p style={{ color: "#9aa0a6", fontSize: 13 }}>En attente de l'hôte…</p>
+              <p style={{ color: "#5f6368", fontSize: 11 }}>Le live démarrera quand l'admin active sa caméra</p>
             </div>
           )}
         </div>
@@ -860,16 +828,7 @@ export default function MeetRoom() {
           <div style={{ width: 320, background: "#2d2f31", borderRadius: 14, border: "1px solid rgba(255,255,255,.06)", display: "flex", flexDirection: "column", overflow: "hidden", flexShrink: 0, animation: "slideIn .25s ease" }}>
             <div style={{ padding: "12px 14px", borderBottom: "1px solid rgba(255,255,255,.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: "#e8eaed", fontWeight: 700, fontSize: 13 }}>💬 Chat en direct</span>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <select value={transLang} onChange={e => setTransLang(e.target.value)}
-                  style={{ background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.1)", color: "#e8eaed", padding: "3px 6px", borderRadius: 6, fontSize: 11, outline: "none", cursor: "pointer" }}>
-                  <option value="fr">🇫🇷 FR</option>
-                  <option value="ar">🇹🇳 AR</option>
-                  <option value="en">🇬🇧 EN</option>
-                  <option value="es">🇪🇸 ES</option>
-                </select>
-                <button onClick={() => setChatOpen(false)} style={{ background: "none", border: "none", color: "#5f6368", cursor: "pointer", fontSize: 16 }}>✕</button>
-              </div>
+              <button onClick={() => setChatOpen(false)} style={{ background: "none", border: "none", color: "#5f6368", cursor: "pointer", fontSize: 16 }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: 10, display: "flex", flexDirection: "column", gap: 8 }}>
               {msgs.length === 0 && (
@@ -890,20 +849,7 @@ export default function MeetRoom() {
                     <div style={{ padding: "8px 12px", borderRadius: 12, fontSize: 13, lineHeight: 1.6, wordBreak: "break-word", background: isMe ? "linear-gradient(135deg,#1a73e8,#0d47a1)" : "rgba(255,255,255,.09)" }}>
                       {m.text}
                     </div>
-                    {translations[m.id] && (
-                      <div style={{ padding: "6px 10px", borderRadius: 10, fontSize: 12, marginTop: 3, background: "rgba(52,168,83,.12)", border: "1px solid rgba(52,168,83,.2)", color: "#81c995" }}>
-                        🌍 {translations[m.id]}
-                      </div>
-                    )}
-                    <div style={{ fontSize: 10, color: "#5f6368", marginTop: 2, display: "flex", gap: 8, alignItems: "center" }}>
-                      <span>{m.time}</span>
-                      {!isMe && (
-                        <button onClick={() => doTranslate(m.id, m.text)} disabled={translating[m.id]}
-                          style={{ background: "none", border: "none", color: translating[m.id] ? "#5f6368" : "#8ab4f8", cursor: "pointer", fontSize: 10, padding: 0 }}>
-                          {translating[m.id] ? "⏳…" : "🌍 Traduire"}
-                        </button>
-                      )}
-                    </div>
+                    <div style={{ fontSize: 10, color: "#5f6368", marginTop: 2 }}>{m.time}</div>
                   </div>
                 );
               })}
@@ -930,11 +876,7 @@ export default function MeetRoom() {
             <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
               {ptcps.map(p => (
                 <div key={p.socketId} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 4px", borderBottom: "1px solid rgba(255,255,255,.04)" }}>
-                  <div style={{
-                    width: 34, height: 34, borderRadius: "50%", display: "flex", alignItems: "center",
-                    justifyContent: "center", fontWeight: 800, fontSize: 12, flexShrink: 0, color: "#fff",
-                    background: p.role === "host" ? "linear-gradient(135deg,#1a73e8,#0d47a1)" : "linear-gradient(135deg,#34a853,#1a6e38)"
-                  }}>
+                  <div style={{ width: 34, height: 34, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: 12, flexShrink: 0, color: "#fff", background: p.role === "host" ? "linear-gradient(135deg,#1a73e8,#0d47a1)" : "linear-gradient(135deg,#34a853,#1a6e38)" }}>
                     {(p.userName || "?")[0].toUpperCase()}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
