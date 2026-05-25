@@ -1,0 +1,286 @@
+/* ══════════════════════════════════════════════
+   Profile.css — Swafy Jeune Profile Page
+   Matches JeuneLayout glass design
+══════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
+
+.prof-root {
+  min-height: 100vh;
+  background: linear-gradient(145deg, #c8b8ec 0%, #a892d8 30%, #9078c8 55%, #8068b8 75%, #b0a0d8 100%);
+  padding: 24px 16px 60px;
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Back ── */
+.prof-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.18);
+  border: none;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  margin-bottom: 20px;
+  transition: background .2s;
+}
+.prof-back:hover { background: rgba(255,255,255,0.28); }
+
+/* ── Card ── */
+.prof-card {
+  max-width: 680px;
+  margin: 0 auto;
+  background: rgba(255,255,255,0.94);
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(50,30,100,0.22);
+}
+
+/* ── Cover ── */
+.prof-cover {
+  height: 120px;
+  position: relative;
+  overflow: hidden;
+}
+.prof-cover-gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #5a3fa0, #9b7fd4, #7c5cbf);
+}
+
+/* ── Top ── */
+.prof-top {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 0 28px 20px;
+  margin-top: -40px;
+  position: relative;
+}
+.prof-ava-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.prof-ava {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  object-fit: cover;
+  box-shadow: 0 6px 20px rgba(90,63,160,0.2);
+  background: #e8e0f7;
+}
+.prof-ava-btn {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #5a3fa0;
+  color: #fff;
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .2s;
+}
+.prof-ava-btn:hover { background: #7c5cbf; }
+
+.prof-top-info {
+  flex: 1;
+  padding-bottom: 4px;
+}
+.prof-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #261a52;
+  margin-bottom: 2px;
+}
+.prof-email {
+  font-size: 13px;
+  color: #9080b8;
+  margin-bottom: 6px;
+}
+.prof-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #5a3fa0, #7c5cbf);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: .3px;
+}
+.prof-edit-btn {
+  background: linear-gradient(135deg, #5a3fa0, #7c5cbf);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .2s;
+  align-self: flex-end;
+  margin-bottom: 4px;
+}
+.prof-edit-btn:hover { opacity: .88; }
+
+/* ── Sections ── */
+.prof-section {
+  padding: 20px 28px;
+  border-top: 1px solid #f0eef8;
+}
+.prof-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5a3fa0;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  margin-bottom: 14px;
+}
+
+.prof-bio {
+  font-size: 14px;
+  color: #4a3880;
+  line-height: 1.6;
+}
+
+/* ── Grid ── */
+.prof-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.prof-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.prof-field.full { grid-column: 1 / -1; }
+.prof-field label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9080b8;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.prof-val {
+  font-size: 14px;
+  color: #261a52;
+  font-weight: 500;
+}
+.prof-empty { color: #c0b4d8; font-style: italic; }
+
+/* ── Inputs ── */
+.prof-input {
+  padding: 9px 12px;
+  border: 1.5px solid #e8e0f5;
+  border-radius: 9px;
+  font-size: 13px;
+  color: #261a52;
+  font-family: 'Inter', sans-serif;
+  background: #faf8ff;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.prof-input:focus {
+  border-color: #7c5cbf;
+  box-shadow: 0 0 0 3px rgba(124,92,191,0.12);
+}
+.prof-textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+/* ── Actions ── */
+.prof-actions {
+  padding: 20px 28px 28px;
+  border-top: 1px solid #f0eef8;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.prof-msg {
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.prof-msg-err { background: #fee2e2; color: #b91c1c; }
+.prof-msg-ok  { background: #d1fae5; color: #065f46; }
+
+.prof-btns {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+.prof-btn-cancel {
+  background: #f4f0ff;
+  color: #5a3fa0;
+  border: 1.5px solid #e0d4f8;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s;
+  font-family: 'Inter', sans-serif;
+}
+.prof-btn-cancel:hover { background: #ebe3ff; }
+.prof-btn-save {
+  background: linear-gradient(135deg, #5a3fa0, #7c5cbf);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 24px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .2s;
+  font-family: 'Inter', sans-serif;
+}
+.prof-btn-save:disabled { opacity: .6; cursor: not-allowed; }
+.prof-btn-save:hover:not(:disabled) { opacity: .88; }
+
+/* ── Loading ── */
+.prof-loading {
+  min-height: 100vh;
+  background: linear-gradient(145deg, #c8b8ec, #9078c8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+}
+.prof-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  animation: profSpin .8s linear infinite;
+}
+@keyframes profSpin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ── */
+@media (max-width: 520px) {
+  .prof-root   { padding: 16px 10px 40px; }
+  .prof-top    { padding: 0 16px 16px; }
+  .prof-section { padding: 16px; }
+  .prof-grid   { grid-template-columns: 1fr; }
+  .prof-name   { font-size: 18px; }
+  .prof-ava    { width: 68px; height: 68px; }
+}
