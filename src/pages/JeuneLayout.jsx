@@ -352,17 +352,18 @@ const LiveEvWidget = ({ goToLive }) => {
       })
       .catch(() => {});
 
-    const onStarted = e => {
-      const { roomCode, viewerLink } = e.detail || {};
-      if (viewerLink) setLive({ room_code: roomCode, stream_link: viewerLink, is_active: 1, title_live: "Live en cours" });
-    };
-    const onEnded = () => setLive(null);
-    window.addEventListener("live-started", onStarted);
-    window.addEventListener("live-ended",   onEnded);
-    return () => {
-      window.removeEventListener("live-started", onStarted);
-      window.removeEventListener("live-ended",   onEnded);
-    };
+    
+const onStarted = e => {
+  const d = e.detail;
+
+  if (d.viewerLink) {
+    setLive({
+      room_code: d.roomCode,
+      stream_link: d.viewerLink 
+    });
+  }
+};
+
   }, []);
 
   const joinLive = () => {

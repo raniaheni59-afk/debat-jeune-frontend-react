@@ -1,17 +1,3 @@
-/**
- * MeetRoom.jsx — Swafy Meet (Google Meet style)
- * 
- * ROLES:
- *   at= param → host (admin) : has camera + mic, can share screen, see all peers, manage participants
- *   vt= param → guest (jeune): mic only (muted by default), sees only admin video, can chat + react + raise hand
- *
- * FIXES:
- *   ✅ Camera black: video ref assigned after stream ready + useEffect on stream change
- *   ✅ Guest sees admin video (filters tilesToShow to host only)
- *   ✅ Messages arrive to ALL (admin + jeunes) via receive-message
- *   ✅ Audio: jeune mic muted by default, admin unmuted
- *   ✅ Token: role derived strictly from URL param (at=host / vt=guest)
- */
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
