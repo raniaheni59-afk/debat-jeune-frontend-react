@@ -247,6 +247,7 @@ export default function MeetRoom() {
 
   // ── createPeer ──
   const createPeer = useCallback((sid) => {
+    // Fermer peer existant
     if (pcMap.current[sid]) { try { pcMap.current[sid].close(); } catch {} }
 
     const pc = new RTCPeerConnection({ iceServers: ICE });
@@ -255,7 +256,7 @@ export default function MeetRoom() {
       if (e.candidate) sockRef.current?.emit("ice-candidate", { target:sid, candidate:e.candidate });
     };
     pc.oniceconnectionstatechange = () => {
-      if (pc.iceConnectionState === "failed") { try { pc.restartIce(); } catch {} }
+      if (pc.iceConnectionState === "failed") pc.restartIce();
     };
     pc.ontrack = e => {
       const stream = e.streams[0];
@@ -267,19 +268,17 @@ export default function MeetRoom() {
       });
     };
 
-    // ✅ Ajouter tracks locaux — admin: vidéo (screen si actif) + audio / guest: audio seulement
+    // ✅ Ajouter les tracks locaux au peer
+    // Si partage d'écran actif → envoyer screen track pour la vidéo
     const s = lsRef.current;
     if (s) {
       s.getAudioTracks().forEach(t => { try { pc.addTrack(t, s); } catch {} });
-      if (myRole === "host") {
-        // Si partage d'écran actif → envoyer screen track, sinon camera
-        const videoTrack = screenStr.current?.getVideoTracks()[0] || s.getVideoTracks()[0];
-        if (videoTrack) { try { pc.addTrack(videoTrack, s); } catch {} }
-      }
+      const videoTrack = screenStr.current?.getVideoTracks()[0] || s.getVideoTracks()[0];
+      if (videoTrack) { try { pc.addTrack(videoTrack, s); } catch {} }
     }
 
     return pc;
-  }, [myRole]);
+  }, []);
 
   // ── ✅ createOfferForPeer: créer et envoyer offre à un peer ──
   const createOfferForPeer = useCallback(async (sid) => {
@@ -368,14 +367,22 @@ export default function MeetRoom() {
       sock.on("connect_error", err => console.error("Socket error:", err.message));
 
       // ✅ FIX CRITIQUE: quand on rejoint, envoyer offres aux peers déjà présents
-      sock.on("all-users", async users => {
+      // L'admin attend que le stream local soit prêt avant d'envoyer les offres
+      sock.on("all-users", users => {
         for (const u of users) {
           if (u.socketId === sock.id) continue;
           nameMap.current[u.socketId]  = u.userName;
           roleMap.current[u.socketId]  = u.role;
           emailMap.current[u.socketId] = u.email || "";
-          await createOfferForPeer(u.socketId);
         }
+        // ✅ Admin envoie offres après 800ms — laisse getUserMedia finir
+        if (myRole === "host") {
+          const targets = users.filter(u => u.socketId !== sock.id);
+          targets.forEach((u, i) => {
+            setTimeout(() => createOfferForPeer(u.socketId), 800 + i * 200);
+          });
+        }
+        // ✅ Guest ne crée PAS de peer ici — attend l'offre de l'admin
       });
 
       sock.on("user-joined", ({ socketId, userName:n, role, email }) => {
@@ -383,23 +390,19 @@ export default function MeetRoom() {
         roleMap.current[socketId]  = role;
         emailMap.current[socketId] = email || "";
         showToast(`👋 ${n} a rejoint`, "#34a853");
-        // ✅ FIX: si je suis l'admin et qu'un guest rejoint → envoyer une offre
-        // Car le guest n'a pas encore de stream de l'admin
+        // ✅ Admin envoie offre avec délai — stream doit être initialisé côté guest
         if (myRole === "host") {
-          setTimeout(() => createOfferForPeer(socketId), 300);
+          setTimeout(() => createOfferForPeer(socketId), 600);
         }
       });
 
-      // ✅ FIX: si je suis un guest et que l'admin arrive → créer peer pour l'admin
+      // ✅ FIX: host-joined — mettre à jour les maps, NE PAS créer de peer
+      // L'admin enverra une offre via user-joined qu'il reçoit simultanément
       sock.on("host-joined", ({ socketId, userName:n }) => {
-        nameMap.current[socketId]  = n;
-        roleMap.current[socketId]  = "host";
+        nameMap.current[socketId] = n;
+        roleMap.current[socketId] = "host";
         showToast(`👑 ${n} (Admin) a rejoint`, "#1a73e8");
-        // Le guest crée un peer pour recevoir le stream de l'admin
-        if (myRole === "guest") {
-          const pc = createPeer(socketId);
-          pcMap.current[socketId] = pc;
-        }
+        // ✅ NE PAS créer de peer ici — l'admin envoie l'offre, pas le guest
       });
 
       sock.on("offer", async ({ caller, sdp }) => {
@@ -470,15 +473,17 @@ export default function MeetRoom() {
       });
 
       sock.on("force-kicked", () => {
-        alert("Vous avez été retiré de la session.");
-        cleanup(); navigate("/jeune");
+        cleanup();
+        alert("Vous avez été retiré de cette session par l'administrateur.");
+        window.location.href = "/jeune";
       });
 
       sock.on("force-blocked", ({ message }) => {
-        alert(message||"Votre accès a été révoqué.");
         cleanup();
-        localStorage.removeItem("token"); localStorage.removeItem("user");
-        navigate("/login");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        alert(message || "Votre accès a été révoqué par l'administrateur.");
+        window.location.href = "/login";
       });
 
       sock.on("live-ended", () => {
@@ -575,15 +580,31 @@ export default function MeetRoom() {
         screenStr.current = ss;
         const scrTrack = ss.getVideoTracks()[0];
 
-        // ✅ Remplacer track vidéo dans TOUS les peer connections actifs
+        // ✅ Remplacer OU ajouter track vidéo dans TOUS les peer connections actifs
         const replacePromises = Object.values(pcMap.current).map(pc => {
           const sender = pc.getSenders().find(s => s.track?.kind==="video");
           if (sender) return sender.replaceTrack(scrTrack).catch(()=>{});
+          // Pas de sender vidéo → ajouter directement
+          try { pc.addTrack(scrTrack, ss); } catch {}
           return Promise.resolve();
         });
         await Promise.all(replacePromises);
 
-        scrTrack.onended = () => toggleScreen();
+        scrTrack.onended = async () => {
+          // Arrêt automatique quand l'user ferme le partage
+          screenStr.current = null;
+          setScreenOn(false);
+          emit("screen-share-stopped", { roomCode });
+          const camTrack = localStr.current?.getVideoTracks()[0];
+          Object.values(pcMap.current).forEach(pc => {
+            const sender = pc.getSenders().find(s => s.track?.kind==="video");
+            if (sender && camTrack) sender.replaceTrack(camTrack).catch(()=>{});
+          });
+          if (localVid.current && localStr.current) {
+            localVid.current.srcObject = localStr.current;
+            localVid.current.play().catch(()=>{});
+          }
+        };
         setScreenOn(true);
         emit("screen-share-started", { roomCode });
         showToast("Écran partagé — visible par tous ✅","#34a853","🖥️");
