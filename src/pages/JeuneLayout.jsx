@@ -336,7 +336,7 @@ const MODAL_MAP = {
 /* ═══════════════════════════════════════════════════════════
    LIVE WIDGET — sidebar, shows active live from API
 ═══════════════════════════════════════════════════════════ */
-const LiveEvWidget = ({ goToLive }) => {
+const LiveEvWidget = ({ goToLive, activeLiveLink }) => {
   const [live, setLive] = React.useState(null);
   const navigate = useNavigate();
 
@@ -352,24 +352,36 @@ const LiveEvWidget = ({ goToLive }) => {
       })
       .catch(() => {});
 
-    
-const onStarted = e => {
-  const d = e.detail;
-
-  if (d.viewerLink) {
-    setLive({
-      room_code: d.roomCode,
-      stream_link: d.viewerLink 
-    });
-  }
-};
-
+    const onStarted = e => {
+      const d = e.detail;
+      if (d.viewerLink) {
+        setLive({
+          room_code: d.roomCode,
+          stream_link: d.viewerLink,
+          title_live: d.title || "Live en cours",
+        });
+      }
+    };
+    window.addEventListener("live-started", onStarted);
+    window.addEventListener("live-ended", () => setLive(null));
+    return () => {
+      window.removeEventListener("live-started", onStarted);
+      window.removeEventListener("live-ended", () => setLive(null));
+    };
   }, []);
 
+  // Sync avec activeLiveLink passé depuis JeuneLayout
+  React.useEffect(() => {
+    if (activeLiveLink && !live) {
+      setLive({ stream_link: activeLiveLink, title_live: "Live en cours" });
+    }
+  }, [activeLiveLink]);
+
   const joinLive = () => {
-    if (live?.stream_link) {
+    const linkToUse = live?.stream_link || activeLiveLink || localStorage.getItem("currentLiveViewerLink");
+    if (linkToUse) {
       try {
-        const url      = new URL(live.stream_link);
+        const url      = new URL(linkToUse);
         const parts    = url.pathname.split("/").filter(Boolean);
         const roomCode = parts[parts.length - 1];
         const vt       = url.searchParams.get("vt");
@@ -681,6 +693,10 @@ const JeuneLayout = () => {
   ]);
   const cbEndRef = useRef(null);
 
+  /* ── LIVE STATE (pour notification + chatbot) ── */
+  const [activeLiveLink, setActiveLiveLink] = useState(null); // viewerLink du live actif
+  const [liveNotifToast, setLiveNotifToast] = useState(null); // toast notification live
+
   /* ── SOCKET ── ✅ FIX: useRef pour éviter le loop connect/disconnect */
   const socketRef = useRef(null);
 
@@ -701,11 +717,55 @@ const JeuneLayout = () => {
     socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
     socketRef.current.on("new_message", () => setUnreadMessages((n) => n + 1));
 
+    // ✅ Notification live en temps réel
+    socketRef.current.on("live-started", (data) => {
+      const { viewerLink, title, roomCode } = data;
+      if (viewerLink) {
+        localStorage.setItem("currentLiveViewerLink", viewerLink);
+        setActiveLiveLink(viewerLink);
+      }
+      // Afficher toast notification
+      setLiveNotifToast({ title: title || "Live en cours", viewerLink, roomCode });
+      setUnreadNotifs((n) => n + 1);
+      // Ajouter dans la liste des notifications
+      setNotifications((prev) => [{
+        id_notification: Date.now(),
+        type_notification: "live_started",
+        message: `🔴 Live démarré — "${title || "Live en cours"}" — Cliquez pour rejoindre`,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        _liveLink: viewerLink,
+        _roomCode: roomCode,
+      }, ...prev]);
+      // Auto-hide toast après 15s
+      setTimeout(() => setLiveNotifToast(null), 15000);
+    });
+
+    socketRef.current.on("live-ended", () => {
+      setActiveLiveLink(null);
+      setLiveNotifToast(null);
+    });
+
     return () => {
       socketRef.current?.disconnect();
       socketRef.current = null;
     };
   }, []); // ✅ dependency array vide = une seule fois
+
+  // ✅ Charger le live actif au démarrage
+  useEffect(() => {
+    const stored = localStorage.getItem("currentLiveViewerLink");
+    if (stored) setActiveLiveLink(stored);
+    // Vérifier depuis l'API aussi
+    API.get("/lives").then(res => {
+      const list = Array.isArray(res.data) ? res.data : [];
+      const active = list.find(l => l.is_active === 1 || l.is_active === true);
+      if (active?.stream_link) {
+        setActiveLiveLink(active.stream_link);
+        localStorage.setItem("currentLiveViewerLink", active.stream_link);
+      }
+    }).catch(() => {});
+  }, []);
 
   /* ── FETCH ── */
   const fetchPublications = useCallback(async (silent = false) => {
@@ -756,8 +816,23 @@ const JeuneLayout = () => {
     setMobileOpen(false);
   };
 
-  const markNotifRead = async (id) => {
+  const markNotifRead = async (notif) => {
+    // Support both old format (id only) and new format (object with _liveLink)
+    const id = typeof notif === "object" ? notif.id_notification : notif;
+    const liveLink = typeof notif === "object" ? notif._liveLink : null;
+    const roomCode = typeof notif === "object" ? notif._roomCode : null;
     try { await API.put(`/notifications/${id}/read`); fetchNotifications(); } catch {}
+    // Si c'est une notif live → naviguer vers le live
+    if (liveLink) {
+      try {
+        const url = new URL(liveLink);
+        const parts = url.pathname.split("/").filter(Boolean);
+        const rc = parts[parts.length - 1];
+        const vt = url.searchParams.get("vt");
+        if (rc && vt) { navigate(`/meet/${rc}?vt=${vt}`); return; }
+      } catch {}
+    }
+    if (roomCode) navigate(`/meet/${roomCode}`);
   };
 
   const handlePublier = async (e) => {
@@ -795,7 +870,11 @@ const JeuneLayout = () => {
       .map(m => ({ sender: m.from === "user" ? "user" : "bot", text: m.text }));
 
     try {
-      const res = await API.post("/chatbot", { message: text, history });
+      const res = await API.post("/chatbot", {
+        message: text,
+        history,
+        context: activeLiveLink ? `Un live est actuellement en cours sur la plateforme Swafy.` : "",
+      });
       const reply = res.data.reply || "Je n'ai pas compris. Pouvez-vous reformuler ?";
       setCbMsgs((m) => [...m, { from:"bot", text: reply }]);
     } catch {
@@ -849,7 +928,7 @@ const JeuneLayout = () => {
               <div key={n.id_notification}
                 className={`jl-notif-item${n.is_read ? "" : " unread"}`}
                 style={{ animationDelay:`${i * 0.06}s` }}
-                onClick={() => markNotifRead(n.id_notification)}>
+                onClick={() => markNotifRead(n)}>
                 <div className="jl-notif-icon">
                   {n.type_notification==="new_post" ? "📝"
                   :n.type_notification==="publication_comment" ? "💬" : "🔔"}
@@ -1134,15 +1213,56 @@ const JeuneLayout = () => {
 
         
 
-            {/* Chatbot */}
+            {/* Live widget */}
+            <LiveEvWidget goToLive={() => goTo(PAGES.LIVE)} activeLiveLink={activeLiveLink} />
+
+            {/* Live notification toast */}
+            {liveNotifToast && (
+              <div style={{
+                background: "linear-gradient(135deg,#7c3aed,#3b82f6)",
+                borderRadius: 14, padding: "14px 16px", marginBottom: 12,
+                border: "1px solid rgba(255,255,255,.15)",
+                animation: "jlFadeIn .4s ease",
+                cursor: "pointer",
+              }} onClick={() => {
+                if (liveNotifToast.viewerLink) {
+                  try {
+                    const url = new URL(liveNotifToast.viewerLink);
+                    const parts = url.pathname.split("/").filter(Boolean);
+                    const rc = parts[parts.length - 1];
+                    const vt = url.searchParams.get("vt");
+                    if (rc && vt) { navigate(`/meet/${rc}?vt=${vt}`); return; }
+                  } catch {}
+                }
+              }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <span style={{ width:9, height:9, borderRadius:"50%", background:"#f87171", display:"inline-block", animation:"jlPulse 1s infinite" }}/>
+                  <span style={{ color:"#fff", fontWeight:800, fontSize:12, letterSpacing:1, textTransform:"uppercase" }}>🔴 LIVE EN COURS</span>
+                  <button onClick={(e) => { e.stopPropagation(); setLiveNotifToast(null); }}
+                    style={{ marginLeft:"auto", background:"rgba(255,255,255,.2)", border:"none", color:"#fff", borderRadius:6, width:22, height:22, cursor:"pointer", fontSize:12, display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+                </div>
+                <p style={{ color:"rgba(255,255,255,.9)", fontSize:13, fontWeight:600, margin:"0 0 10px" }}>
+                  {liveNotifToast.title}
+                </p>
+                <button style={{ width:"100%", background:"rgba(255,255,255,.2)", border:"1px solid rgba(255,255,255,.3)", borderRadius:10, padding:"8px", color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                  ▶ Rejoindre le Live
+                </button>
+              </div>
+            )}
+
+            {/* Chatbot — always visible, context changes with live */}
             <div className="jl-cb">
               <div className="jl-cb-head">
                 <div className="jl-cb-icon"><Icon name="robot" size={14}/></div>
                 <div>
                   <p className="jl-cb-title">Assistant Swafy</p>
-                  <p className="jl-cb-sub">Toujours disponible</p>
+                  <p className="jl-cb-sub">{activeLiveLink ? "Actif pendant le live" : "Toujours disponible"}</p>
                 </div>
-                <span className="jl-cb-online">● En ligne</span>
+                {activeLiveLink ? (
+                  <span style={{ background:"#ef4444", color:"#fff", fontSize:9, fontWeight:800, padding:"2px 7px", borderRadius:10, animation:"jlPulse 1.2s infinite" }}>🔴 LIVE</span>
+                ) : (
+                  <span className="jl-cb-online">● En ligne</span>
+                )}
               </div>
               <div className="jl-cb-msgs">
                 {cbMsgs.map((m, i) => (

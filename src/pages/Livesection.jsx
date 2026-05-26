@@ -507,9 +507,9 @@ export default function LiveSection() {
 }
 
 const S = {
-  center:    { display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",minHeight:280 },
+  center:    { display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",minHeight:280,background:"#ffffff",borderRadius:20 },
   spinner:   { width:40,height:40,border:"3px solid #e5e7eb",borderTopColor:"#7c3aed",borderRadius:"50%",animation:"spin .8s linear infinite" },
-  noLive:    { display:"flex",alignItems:"center",justifyContent:"center",minHeight:320,background:"#f9fafb",borderRadius:20,border:"2px dashed #e5e7eb" },
+  noLive:    { display:"flex",alignItems:"center",justifyContent:"center",minHeight:320,background:"#ffffff",borderRadius:20,border:"2px dashed #e5e7eb",boxShadow:"0 2px 12px rgba(90,63,160,.06)" },
   alert:     { display:"flex",alignItems:"center",gap:10,background:"linear-gradient(135deg,#7c3aed,#3b82f6)",color:"#fff",borderRadius:12,padding:"12px 18px",marginBottom:16,animation:"slideDown .4s ease",fontSize:14,fontWeight:500,flexWrap:"wrap" },
   alertDot:  { width:10,height:10,background:"#fca5a5",borderRadius:"50%",animation:"pulseDot 1.2s infinite",flexShrink:0 },
   alertX:    { background:"none",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",fontSize:16 },
