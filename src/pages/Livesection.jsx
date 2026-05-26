@@ -33,7 +33,7 @@ function extractViewerInfo(streamLink) {
   }
 }
 
-export default function LiveSection() {
+export default function LiveSection({ activeLiveLink, onLiveLinkReceived }) {
   const navigate = useNavigate();
   const auth     = getAuth();
 
@@ -72,6 +72,10 @@ export default function LiveSection() {
       const list = Array.isArray(data) ? data : [];
       const active = list.find(l => l.is_active === 1 || l.is_active === true);
       if (active) {
+        // ✅ FIX: si stream_link null dans DB, essayer activeLiveLink prop ou localStorage
+        const fallbackLink = activeLiveLink || localStorage.getItem("currentLiveViewerLink") || "";
+        const streamLink = active.stream_link || fallbackLink;
+
         const liveData = {
           id:          active.id_live || active.id,
           roomCode:    active.room_code,
@@ -79,15 +83,19 @@ export default function LiveSection() {
           description: active.description  || "",
           hostName:    active.admin_name   || active.host_name || "Admin",
           thematique:  active.thematique   || "",
-          streamLink:  active.stream_link  || "",
+          streamLink,
           startedAt:   active.created_at,
         };
         setLive(liveData);
-        if (liveData.streamLink) localStorage.setItem("currentLiveViewerLink", liveData.streamLink);
+        if (streamLink) {
+          localStorage.setItem("currentLiveViewerLink", streamLink);
+          onLiveLinkReceived?.(streamLink);
+        }
       } else {
-        setLive(null);
+        // ✅ FIX: si API dit pas de live actif mais on a un lien en mémoire → garder
+        if (!activeLiveLink) setLive(null);
       }
-    } catch { setLive(null); }
+    } catch { /* garder l'état actuel */ }
     finally { setLoading(false); }
   };
 
@@ -95,7 +103,36 @@ export default function LiveSection() {
     fetchActiveLive();
     const interval = setInterval(fetchActiveLive, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [activeLiveLink]); // ✅ re-run si activeLiveLink change (reçu depuis JeuneLayout via socket)
+
+  // ✅ FIX: si activeLiveLink arrive depuis JeuneLayout (socket live-started)
+  // et qu'on a pas encore de live ou le streamLink est vide → mettre à jour immédiatement
+  useEffect(() => {
+    if (!activeLiveLink) return;
+    setLive(prev => {
+      if (!prev) {
+        // Extraire roomCode depuis le lien
+        try {
+          const url = new URL(activeLiveLink);
+          const parts = url.pathname.split("/").filter(Boolean);
+          const roomCode = parts[parts.length - 1];
+          return {
+            roomCode,
+            title:       "Live en cours",
+            description: "",
+            hostName:    "Admin",
+            thematique:  "",
+            streamLink:  activeLiveLink,
+            startedAt:   new Date(),
+          };
+        } catch { return prev; }
+      }
+      // Si live existe mais streamLink vide → mettre à jour
+      if (!prev.streamLink) return { ...prev, streamLink: activeLiveLink };
+      return prev;
+    });
+    setLoading(false);
+  }, [activeLiveLink]);
 
   // ── Socket ──────────────────────────────────────────
   useEffect(() => {
@@ -114,7 +151,6 @@ export default function LiveSection() {
         description: description || "",
         hostName:    hostName    || "Admin",
         thematique:  thematique  || "",
-        // ✅ viewerLink = lien avec ?vt= (token guest) — PAS le lien admin
         streamLink:  viewerLink  || "",
         startedAt:   new Date(),
       };
@@ -123,7 +159,10 @@ export default function LiveSection() {
       setJoined(false);
       joinedRef.current = false;
       setMsgs([]);
-      if (viewerLink) localStorage.setItem("currentLiveViewerLink", viewerLink);
+      if (viewerLink) {
+        localStorage.setItem("currentLiveViewerLink", viewerLink);
+        onLiveLinkReceived?.(viewerLink); // ✅ Notifier JeuneLayout
+      }
 
       // ✅ Sauvegarder notification localement pour la page Notifications
       try {
@@ -176,7 +215,10 @@ export default function LiveSection() {
   // ── Join socket room pour le chat ────────────────────
   useEffect(() => {
     if (!live || !sockRef.current || !auth.ok || joinedRef.current) return;
-    const { roomCode, vt } = extractViewerInfo(live.streamLink);
+
+    // ✅ Essayer streamLink du live, puis activeLiveLink, puis localStorage
+    const linkToUse = live.streamLink || activeLiveLink || localStorage.getItem("currentLiveViewerLink") || "";
+    const { roomCode, vt } = extractViewerInfo(linkToUse);
     if (!roomCode || !vt) return;
 
     joinedRef.current = true;
@@ -194,22 +236,29 @@ export default function LiveSection() {
         console.warn("join-room refusé:", ack?.message);
       }
     });
-  }, [live, auth.ok]);
+  }, [live, auth.ok, activeLiveLink]);
 
   // ── Rejoindre le live en vidéo ───────────────────────
-  // ✅ Utilise TOUJOURS le viewerLink (avec ?vt=) — jamais le lien host
   const joinLive = () => {
     if (!auth.ok) { setNudge(true); return; }
-    if (!live) return;
 
-    // Priorité 1 : streamLink du live actuel
-    const { roomCode, vt } = extractViewerInfo(live.streamLink);
+    // Priorité 1 : streamLink du live actuel (doit avoir ?vt=)
+    const { roomCode, vt } = extractViewerInfo(live?.streamLink);
     if (roomCode && vt) {
       navigate(`/meet/${roomCode}?vt=${vt}`);
       return;
     }
 
-    // Priorité 2 : lien sauvegardé dans localStorage (envoyé par admin via socket)
+    // Priorité 2 : activeLiveLink passé depuis JeuneLayout (le plus frais)
+    if (activeLiveLink) {
+      const { roomCode: rc2, vt: v2 } = extractViewerInfo(activeLiveLink);
+      if (rc2 && v2) {
+        navigate(`/meet/${rc2}?vt=${v2}`);
+        return;
+      }
+    }
+
+    // Priorité 3 : lien sauvegardé dans localStorage
     const storedLink = localStorage.getItem("currentLiveViewerLink");
     if (storedLink) {
       const { roomCode: rc, vt: v } = extractViewerInfo(storedLink);
@@ -219,7 +268,14 @@ export default function LiveSection() {
       }
     }
 
-    alert("Lien de live indisponible. Attendez que l'admin renvoie le lien.");
+    // Priorité 4 : si on a le roomCode mais pas le vt → aller quand même
+    if (live?.roomCode) {
+      navigate(`/meet/${live.roomCode}`);
+      return;
+    }
+
+    alert("Lien de live indisponible. L'admin n'a pas encore démarré la salle.");
+  };
   };
 
   // ── Chat ─────────────────────────────────────────────
@@ -504,7 +560,7 @@ export default function LiveSection() {
       )}
     </div>
   );
-}
+
 
 const S = {
   center:    { display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",minHeight:280,background:"#ffffff",borderRadius:20 },

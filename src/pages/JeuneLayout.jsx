@@ -963,7 +963,12 @@ const JeuneLayout = () => {
       case PAGES.LIVE:
         return (
           <div className="jl-page" style={{ padding: 0 }}>
-            <LiveSection />
+            <LiveSection activeLiveLink={activeLiveLink} onLiveLinkReceived={(link) => {
+              if (link) {
+                setActiveLiveLink(link);
+                localStorage.setItem("currentLiveViewerLink", link);
+              }
+            }} />
           </div>
         );
 
