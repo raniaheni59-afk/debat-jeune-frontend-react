@@ -276,7 +276,6 @@ export default function LiveSection({ activeLiveLink, onLiveLinkReceived }) {
 
     alert("Lien de live indisponible. L'admin n'a pas encore démarré la salle.");
   };
-  };
 
   // ── Chat ─────────────────────────────────────────────
   const sendMsg = () => {
@@ -560,7 +559,7 @@ export default function LiveSection({ activeLiveLink, onLiveLinkReceived }) {
       )}
     </div>
   );
-
+}
 
 const S = {
   center:    { display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",minHeight:280,background:"#ffffff",borderRadius:20 },
