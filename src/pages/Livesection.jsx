@@ -18,12 +18,11 @@ function getAuth() {
   } catch { return { user:null, token:null, name:"Participant", email:"", ok:false }; }
 }
 
-// ✅ FIX: extraire roomCode et vt depuis n'importe quel format de lien
+// Extraire roomCode et vt depuis n'importe quel format de lien
 function extractViewerInfo(streamLink) {
   if (!streamLink) return { roomCode:null, vt:null };
   try {
     const url = new URL(streamLink);
-    // Format: /meet/{roomCode}?vt=TOKEN  ou  /live/{roomCode}?vt=TOKEN
     const parts    = url.pathname.split("/").filter(Boolean);
     const roomCode = parts[parts.length - 1];
     const vt       = url.searchParams.get("vt") || url.searchParams.get("at");
@@ -38,36 +37,40 @@ export default function LiveSection() {
   const navigate = useNavigate();
   const auth     = getAuth();
 
-  const [live,      setLive]     = useState(null);
-  const [loading,   setLoading]  = useState(true);
-  const [alertShow, setAlertShow]= useState(false);
-  const [joined,    setJoined]   = useState(false);
-  const [msgs,      setMsgs]     = useState([]);
-  const [input,     setInput]    = useState("");
-  const [reactions, setReactions]= useState({});
-  const [floats,    setFloats]   = useState([]);
-  const [myReaction,setMyReact]  = useState(null);
-  const [nudge,     setNudge]    = useState(false);
-  const [copied,    setCopied]   = useState(false);
+  const [live,       setLive]      = useState(null);
+  const [loading,    setLoading]   = useState(true);
+  const [alertShow,  setAlertShow] = useState(false);
+  const [joined,     setJoined]    = useState(false);
+  const [msgs,       setMsgs]      = useState([]);
+  const [input,      setInput]     = useState("");
+  const [reactions,  setReactions] = useState({});
+  const [floats,     setFloats]    = useState([]);
+  const [myReaction, setMyReact]   = useState(null);
+  const [nudge,      setNudge]     = useState(false);
+  const [copied,     setCopied]    = useState(false);
 
-  const sockRef = useRef(null);
-  const chatEnd = useRef(null);
-  const joinedRef = useRef(false); // eviter double join
+  // ── Chatbot ─────────────────────────────────────────
+  const [cbOpen,    setCbOpen]   = useState(false);
+  const [cbInput,   setCbInput]  = useState("");
+  const [cbMsgs,    setCbMsgs]   = useState([
+    { from:"bot", text:"👋 Salam ! Je suis l'assistant Swafy. Pose-moi tes questions sur ce live !" }
+  ]);
+  const [cbLoading, setCbLoading]= useState(false);
+  const cbEndRef = useRef(null);
 
-  // ✅ FIX: Fetch live actif — ne requiert PAS de token obligatoire
+  const sockRef   = useRef(null);
+  const chatEnd   = useRef(null);
+  const joinedRef = useRef(false);
+
+  // ── Fetch live actif ─────────────────────────────────
   const fetchActiveLive = async () => {
     try {
-      // Essayer d'abord avec auth token si disponible
       const headers = {};
       if (auth.token) headers["Authorization"] = `Bearer ${auth.token}`;
-
-      const res = await fetch(`${SOCKET_URL}/api/lives`, { headers });
+      const res  = await fetch(`${SOCKET_URL}/api/lives`, { headers });
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
-
-      // Trouver le live actif (is_active = 1 ou true)
       const active = list.find(l => l.is_active === 1 || l.is_active === true);
-
       if (active) {
         const liveData = {
           id:          active.id_live || active.id,
@@ -80,27 +83,21 @@ export default function LiveSection() {
           startedAt:   active.created_at,
         };
         setLive(liveData);
-        // Sauvegarder pour MeetRoom
         if (liveData.streamLink) localStorage.setItem("currentLiveViewerLink", liveData.streamLink);
       } else {
         setLive(null);
       }
-    } catch (err) {
-      console.error("fetchActiveLive error:", err);
-      setLive(null);
-    } finally {
-      setLoading(false);
-    }
+    } catch { setLive(null); }
+    finally { setLoading(false); }
   };
 
-  // ✅ Charger au démarrage + refresh automatique toutes les 10s
   useEffect(() => {
     fetchActiveLive();
     const interval = setInterval(fetchActiveLive, 10000);
     return () => clearInterval(interval);
   }, []);
 
-  // ── Socket ──────────────────────────────────────────────
+  // ── Socket ──────────────────────────────────────────
   useEffect(() => {
     const sock = io(SOCKET_URL, {
       transports: ["websocket"],
@@ -109,7 +106,6 @@ export default function LiveSection() {
     });
     sockRef.current = sock;
 
-    // ✅ FIX: live-started reçoit maintenant title, description, thematique du serveur
     sock.on("live-started", (data) => {
       const { roomCode, viewerLink, hostName, title, description, thematique } = data;
       const newLive = {
@@ -118,6 +114,7 @@ export default function LiveSection() {
         description: description || "",
         hostName:    hostName    || "Admin",
         thematique:  thematique  || "",
+        // ✅ viewerLink = lien avec ?vt= (token guest) — PAS le lien admin
         streamLink:  viewerLink  || "",
         startedAt:   new Date(),
       };
@@ -127,6 +124,28 @@ export default function LiveSection() {
       joinedRef.current = false;
       setMsgs([]);
       if (viewerLink) localStorage.setItem("currentLiveViewerLink", viewerLink);
+
+      // ✅ Sauvegarder notification localement pour la page Notifications
+      try {
+        const stored = JSON.parse(localStorage.getItem("live_notifications") || "[]");
+        stored.unshift({
+          id: Date.now(),
+          type: "live_started",
+          title: title || "Live en cours",
+          hostName: hostName || "Admin",
+          viewerLink: viewerLink || "",
+          roomCode,
+          createdAt: new Date().toISOString(),
+          read: false,
+        });
+        // Garder max 20 notifications
+        localStorage.setItem("live_notifications", JSON.stringify(stored.slice(0, 20)));
+        // Dispatcher un événement pour que JeuneLayout mette à jour le badge
+        window.dispatchEvent(new CustomEvent("live_notification", {
+          detail: { title, hostName, viewerLink, roomCode }
+        }));
+      } catch {}
+
       setTimeout(() => setAlertShow(false), 12000);
     });
 
@@ -136,9 +155,9 @@ export default function LiveSection() {
       joinedRef.current = false;
       setMsgs([]);
       setReactions({});
+      setCbOpen(false);
     });
 
-    // ✅ Recevoir les messages du chat de MeetRoom
     sock.on("receive-message", msg => {
       setMsgs(prev => [...prev, { ...msg, id: Date.now()+Math.random() }]);
       setTimeout(() => chatEnd.current?.scrollIntoView({ behavior:"smooth" }), 50);
@@ -154,7 +173,7 @@ export default function LiveSection() {
     return () => sock.disconnect();
   }, []);
 
-  // ── Join socket room pour le chat ────────────────────────
+  // ── Join socket room pour le chat ────────────────────
   useEffect(() => {
     if (!live || !sockRef.current || !auth.ok || joinedRef.current) return;
     const { roomCode, vt } = extractViewerInfo(live.streamLink);
@@ -177,48 +196,53 @@ export default function LiveSection() {
     });
   }, [live, auth.ok]);
 
-  // ── Rejoindre le live en vidéo ───────────────────────────
+  // ── Rejoindre le live en vidéo ───────────────────────
+  // ✅ Utilise TOUJOURS le viewerLink (avec ?vt=) — jamais le lien host
   const joinLive = () => {
     if (!auth.ok) { setNudge(true); return; }
-    if (!live)    return;
+    if (!live) return;
 
+    // Priorité 1 : streamLink du live actuel
     const { roomCode, vt } = extractViewerInfo(live.streamLink);
-
     if (roomCode && vt) {
-      // ✅ Lien correct vers MeetRoom avec token viewer
       navigate(`/meet/${roomCode}?vt=${vt}`);
-    } else {
-      // Fallback: essayer avec room_code direct
-      const storedLink = localStorage.getItem("currentLiveViewerLink");
-      if (storedLink) {
-        const { roomCode: rc, vt: v } = extractViewerInfo(storedLink);
-        if (rc && v) { navigate(`/meet/${rc}?vt=${v}`); return; }
-      }
-      alert("Lien de live invalide. Attendez que l'admin renvoie le lien.");
+      return;
     }
+
+    // Priorité 2 : lien sauvegardé dans localStorage (envoyé par admin via socket)
+    const storedLink = localStorage.getItem("currentLiveViewerLink");
+    if (storedLink) {
+      const { roomCode: rc, vt: v } = extractViewerInfo(storedLink);
+      if (rc && v) {
+        navigate(`/meet/${rc}?vt=${v}`);
+        return;
+      }
+    }
+
+    alert("Lien de live indisponible. Attendez que l'admin renvoie le lien.");
   };
 
-  // ── Chat ──────────────────────────────────────────────────
+  // ── Chat ─────────────────────────────────────────────
   const sendMsg = () => {
-    if (!auth.ok)           { setNudge(true); return; }
-    if (!input.trim()||!live) return;
+    if (!auth.ok) { setNudge(true); return; }
+    if (!input.trim() || !live) return;
     const { roomCode } = extractViewerInfo(live.streamLink);
     if (!roomCode) return;
     sockRef.current?.emit("send-message", { roomCode, message: input });
     setInput("");
   };
 
-  // ── Réaction ──────────────────────────────────────────────
+  // ── Réaction ─────────────────────────────────────────
   const sendReaction = emoji => {
     if (!auth.ok) { setNudge(true); return; }
-    if (!live)    return;
+    if (!live) return;
     const { roomCode } = extractViewerInfo(live.streamLink);
     if (!roomCode) return;
     setMyReact(emoji);
     sockRef.current?.emit("send-reaction", { roomCode, emoji });
   };
 
-  // ── Copy link ──────────────────────────────────────────────
+  // ── Copy link (viewer link uniquement) ───────────────
   const copyLink = async () => {
     const lnk = live?.streamLink || localStorage.getItem("currentLiveViewerLink") || "";
     if (!lnk) return;
@@ -227,17 +251,45 @@ export default function LiveSection() {
     setTimeout(() => setCopied(false), 2500);
   };
 
+  // ── Chatbot ──────────────────────────────────────────
+  const sendCb = async () => {
+    const text = cbInput.trim();
+    if (!text || cbLoading) return;
+    const userMsg = { from:"user", text };
+    setCbMsgs(m => [...m, userMsg]);
+    setCbInput("");
+    setCbLoading(true);
+    try {
+      const history = cbMsgs
+        .filter(m => m.from === "user" || m.from === "bot")
+        .map(m => ({ sender: m.from === "user" ? "user" : "bot", text: m.text }));
+      const res = await API.post("/chatbot", {
+        message: text,
+        history,
+        context: live ? `Live actif: "${live.title}" — thématique: ${live.thematique}` : ""
+      });
+      const reply = res.data?.reply || "Je n'ai pas compris. Pouvez-vous reformuler ?";
+      setCbMsgs(m => [...m, { from:"bot", text: reply }]);
+    } catch {
+      setCbMsgs(m => [...m, { from:"bot", text:"❌ Erreur de connexion. Réessayez." }]);
+    } finally {
+      setCbLoading(false);
+      setTimeout(() => cbEndRef.current?.scrollIntoView({ behavior:"smooth" }), 50);
+    }
+  };
+
   const ANIM = `
     @keyframes slideDown{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
-    @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-70px)scale(1.3)}}
+    @keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-70px) scale(1.3)}}
     @keyframes pulseDot{0%,100%{opacity:1}50%{opacity:.3}}
     @keyframes scaleIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
     @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes popIn{from{transform:scale(.88) translateY(10px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
     ::-webkit-scrollbar{width:4px}
     ::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:4px}
   `;
 
-  // ── NO LIVE ───────────────────────────────────────────────
+  // ── NO LIVE ──────────────────────────────────────────
   if (loading) return (
     <div style={S.center}>
       <style>{ANIM}</style>
@@ -253,24 +305,29 @@ export default function LiveSection() {
         <div style={{ fontSize:56,marginBottom:12 }}>📡</div>
         <h3 style={{ color:"#1f2937",fontSize:20,fontWeight:800,margin:"0 0 8px" }}>Aucun live en cours</h3>
         <p style={{ color:"#6b7280",fontSize:14,marginBottom:16 }}>Restez connecté — vous serez notifié dès qu'un live commence.</p>
-        <button onClick={fetchActiveLive} style={{ background:"linear-gradient(135deg,#7c3aed,#3b82f6)",border:"none",borderRadius:10,padding:"9px 20px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer" }}>
+        <button onClick={fetchActiveLive}
+          style={{ background:"linear-gradient(135deg,#7c3aed,#3b82f6)",border:"none",borderRadius:10,padding:"9px 20px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer" }}>
           🔄 Vérifier maintenant
         </button>
       </div>
     </div>
   );
 
-  // ── LIVE EN COURS ─────────────────────────────────────────
+  // ── LIVE EN COURS ────────────────────────────────────
   return (
     <div style={{ fontFamily:"'Inter',sans-serif",position:"relative" }}>
       <style>{ANIM}</style>
 
-      {/* ALERTE */}
+      {/* ALERTE live démarré */}
       {alertShow && (
         <div style={S.alert}>
           <span style={S.alertDot} />
           🎙️ <strong>{live.hostName}</strong> a démarré un live !
           {live.title !== "Live en cours" && <em style={{ opacity:.85,marginLeft:4 }}>"{live.title}"</em>}
+          <button onClick={joinLive}
+            style={{ marginLeft:"auto",background:"rgba(255,255,255,.25)",border:"1px solid rgba(255,255,255,.4)",borderRadius:8,padding:"5px 14px",color:"#fff",cursor:"pointer",fontWeight:700,fontSize:13,whiteSpace:"nowrap" }}>
+            ▶ Rejoindre
+          </button>
           <button onClick={()=>setAlertShow(false)} style={S.alertX}>✕</button>
         </div>
       )}
@@ -287,7 +344,7 @@ export default function LiveSection() {
               <span style={{ width:8,height:8,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"pulseDot 1s infinite" }} />
               🔴 EN DIRECT
             </div>
-            <div style={{ textAlign:"center",zIndex:1 }}>
+            <div style={{ textAlign:"center",zIndex:1,padding:"0 20px" }}>
               <div style={{ fontSize:64,marginBottom:10 }}>🎥</div>
               <p style={{ color:"#fff",fontWeight:700,fontSize:16,marginBottom:4 }}>{live.title}</p>
               {live.description && (
@@ -296,6 +353,9 @@ export default function LiveSection() {
               {live.thematique && (
                 <span style={{ background:"rgba(124,58,237,.3)",color:"#c4b5fd",fontSize:11,padding:"3px 10px",borderRadius:20 }}>🎯 {live.thematique}</span>
               )}
+              {live.hostName && (
+                <p style={{ color:"rgba(255,255,255,.45)",fontSize:11,marginTop:8 }}>Animé par <strong style={{ color:"rgba(255,255,255,.75)" }}>{live.hostName}</strong></p>
+              )}
             </div>
             {/* Réactions flottantes */}
             <div style={{ position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",display:"flex",gap:8,pointerEvents:"none" }}>
@@ -303,16 +363,24 @@ export default function LiveSection() {
             </div>
           </div>
 
-          {/* Bouton rejoindre */}
-          <button onClick={joinLive} style={S.joinBtn}>
-            ▶ Entrer dans le Live
-          </button>
+          {/* Boutons principaux */}
+          <div style={{ display:"flex",gap:10 }}>
+            <button onClick={joinLive} style={{ ...S.joinBtn, flex:1 }}>
+              ▶ Entrer dans le Live
+            </button>
+            {/* ✅ Chatbot — visible uniquement pendant un live */}
+            <button onClick={() => setCbOpen(o => !o)}
+              style={{ background: cbOpen ? "linear-gradient(135deg,#7c3aed,#5a1fa0)" : "rgba(124,58,237,.1)", border:"1px solid rgba(124,58,237,.3)", borderRadius:14, padding:"14px 16px", color: cbOpen ? "#fff" : "#7c3aed", cursor:"pointer", fontSize:20, transition:"all .2s", flexShrink:0 }}
+              title="Assistant IA">
+              🤖
+            </button>
+          </div>
 
-          {/* Partager le lien */}
+          {/* Partager le lien viewer */}
           {live.streamLink && (
             <div style={S.linkBox}>
               <span style={{ color:"#6b7280",fontSize:11,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}>
-                🔗 {live.streamLink.length>70?live.streamLink.slice(0,70)+"…":live.streamLink}
+                🔗 {live.streamLink.length>70 ? live.streamLink.slice(0,70)+"…" : live.streamLink}
               </span>
               <button onClick={copyLink} style={S.copyBtn}>{copied?"✅":"📋"}</button>
             </div>
@@ -348,11 +416,9 @@ export default function LiveSection() {
               </div>
             ) : msgs.map(m=>(
               <div key={m.id} style={{ display:"flex",gap:8,alignItems:"flex-start" }}>
-                <div style={{
-                  width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",
-                  fontWeight:800,fontSize:11,flexShrink:0,marginTop:2,color:"#fff",
-                  background: m.role==="host"?"linear-gradient(135deg,#7c3aed,#5a2fa0)":"linear-gradient(135deg,#1a73e8,#0d47a1)"
-                }}>{(m.user||"?")[0].toUpperCase()}</div>
+                <div style={{ width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:800,fontSize:11,flexShrink:0,marginTop:2,color:"#fff",background:m.role==="host"?"linear-gradient(135deg,#7c3aed,#5a2fa0)":"linear-gradient(135deg,#1a73e8,#0d47a1)" }}>
+                  {(m.user||"?")[0].toUpperCase()}
+                </div>
                 <div style={{ flex:1 }}>
                   <div style={{ display:"flex",alignItems:"center",gap:5,marginBottom:2 }}>
                     {m.role==="host" && <span style={{ background:"#7c3aed",color:"#fff",fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:10 }}>HOST</span>}
@@ -386,6 +452,39 @@ export default function LiveSection() {
         </div>
       </div>
 
+      {/* ✅ CHATBOT PANEL — uniquement pendant live */}
+      {cbOpen && (
+        <div style={{ marginTop:16,background:"#fff",borderRadius:18,border:"1px solid #e5e7eb",boxShadow:"0 4px 24px rgba(124,58,237,.12)",overflow:"hidden",animation:"popIn .25s ease" }}>
+          <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",background:"linear-gradient(135deg,#7c3aed,#5a1fa0)" }}>
+            <span style={{ color:"#fff",fontWeight:700,fontSize:14 }}>🤖 Assistant IA — Live</span>
+            <button onClick={()=>setCbOpen(false)} style={{ background:"rgba(255,255,255,.2)",border:"none",color:"#fff",borderRadius:6,padding:"3px 8px",cursor:"pointer",fontSize:13 }}>✕</button>
+          </div>
+          <div style={{ height:240,overflowY:"auto",padding:"12px 14px",display:"flex",flexDirection:"column",gap:10 }}>
+            {cbMsgs.map((m,i)=>(
+              <div key={i} style={{ display:"flex",justifyContent:m.from==="user"?"flex-end":"flex-start" }}>
+                <div style={{ maxWidth:"80%",background:m.from==="user"?"linear-gradient(135deg,#7c3aed,#5a1fa0)":"#f3f4f6",color:m.from==="user"?"#fff":"#1f2937",borderRadius:12,padding:"8px 12px",fontSize:13,lineHeight:1.5 }}>
+                  {m.text}
+                </div>
+              </div>
+            ))}
+            {cbLoading && (
+              <div style={{ display:"flex",justifyContent:"flex-start" }}>
+                <div style={{ background:"#f3f4f6",borderRadius:12,padding:"8px 14px",color:"#9ca3af",fontSize:13 }}>💭 En cours…</div>
+              </div>
+            )}
+            <div ref={cbEndRef} />
+          </div>
+          <div style={{ display:"flex",gap:6,padding:"8px 12px",borderTop:"1px solid #f3f4f6" }}>
+            <input value={cbInput} onChange={e=>setCbInput(e.target.value)}
+              onKeyDown={e=>e.key==="Enter"&&sendCb()}
+              placeholder="Posez votre question…"
+              style={{ flex:1,background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:20,padding:"8px 14px",color:"#1f2937",fontSize:13,outline:"none",fontFamily:"inherit" }} />
+            <button onClick={sendCb} disabled={cbLoading}
+              style={{ background:"#7c3aed",border:"none",borderRadius:"50%",width:36,height:36,color:"#fff",cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,opacity:cbLoading?.6:1 }}>➤</button>
+          </div>
+        </div>
+      )}
+
       {/* MODAL INSCRIPTION */}
       {nudge && (
         <div style={{ position:"fixed",inset:0,background:"rgba(0,0,0,.6)",backdropFilter:"blur(8px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999 }}>
@@ -397,7 +496,7 @@ export default function LiveSection() {
             </p>
             <div style={{ display:"flex",gap:10,justifyContent:"center",marginBottom:12 }}>
               <button onClick={()=>navigate("/register")} style={{ background:"linear-gradient(135deg,#7c3aed,#3b82f6)",border:"none",borderRadius:12,padding:"12px 24px",color:"#fff",fontWeight:700,cursor:"pointer" }}>S'inscrire</button>
-              <button onClick={()=>navigate("/login")}    style={{ background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:12,padding:"12px 24px",color:"#374151",fontWeight:600,cursor:"pointer" }}>Se connecter</button>
+              <button onClick={()=>navigate("/login")} style={{ background:"#f3f4f6",border:"1px solid #e5e7eb",borderRadius:12,padding:"12px 24px",color:"#374151",fontWeight:600,cursor:"pointer" }}>Se connecter</button>
             </div>
             <button onClick={()=>setNudge(false)} style={{ background:"none",border:"none",color:"#9ca3af",cursor:"pointer",fontSize:13 }}>Continuer en visiteur</button>
           </div>
@@ -413,11 +512,11 @@ const S = {
   noLive:    { display:"flex",alignItems:"center",justifyContent:"center",minHeight:320,background:"#f9fafb",borderRadius:20,border:"2px dashed #e5e7eb" },
   alert:     { display:"flex",alignItems:"center",gap:10,background:"linear-gradient(135deg,#7c3aed,#3b82f6)",color:"#fff",borderRadius:12,padding:"12px 18px",marginBottom:16,animation:"slideDown .4s ease",fontSize:14,fontWeight:500,flexWrap:"wrap" },
   alertDot:  { width:10,height:10,background:"#fca5a5",borderRadius:"50%",animation:"pulseDot 1.2s infinite",flexShrink:0 },
-  alertX:    { marginLeft:"auto",background:"none",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",fontSize:16 },
+  alertX:    { background:"none",border:"none",color:"rgba(255,255,255,.7)",cursor:"pointer",fontSize:16 },
   grid:      { display:"grid",gridTemplateColumns:"1fr 360px",gap:16 },
   preview:   { background:"linear-gradient(160deg,#0f0c29,#1a1a3e)",borderRadius:18,minHeight:280,position:"relative",overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center",border:"1px solid rgba(255,255,255,.06)" },
   liveBadge: { position:"absolute",top:12,left:12,display:"flex",alignItems:"center",gap:6,background:"rgba(239,68,68,.15)",border:"1px solid rgba(239,68,68,.4)",borderRadius:20,padding:"4px 12px",color:"#fca5a5",fontSize:11,fontWeight:800,letterSpacing:1 },
-  joinBtn:   { background:"linear-gradient(135deg,#7c3aed,#3b82f6)",border:"none",borderRadius:14,padding:"14px 0",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",width:"100%",boxShadow:"0 8px 24px rgba(124,58,237,.35)",transition:"transform .15s" },
+  joinBtn:   { background:"linear-gradient(135deg,#7c3aed,#3b82f6)",border:"none",borderRadius:14,padding:"14px 0",color:"#fff",fontSize:15,fontWeight:800,cursor:"pointer",boxShadow:"0 8px 24px rgba(124,58,237,.35)",transition:"transform .15s" },
   linkBox:   { display:"flex",alignItems:"center",gap:8,background:"#f3f4f6",borderRadius:10,padding:"8px 12px",border:"1px solid #e5e7eb" },
   copyBtn:   { background:"none",border:"none",cursor:"pointer",fontSize:16,flexShrink:0 },
   chatBox:   { background:"#fff",borderRadius:18,border:"1px solid #e5e7eb",display:"flex",flexDirection:"column",overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,.06)" },
