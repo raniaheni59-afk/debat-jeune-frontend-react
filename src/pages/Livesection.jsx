@@ -62,19 +62,61 @@ export default function LiveSection({ activeLiveLink, onLiveLinkReceived }) {
   const chatEnd   = useRef(null);
   const joinedRef = useRef(false);
 
+  // ── Obtenir un token frais si le token actuel est expiré ────────
+  const fetchFreshViewerToken = async (roomCode) => {
+    try {
+      const headers = {};
+      if (auth.token) headers["Authorization"] = `Bearer ${auth.token}`;
+      const res = await fetch(`${SOCKET_URL}/api/lives/viewer-token/${roomCode}`, { headers });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.success && data.viewerLink) {
+        localStorage.setItem("currentLiveViewerLink", data.viewerLink);
+        onLiveLinkReceived?.(data.viewerLink);
+        return data.viewerLink;
+      }
+    } catch {}
+    return null;
+  };
+
   // ── Fetch live actif ─────────────────────────────────
   const fetchActiveLive = async () => {
     try {
       const headers = {};
       if (auth.token) headers["Authorization"] = `Bearer ${auth.token}`;
       const res  = await fetch(`${SOCKET_URL}/api/lives`, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
       const active = list.find(l => l.is_active === 1 || l.is_active === true);
       if (active) {
-        // ✅ FIX: si stream_link null dans DB, essayer activeLiveLink prop ou localStorage
         const fallbackLink = activeLiveLink || localStorage.getItem("currentLiveViewerLink") || "";
-        const streamLink = active.stream_link || fallbackLink;
+        let streamLink = active.stream_link || fallbackLink;
+
+        // ✅ FIX: si stream_link existe, vérifier si le token est expiré
+        if (streamLink) {
+          try {
+            const url = new URL(streamLink);
+            const vt = url.searchParams.get("vt");
+            if (vt) {
+              // Décoder sans vérif pour voir l'expiration
+              const parts = vt.split(".");
+              if (parts.length === 3) {
+                const payload = JSON.parse(atob(parts[1]));
+                const isExpired = payload.exp && (payload.exp * 1000) < Date.now();
+                if (isExpired) {
+                  // Token expiré → demander un token frais
+                  const freshLink = await fetchFreshViewerToken(active.room_code);
+                  if (freshLink) streamLink = freshLink;
+                }
+              }
+            }
+          } catch {}
+        } else if (active.room_code) {
+          // Pas de stream_link → demander un token frais directement
+          const freshLink = await fetchFreshViewerToken(active.room_code);
+          if (freshLink) streamLink = freshLink;
+        }
 
         const liveData = {
           id:          active.id_live || active.id,
@@ -92,10 +134,12 @@ export default function LiveSection({ activeLiveLink, onLiveLinkReceived }) {
           onLiveLinkReceived?.(streamLink);
         }
       } else {
-        // ✅ FIX: si API dit pas de live actif mais on a un lien en mémoire → garder
         if (!activeLiveLink) setLive(null);
       }
-    } catch { /* garder l'état actuel */ }
+    } catch (err) {
+      console.warn("fetchActiveLive error:", err.message);
+      // Ne pas mettre setLive(null) pour garder l'état actuel si le serveur est down momentanément
+    }
     finally { setLoading(false); }
   };
 
@@ -216,7 +260,6 @@ export default function LiveSection({ activeLiveLink, onLiveLinkReceived }) {
   useEffect(() => {
     if (!live || !sockRef.current || !auth.ok || joinedRef.current) return;
 
-    // ✅ Essayer streamLink du live, puis activeLiveLink, puis localStorage
     const linkToUse = live.streamLink || activeLiveLink || localStorage.getItem("currentLiveViewerLink") || "";
     const { roomCode, vt } = extractViewerInfo(linkToUse);
     if (!roomCode || !vt) return;
@@ -228,53 +271,86 @@ export default function LiveSection({ activeLiveLink, onLiveLinkReceived }) {
       role:        "guest",
       accessToken: vt,
       email:       auth.email,
-    }, ack => {
+    }, async ack => {
       if (ack?.ok) {
         setJoined(true);
       } else {
         joinedRef.current = false;
         console.warn("join-room refusé:", ack?.message);
+        // ✅ FIX: si token expiré/invalide → demander un token frais et réessayer
+        if (ack?.message?.includes("expiré") || ack?.message?.includes("invalide")) {
+          const freshLink = await fetchFreshViewerToken(roomCode);
+          if (freshLink) {
+            setLive(prev => prev ? { ...prev, streamLink: freshLink } : prev);
+            // Réessayer join-room après court délai
+            setTimeout(() => {
+              const { roomCode: rc2, vt: vt2 } = extractViewerInfo(freshLink);
+              if (!rc2 || !vt2) return;
+              sockRef.current?.emit("join-room", {
+                roomCode: rc2, userName: auth.name,
+                role: "guest", accessToken: vt2, email: auth.email,
+              }, ack2 => {
+                if (ack2?.ok) setJoined(true);
+              });
+            }, 500);
+          }
+        }
       }
     });
   }, [live, auth.ok, activeLiveLink]);
 
   // ── Rejoindre le live en vidéo ───────────────────────
-  const joinLive = () => {
+  const joinLive = async () => {
     if (!auth.ok) { setNudge(true); return; }
 
-    // Priorité 1 : streamLink du live actuel (doit avoir ?vt=)
-    const { roomCode, vt } = extractViewerInfo(live?.streamLink);
-    if (roomCode && vt) {
-      navigate(`/meet/${roomCode}?vt=${vt}`);
-      return;
-    }
+    // Helper: vérifier si un token JWT est expiré
+    const isExpired = (vt) => {
+      try {
+        const payload = JSON.parse(atob(vt.split(".")[1]));
+        return payload.exp && (payload.exp * 1000) < Date.now();
+      } catch { return true; }
+    };
 
-    // Priorité 2 : activeLiveLink passé depuis JeuneLayout (le plus frais)
-    if (activeLiveLink) {
-      const { roomCode: rc2, vt: v2 } = extractViewerInfo(activeLiveLink);
-      if (rc2 && v2) {
-        navigate(`/meet/${rc2}?vt=${v2}`);
+    // Tous les liens candidats par priorité
+    const candidates = [
+      live?.streamLink,
+      activeLiveLink,
+      localStorage.getItem("currentLiveViewerLink"),
+    ].filter(Boolean);
+
+    for (const link of candidates) {
+      const { roomCode, vt } = extractViewerInfo(link);
+      if (!roomCode || !vt) continue;
+
+      if (!isExpired(vt)) {
+        // Token valide → naviguer directement
+        navigate(`/meet/${roomCode}?vt=${vt}`);
         return;
+      }
+
+      // Token expiré → obtenir un token frais
+      const freshLink = await fetchFreshViewerToken(roomCode);
+      if (freshLink) {
+        const { roomCode: rc2, vt: vt2 } = extractViewerInfo(freshLink);
+        if (rc2 && vt2) {
+          navigate(`/meet/${rc2}?vt=${vt2}`);
+          return;
+        }
       }
     }
 
-    // Priorité 3 : lien sauvegardé dans localStorage
-    const storedLink = localStorage.getItem("currentLiveViewerLink");
-    if (storedLink) {
-      const { roomCode: rc, vt: v } = extractViewerInfo(storedLink);
-      if (rc && v) {
-        navigate(`/meet/${rc}?vt=${v}`);
-        return;
-      }
-    }
-
-    // Priorité 4 : si on a le roomCode mais pas le vt → aller quand même
+    // Dernier recours: roomCode seul → obtenir token frais
     if (live?.roomCode) {
+      const freshLink = await fetchFreshViewerToken(live.roomCode);
+      if (freshLink) {
+        const { roomCode: rc, vt } = extractViewerInfo(freshLink);
+        if (rc && vt) { navigate(`/meet/${rc}?vt=${vt}`); return; }
+      }
       navigate(`/meet/${live.roomCode}`);
       return;
     }
 
-    alert("Lien de live indisponible. L'admin n'a pas encore démarré la salle.");
+    alert("Le live n'est plus actif ou le lien est introuvable.");
   };
 
   // ── Chat ─────────────────────────────────────────────
