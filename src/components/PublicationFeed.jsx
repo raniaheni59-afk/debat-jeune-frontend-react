@@ -23,6 +23,29 @@ export default function PublicationFeed() {
     fetchPublications();
   }, [fetchPublications]);
 
+  // Listen for new publications via socket.io and auto-refresh
+  useEffect(() => {
+    let socket = null;
+    try {
+      const { io } = require("socket.io-client");
+      const baseURL = api.defaults?.baseURL || "";
+      const BACKEND_URL = baseURL.replace(/\/api\/?$/, "").replace(/\/$/, "") || "";
+      const token = localStorage.getItem("token");
+      socket = io(BACKEND_URL, {
+        auth: { token },
+        transports: ["websocket"],
+        reconnectionAttempts: 3,
+      });
+      socket.on("new_publication", () => {
+        fetchPublications();
+      });
+      socket.on("update_publication", () => {
+        fetchPublications();
+      });
+    } catch {}
+    return () => { try { socket?.disconnect(); } catch {} };
+  }, [fetchPublications]);
+
   // called when a card is updated/deleted — re-fetch silently
   const handleUpdate = useCallback(() => {
     fetchPublications();
