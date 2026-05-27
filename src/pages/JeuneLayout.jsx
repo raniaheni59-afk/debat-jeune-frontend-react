@@ -915,33 +915,156 @@ const JeuneLayout = () => {
         );
 
       /* ── NOTIFICATIONS ── */
-      case PAGES.NOTIFS:
+      case PAGES.NOTIFS: {
+        const BACK_URL = BACKEND;
+        const getNotifIcon = (type) => ({
+          new_post: "📢",
+          publication_comment: "💬",
+          publication_reaction: "❤️",
+          debat_vote: "⚖️",
+          comment_reaction: "👍",
+          live_started: "🔴",
+          enquete_response: "📋",
+        }[type] || "🔔");
+
+        const getNotifBg = (type, isRead) => {
+          if (type === "live_started") return isRead ? "#fff9f0" : "#fff3e0";
+          return isRead ? "white" : "#f0f3ff";
+        };
+
+        const timeAgoFmt = (date) => {
+          const diff = Date.now() - new Date(date).getTime();
+          const mins  = Math.floor(diff / 60000);
+          const hours = Math.floor(diff / 3600000);
+          const days  = Math.floor(diff / 86400000);
+          if (mins < 1)   return "À l'instant";
+          if (mins < 60)  return `Il y a ${mins} min`;
+          if (hours < 24) return `Il y a ${hours}h`;
+          return `Il y a ${days}j`;
+        };
+
+        const handleNotifClick = async (n) => {
+          // Live notification → navigate to live
+          if (n.type_notification === "live_started" || n._liveLink || n._roomCode) {
+            if (!n.is_read) { try { await API.put(`/notifications/${n.id_notification}/read`); } catch {} }
+            const liveLink = n._liveLink;
+            if (liveLink) {
+              try {
+                const url   = new URL(liveLink);
+                const parts = url.pathname.split("/").filter(Boolean);
+                const rc    = parts[parts.length - 1];
+                const vt    = url.searchParams.get("vt");
+                if (rc && vt) { navigate(`/meet/${rc}?vt=${vt}`); return; }
+              } catch {}
+            }
+            if (n._roomCode) { navigate(`/meet/${n._roomCode}`); return; }
+            goTo(PAGES.LIVE);
+            return;
+          }
+          // Enquête → go to enquetes
+          if (n.type_notification === "enquete_response") {
+            await markNotifRead(n.id_notification || n);
+            goTo(PAGES.ENQUETE);
+            return;
+          }
+          // Publication/commentaire/réaction → markRead then navigate
+          await markNotifRead(n);
+        };
+
         return (
           <div className="jl-page">
-            <h2 className="jl-section-title"><Icon name="bell" size={18}/> Notifications</h2>
+            {/* Header */}
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:20, flexWrap:"wrap", gap:10 }}>
+              <h2 className="jl-section-title" style={{ margin:0 }}>
+                <Icon name="bell" size={18}/> Notifications
+                {unreadNotifs > 0 && (
+                  <span style={{ marginLeft:10, background:"#7c3aed", color:"white", borderRadius:20, padding:"2px 10px", fontSize:13, fontWeight:600 }}>
+                    {unreadNotifs}
+                  </span>
+                )}
+              </h2>
+              {unreadNotifs > 0 && (
+                <button
+                  onClick={async () => {
+                    try { await API.put("/notifications/read-all"); await fetchNotifications(); } catch {}
+                  }}
+                  style={{ background:"none", border:"1px solid #7c3aed", borderRadius:20, padding:"6px 14px", color:"#7c3aed", cursor:"pointer", fontSize:13, fontWeight:500 }}>
+                  Tout lire
+                </button>
+              )}
+            </div>
+
+            {/* Liste */}
             {notifications.length === 0 ? (
               <div className="jl-empty">
                 <span className="jl-empty-icon">🔔</span>
                 <p>Aucune notification pour le moment</p>
+                <p style={{ fontSize:13, color:"#aaa" }}>Vous serez notifié des nouvelles activités</p>
               </div>
-            ) : notifications.map((n, i) => (
-              <div key={n.id_notification}
-                className={`jl-notif-item${n.is_read ? "" : " unread"}`}
-                style={{ animationDelay:`${i * 0.06}s` }}
-                onClick={() => markNotifRead(n)}>
-                <div className="jl-notif-icon">
-                  {n.type_notification==="new_post" ? "📝"
-                  :n.type_notification==="publication_comment" ? "💬" : "🔔"}
-                </div>
-                <div style={{ flex:1 }}>
-                  <p className="jl-notif-msg">{n.message}</p>
-                  <p className="jl-notif-time">{new Date(n.created_at).toLocaleString("fr-FR")}</p>
-                </div>
-                {!n.is_read && <span className="jl-notif-dot"/>}
+            ) : (
+              <div style={{ background:"white", borderRadius:16, boxShadow:"0 2px 12px rgba(0,0,0,.07)", overflow:"hidden" }}>
+                {notifications.map((n, i) => (
+                  <div
+                    key={n.id_notification}
+                    onClick={() => handleNotifClick(n)}
+                    style={{
+                      display:"flex", alignItems:"center", gap:13, padding:"15px 18px",
+                      cursor:"pointer",
+                      background: getNotifBg(n.type_notification, n.is_read),
+                      borderBottom: i < notifications.length - 1 ? "1px solid #f0f0f0" : "none",
+                      transition:"background .2s",
+                      borderLeft: n.type_notification === "live_started" ? "3px solid #ef4444" : "3px solid transparent",
+                      animationDelay:`${i * 0.05}s`,
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background="#f8f5ff"}
+                    onMouseLeave={e => e.currentTarget.style.background=getNotifBg(n.type_notification, n.is_read)}
+                  >
+                    {/* Avatar */}
+                    <div style={{ position:"relative", flexShrink:0 }}>
+                      {n.type_notification === "live_started" ? (
+                        <div style={{ width:44, height:44, borderRadius:"50%", background:"linear-gradient(135deg,#7c3aed,#ef4444)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:18 }}>
+                          🔴
+                        </div>
+                      ) : (
+                        <img
+                          src={n.photo_user ? `${BACK_URL}/${n.photo_user}` : "https://randomuser.me/api/portraits/lego/1.jpg"}
+                          alt="user"
+                          style={{ width:44, height:44, borderRadius:"50%", objectFit:"cover", border:"2px solid #e8e8f0" }}
+                          onError={e => e.target.src="https://randomuser.me/api/portraits/lego/1.jpg"}
+                        />
+                      )}
+                      <span style={{ position:"absolute", bottom:-2, right:-2, background:"white", borderRadius:"50%", width:19, height:19, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, boxShadow:"0 1px 4px rgba(0,0,0,.15)" }}>
+                        {getNotifIcon(n.type_notification)}
+                      </span>
+                    </div>
+
+                    {/* Texte */}
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <p style={{ margin:0, fontSize:14, color:"#1a1a2e", lineHeight:1.4 }}>
+                        {n.nom_user && <strong>{n.nom_user} {n.prenom_user} </strong>}
+                        <span style={{ color:"#555" }}>{n.message}</span>
+                      </p>
+                      <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:4 }}>
+                        <span style={{ fontSize:12, color:"#999" }}>{timeAgoFmt(n.created_at)}</span>
+                        {n.type_notification === "live_started" && (
+                          <span style={{ fontSize:11, background:"#fef2f2", color:"#ef4444", padding:"2px 7px", borderRadius:20, fontWeight:700 }}>
+                            🔴 LIVE
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dot non lu */}
+                    {!n.is_read && (
+                      <div style={{ width:10, height:10, borderRadius:"50%", background:"#7c3aed", flexShrink:0 }}/>
+                    )}
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         );
+      }
 
       /* ── PUBLIER ── */
       case PAGES.PUBLIER:

@@ -244,9 +244,72 @@ export default function AdminDashboard() {
 
   // ── Notifications real-time ──
   const [adminNotifs, setAdminNotifs] = useState([]);
-  const adminUnread = 0;
-  const markNotifRead = () => {};
-  const markAllNotifsRead = () => {};
+  const [adminUnread, setAdminUnread] = useState(0);
+
+  const fetchAdminNotifs = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await API.get("/notifications", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const list = Array.isArray(res.data) ? res.data : [];
+      setAdminNotifs(list);
+      setAdminUnread(list.filter((n) => n.is_read == 0 || n.is_read === false).length);
+    } catch {}
+  }, []);
+
+  const markNotifRead = useCallback(async (id) => {
+    try {
+      const token = localStorage.getItem("token");
+      await API.put(`/notifications/${id}/read`, {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAdminNotifs((prev) =>
+        prev.map((n) => n.id_notification === id ? { ...n, is_read: 1 } : n)
+      );
+      setAdminUnread((c) => Math.max(0, c - 1));
+    } catch {}
+  }, []);
+
+  const markAllNotifsRead = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      await API.put("/notifications/read-all", {}, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAdminNotifs((prev) => prev.map((n) => ({ ...n, is_read: 1 })));
+      setAdminUnread(0);
+    } catch {}
+  }, []);
+
+  // Fetch on mount + real-time socket updates
+  useEffect(() => {
+    fetchAdminNotifs();
+    const interval = setInterval(fetchAdminNotifs, 30000);
+    return () => clearInterval(interval);
+  }, [fetchAdminNotifs]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      const d = e.detail;
+      if (!d) return;
+      setAdminNotifs((prev) => [{
+        id_notification: d.id_notification || `live-${Date.now()}`,
+        type_notification: d.type_notification || "new_post",
+        message: d.message || "Nouvelle activité",
+        created_at: d.created_at || new Date().toISOString(),
+        is_read: 0,
+        nom_user: d.nom_user || "",
+        prenom_user: d.prenom_user || "",
+        photo_user: d.photo_user || null,
+        entity_id: d.entity_id || null,
+        entity_type: d.entity_type || null,
+      }, ...prev]);
+      setAdminUnread((c) => c + 1);
+    };
+    window.addEventListener("new_notification", handler);
+    return () => window.removeEventListener("new_notification", handler);
+  }, []);
 
   // ── Socket géré dans App.jsx ──
   const [addChartModal, setAddChartModal] = useState(false);
@@ -1219,7 +1282,21 @@ const navItems = [
 {/* ══════ NOTIFICATION PAGE ══════ */}
 {activePage === "notification" && !isFullPage && (() => {
   const BACK = (typeof API !== "undefined" && API.defaults?.baseURL?.split("/api")[0]) || "https://debat-jeune.onrender.com";
-  const getIcon = (type) => ({ new_post:"📢", publication_comment:"💬", publication_reaction:"❤️", debat_vote:"⚖️", comment_reaction:"👍" }[type] || "🔔");
+  const getIcon = (type) => ({
+    new_post: "📢",
+    publication_comment: "💬",
+    publication_reaction: "❤️",
+    debat_vote: "⚖️",
+    comment_reaction: "👍",
+    live_started: "🔴",
+    enquete_response: "📋",
+  }[type] || "🔔");
+
+  const getBg = (type, isRead) => {
+    if (type === "live_started") return (isRead == 1) ? "#fff9f0" : "#fff3e0";
+    return (isRead == 1) ? "#fff" : "#f4f0ff";
+  };
+
   const timeAgo = (date) => {
     const d = Math.floor((Date.now() - new Date(date)) / 1000);
     if (d < 60) return "À l'instant";
@@ -1227,47 +1304,124 @@ const navItems = [
     if (d < 86400) return `Il y a ${Math.floor(d/3600)}h`;
     return `Il y a ${Math.floor(d/86400)}j`;
   };
+
+  const handleNotifClick = async (n) => {
+    await markNotifRead(n.id_notification);
+    // Live notification → aller au live
+    if (n.type_notification === "live_started") {
+      setActivePage("live");
+      return;
+    }
+    // Publication/commentaire/réaction → aller à accueil et scroller
+    const isPubNotif = n.entity_id && (
+      n.entity_type === "publication" ||
+      ["new_post","publication_comment","publication_reaction","debat_vote","comment_reaction"].includes(n.type_notification)
+    );
+    if (isPubNotif) {
+      setActivePage("accueil");
+      setTimeout(() => {
+        const el = document.getElementById(`pub-${n.entity_id}`);
+        if (el) el.scrollIntoView({ behavior:"smooth", block:"center" });
+      }, 400);
+    }
+    // Enquête → aller à enquêtes
+    if (n.type_notification === "enquete_response") {
+      setActivePage("enquetes");
+    }
+  };
+
   return (
     <div style={{ marginLeft: sidebarVisible ? 240 : 0, transition:"margin-left .5s cubic-bezier(.4,0,.2,1)", minHeight:"100vh", padding:"30px 40px 80px", boxSizing:"border-box" }}>
+      {/* Header */}
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:28, flexWrap:"wrap", gap:12 }}>
         <div style={{ display:"flex", alignItems:"center", gap:14 }}>
           <div style={{ width:48, height:48, borderRadius:14, background:"linear-gradient(135deg,#5a3fa0,#7c5cbf)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22 }}>🔔</div>
           <div>
             <h1 style={{ fontFamily:"Poppins,sans-serif", fontSize:22, fontWeight:800, color:"#fff", margin:0 }}>
-              Notifications {adminUnread > 0 && <span style={{ marginLeft:8, background:"#e74c3c", color:"#fff", fontSize:12, fontWeight:700, padding:"3px 10px", borderRadius:20 }}>{adminUnread}</span>}
+              Notifications
+              {adminUnread > 0 && (
+                <span style={{ marginLeft:8, background:"#e74c3c", color:"#fff", fontSize:12, fontWeight:700, padding:"3px 10px", borderRadius:20 }}>
+                  {adminUnread}
+                </span>
+              )}
             </h1>
-            <p style={{ color:"rgba(255,255,255,.65)", fontSize:13, margin:0 }}>{adminUnread > 0 ? `${adminUnread} non lue(s)` : "Tout est à jour"}</p>
+            <p style={{ color:"rgba(255,255,255,.65)", fontSize:13, margin:0 }}>
+              {adminUnread > 0 ? `${adminUnread} non lue(s)` : "Tout est à jour ✓"}
+            </p>
           </div>
         </div>
-        {adminUnread > 0 && <button onClick={markAllNotifsRead} style={{ padding:"10px 22px", borderRadius:12, border:"1.5px solid rgba(255,255,255,.3)", background:"rgba(255,255,255,.1)", color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", backdropFilter:"blur(8px)" }}>✓ Tout marquer lu</button>}
+        <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+          {adminUnread > 0 && (
+            <button onClick={markAllNotifsRead} style={{ padding:"10px 22px", borderRadius:12, border:"1.5px solid rgba(255,255,255,.3)", background:"rgba(255,255,255,.1)", color:"#fff", fontSize:13, fontWeight:600, cursor:"pointer", backdropFilter:"blur(8px)", transition:"background .2s" }}
+              onMouseEnter={e => e.currentTarget.style.background="rgba(255,255,255,.2)"}
+              onMouseLeave={e => e.currentTarget.style.background="rgba(255,255,255,.1)"}>
+              ✓ Tout marquer lu
+            </button>
+          )}
+          <button onClick={fetchAdminNotifs} title="Actualiser" style={{ width:40, height:40, borderRadius:12, border:"1.5px solid rgba(255,255,255,.3)", background:"rgba(255,255,255,.1)", color:"#fff", fontSize:16, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center" }}>
+            🔄
+          </button>
+        </div>
       </div>
+
+      {/* Liste */}
       <div style={{ background:"rgba(255,255,255,.93)", borderRadius:20, overflow:"hidden", boxShadow:"0 4px 24px rgba(100,70,180,.12)", border:"1px solid rgba(255,255,255,.5)" }}>
         {adminNotifs.length === 0 ? (
           <div style={{ textAlign:"center", padding:"70px 20px", color:"#aaa" }}>
             <div style={{ fontSize:52, marginBottom:12 }}>🔔</div>
             <p style={{ fontSize:16, fontWeight:600, color:"#555" }}>Aucune notification</p>
-            <p style={{ fontSize:13, color:"#999", marginTop:6 }}>Vous serez notifié des nouvelles activités</p>
+            <p style={{ fontSize:13, color:"#999", marginTop:6 }}>Vous serez notifié des nouvelles activités des membres</p>
           </div>
         ) : adminNotifs.map((n, idx) => (
-          <div key={n.id_notification} onClick={() => { markNotifRead(n.id_notification); if (n.entity_id) { setActivePage("accueil"); setTimeout(() => { const el = document.getElementById(`pub-${n.entity_id}`); if (el) el.scrollIntoView({ behavior:"smooth", block:"center" }); }, 400); } }}
-            style={{ display:"flex", alignItems:"center", gap:14, padding:"16px 22px", background: n.is_read == 0 ? "#f4f0ff" : "#fff", borderBottom: idx < adminNotifs.length-1 ? "1px solid #f0eef5" : "none", cursor:"pointer", transition:"background .2s" }}
+          <div key={n.id_notification}
+            onClick={() => handleNotifClick(n)}
+            style={{
+              display:"flex", alignItems:"center", gap:14, padding:"16px 22px",
+              background: getBg(n.type_notification, n.is_read),
+              borderBottom: idx < adminNotifs.length-1 ? "1px solid #f0eef5" : "none",
+              cursor:"pointer", transition:"background .2s",
+              borderLeft: n.type_notification === "live_started" ? "3px solid #ef4444" : "3px solid transparent",
+            }}
             onMouseEnter={e => e.currentTarget.style.background="#f8f5ff"}
-            onMouseLeave={e => e.currentTarget.style.background= n.is_read == 0 ? "#f4f0ff" : "#fff"}
+            onMouseLeave={e => e.currentTarget.style.background=getBg(n.type_notification, n.is_read)}
           >
+            {/* Avatar */}
             <div style={{ position:"relative", flexShrink:0 }}>
-              <img src={n.photo_user ? `${BACK}/${n.photo_user}` : "https://randomuser.me/api/portraits/lego/1.jpg"} alt="user"
-                style={{ width:46, height:46, borderRadius:"50%", objectFit:"cover", border:"2px solid #e8e5f0" }}
-                onError={e => e.target.src="https://randomuser.me/api/portraits/lego/1.jpg"} />
-              <span style={{ position:"absolute", bottom:-2, right:-2, background:"#fff", borderRadius:"50%", width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, boxShadow:"0 1px 4px rgba(0,0,0,.15)" }}>{getIcon(n.type_notification)}</span>
+              {n.type_notification === "live_started" ? (
+                <div style={{ width:46, height:46, borderRadius:"50%", background:"linear-gradient(135deg,#7c3aed,#ef4444)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:20 }}>🔴</div>
+              ) : (
+                <img
+                  src={n.photo_user ? `${BACK}/${n.photo_user}` : "https://randomuser.me/api/portraits/lego/1.jpg"}
+                  alt="user"
+                  style={{ width:46, height:46, borderRadius:"50%", objectFit:"cover", border:"2px solid #e8e5f0" }}
+                  onError={e => e.target.src="https://randomuser.me/api/portraits/lego/1.jpg"}
+                />
+              )}
+              <span style={{ position:"absolute", bottom:-2, right:-2, background:"#fff", borderRadius:"50%", width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center", fontSize:11, boxShadow:"0 1px 4px rgba(0,0,0,.15)" }}>
+                {getIcon(n.type_notification)}
+              </span>
             </div>
+
+            {/* Texte */}
             <div style={{ flex:1, minWidth:0 }}>
               <p style={{ margin:0, fontSize:14, color:"#1a1a2e", lineHeight:1.45 }}>
                 {n.nom_user && <strong>{n.nom_user} {n.prenom_user} </strong>}
                 <span style={{ color:"#555" }}>{n.message}</span>
               </p>
-              <span style={{ fontSize:12, color:"#999", marginTop:3, display:"block" }}>{timeAgo(n.created_at)}</span>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginTop:3 }}>
+                <span style={{ fontSize:12, color:"#999" }}>{timeAgo(n.created_at)}</span>
+                {n.type_notification === "live_started" && (
+                  <span style={{ fontSize:11, background:"#fef2f2", color:"#ef4444", padding:"2px 8px", borderRadius:20, fontWeight:700 }}>
+                    🔴 LIVE
+                  </span>
+                )}
+              </div>
             </div>
-            {n.is_read == 0 && <div style={{ width:10, height:10, borderRadius:"50%", background:"#7c5cbf", flexShrink:0 }} />}
+
+            {/* Dot non lu */}
+            {(n.is_read == 0 || n.is_read === false) && (
+              <div style={{ width:10, height:10, borderRadius:"50%", background:"#7c5cbf", flexShrink:0 }}/>
+            )}
           </div>
         ))}
       </div>
