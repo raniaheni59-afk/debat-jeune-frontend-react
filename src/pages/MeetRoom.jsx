@@ -366,43 +366,51 @@ export default function MeetRoom() {
 
       sock.on("connect_error", err => console.error("Socket error:", err.message));
 
-      // ✅ FIX CRITIQUE: quand on rejoint, envoyer offres aux peers déjà présents
-      // L'admin attend que le stream local soit prêt avant d'envoyer les offres
+      // ── all-users: liste des gens déjà dans la room ──────────
+      // ✅ RÈGLE FONDAMENTALE: seul l'admin envoie des offers WebRTC
+      // Le guest NE crée JAMAIS de peer ici — il attend l'offer de l'admin
       sock.on("all-users", users => {
-        for (const u of users) {
-          if (u.socketId === sock.id) continue;
+        const others = users.filter(u => u.socketId !== sock.id);
+        others.forEach(u => {
           nameMap.current[u.socketId]  = u.userName;
           roleMap.current[u.socketId]  = u.role;
           emailMap.current[u.socketId] = u.email || "";
-        }
-        // ✅ Admin envoie offres après 800ms — laisse getUserMedia finir
+        });
         if (myRole === "host") {
-          const targets = users.filter(u => u.socketId !== sock.id);
-          targets.forEach((u, i) => {
-            setTimeout(() => createOfferForPeer(u.socketId), 800 + i * 200);
+          // Envoyer une offer à chaque guest — délai échelonné pour éviter la surcharge
+          // 800ms de base + 250ms par participant pour laisser le temps aux streams
+          others.forEach((u, i) => {
+            setTimeout(() => {
+              if (sockRef.current?.connected) createOfferForPeer(u.socketId);
+            }, 800 + i * 250);
           });
         }
-        // ✅ Guest ne crée PAS de peer ici — attend l'offre de l'admin
+        // ✅ Guest: ne fait RIEN ici — attend l'offer de l'admin
       });
 
+      // ── Nouveau participant rejoint ────────────────────────
       sock.on("user-joined", ({ socketId, userName:n, role, email }) => {
         nameMap.current[socketId]  = n;
         roleMap.current[socketId]  = role;
         emailMap.current[socketId] = email || "";
         showToast(`👋 ${n} a rejoint`, "#34a853");
-        // ✅ Admin envoie offre avec délai — stream doit être initialisé côté guest
+        // ✅ Seul l'admin envoie l'offer — délai 700ms pour laisser le guest finir son getUserMedia
         if (myRole === "host") {
-          setTimeout(() => createOfferForPeer(socketId), 600);
+          setTimeout(() => {
+            if (sockRef.current?.connected) createOfferForPeer(socketId);
+          }, 700);
         }
+        // ✅ Guest ne fait RIEN — attend l'offer de l'admin
       });
 
-      // ✅ FIX: host-joined — mettre à jour les maps, NE PAS créer de peer
-      // L'admin enverra une offre via user-joined qu'il reçoit simultanément
+      // ── Admin rejoint la room ──────────────────────────────
+      // ✅ Le guest met à jour ses maps SEULEMENT — l'admin enverra son offer
+      // via l'événement user-joined qu'il reçoit de son côté
       sock.on("host-joined", ({ socketId, userName:n }) => {
         nameMap.current[socketId] = n;
         roleMap.current[socketId] = "host";
         showToast(`👑 ${n} (Admin) a rejoint`, "#1a73e8");
-        // ✅ NE PAS créer de peer ici — l'admin envoie l'offre, pas le guest
+        // ✅ NE PAS créer de peer ni envoyer d'offer — l'admin le fera
       });
 
       sock.on("offer", async ({ caller, sdp }) => {
