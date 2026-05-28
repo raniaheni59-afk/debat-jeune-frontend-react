@@ -232,6 +232,39 @@
 }
 .register-login-link a:hover { border-color: #fff; }
 
+/* PARENT SECTION */
+.parent-section {
+  grid-column: 1 / -1;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 14px;
+  padding: 16px 18px 12px;
+  margin: 4px 0 4px;
+  animation: fadeIn 0.35s ease;
+}
+
+.parent-section-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: rgba(255, 255, 255, 0.95);
+  margin-bottom: 12px;
+  letter-spacing: 0.4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.parent-section .register-form-grid {
+  gap: 10px;
+}
+
+/* DELEGATION CUSTOM INPUT (shown when "Autre" selected) */
+.input-group input.delegation-custom {
+  margin-top: 8px;
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.2);
+}
+
 @media (max-width: 768px) {
   .register-main-layout { grid-template-columns: 1fr; }
   .register-brand-side  { display: none; }
