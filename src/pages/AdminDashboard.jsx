@@ -1272,8 +1272,18 @@ const navItems = [
       background: "linear-gradient(135deg, #f5f2ff 0%, #ede9ff 100%)",
     }}
   >
-    <PublierPage onBack={async () => {
+    <PublierPage onBack={async (newPublication) => {
       await fetchPublications(); // refresh le feed
+      // ── Notifier tous les jeunes de la nouvelle publication ──
+      if (newPublication?.id_publication || newPublication?.id) {
+        try {
+          await API.post("/notifications/hook/new-publication", {
+            publicationId: newPublication.id_publication || newPublication.id,
+            adminId: user?.id_user || user?.id,
+            title: newPublication.titre_publication || newPublication.title || "Nouvelle publication",
+          });
+        } catch {}
+      }
       setActivePage("accueil");  // retour à accueil (moch dashboard)
     }} />
   </div>

@@ -224,7 +224,7 @@ export default function Register() {
                 {showParentForm && (
                   <div className="parent-section full-width">
                     <div className="parent-section-title">
-                      👨‍👩‍👦 Informations du Parent / Tuteur
+                       Informations du Parent / Tuteur
                     </div>
                     <div className="register-form-grid" style={{ padding: 0, marginTop: 12 }}>
 
@@ -271,7 +271,7 @@ export default function Register() {
                           name="tel_parent"
                           value={form.tel_parent}
                           onChange={handleChange}
-                          placeholder="Ex: 55 123 456"
+                          placeholder=""
                           type="tel"
                           required={isMineur}
                         />

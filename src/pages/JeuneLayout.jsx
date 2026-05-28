@@ -717,6 +717,18 @@ const JeuneLayout = () => {
     socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
     socketRef.current.on("new_message", () => setUnreadMessages((n) => n + 1));
 
+    // ✅ Notification générale (publication, commentaire, réaction, enquête)
+    socketRef.current.on("new_notification", (notif) => {
+      // Ignorer les live_started ici — géré séparément dans live-started
+      if (notif?.type_notification === "live_started") return;
+      setNotifications((prev) => {
+        // Éviter les doublons
+        if (prev.some(n => n.id_notification === notif.id_notification)) return prev;
+        return [{ ...notif, is_read: false }, ...prev];
+      });
+      setUnreadNotifs((n) => n + 1);
+    });
+
     // ✅ Notification live en temps réel
     socketRef.current.on("live-started", (data) => {
       const { viewerLink, title, roomCode } = data;
