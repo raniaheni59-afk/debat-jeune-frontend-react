@@ -253,8 +253,16 @@ export default function AdminDashboard() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const list = Array.isArray(res.data) ? res.data : [];
-      setAdminNotifs(list);
-      setAdminUnread(list.filter((n) => n.is_read == 0 || n.is_read === false).length);
+      // Fusionner avec les notifs real-time (socket) sans écraser les non-persistées
+      setAdminNotifs(prev => {
+        const dbIds = new Set(list.map(n => n.id_notification));
+        const liveOnly = prev.filter(n => !dbIds.has(n.id_notification));
+        return [...liveOnly, ...list];
+      });
+      setAdminUnread(prev => {
+        const dbUnread = list.filter(n => n.is_read == 0 || n.is_read === false).length;
+        return dbUnread;
+      });
     } catch {}
   }, []);
 
@@ -293,18 +301,23 @@ export default function AdminDashboard() {
     const handler = (e) => {
       const d = e.detail;
       if (!d) return;
-      setAdminNotifs((prev) => [{
-        id_notification: d.id_notification || `live-${Date.now()}`,
+      const newNotif = {
+        id_notification:   d.id_notification || `rt-${Date.now()}`,
         type_notification: d.type_notification || "new_post",
-        message: d.message || "Nouvelle activité",
+        message:    d.message    || "Nouvelle activité",
         created_at: d.created_at || new Date().toISOString(),
-        is_read: 0,
-        nom_user: d.nom_user || "",
-        prenom_user: d.prenom_user || "",
+        is_read:    0,
+        nom_user:   d.nom_user   || "",
+        prenom_user:d.prenom_user|| "",
         photo_user: d.photo_user || null,
-        entity_id: d.entity_id || null,
-        entity_type: d.entity_type || null,
-      }, ...prev]);
+        entity_id:  d.entity_id  || null,
+        entity_type:d.entity_type|| null,
+      };
+      setAdminNotifs((prev) => {
+        // Éviter les duplicates si déjà dans la liste
+        if (prev.some(n => n.id_notification === newNotif.id_notification)) return prev;
+        return [newNotif, ...prev];
+      });
       setAdminUnread((c) => c + 1);
     };
     window.addEventListener("new_notification", handler);
@@ -1316,37 +1329,48 @@ const navItems = [
   };
 
   const handleNotifClick = async (n) => {
-    await markNotifRead(n.id_notification);
+    // Marquer lu localement (UX immédiat)
+    setAdminNotifs(prev => prev.map(x => x.id_notification === n.id_notification ? {...x, is_read: 1} : x));
+    setAdminUnread(prev => Math.max(0, prev - (n.is_read == 1 ? 0 : 1)));
+    try { await markNotifRead(n.id_notification); } catch {}
 
-    // 1. Live → aller au live
-    if (n.type_notification === "live_started") {
+    const type = n.type_notification;
+
+    // 1. Live → page live
+    if (type === "live_started") {
       setActivePage("live");
       return;
     }
 
-    // 2. Enquête → aller à enquêtes
-    if (n.type_notification === "enquete_response") {
+    // 2. Enquête → page enquêtes
+    if (type === "enquete_response") {
       setActivePage("enquetes");
       return;
     }
 
-    // 3. Publication/commentaire/réaction → accueil + scroll
-    const isPubNotif = n.entity_id && (
-      n.entity_type === "publication" ||
-      ["new_post","publication_comment","publication_reaction","debat_vote","comment_reaction"].includes(n.type_notification)
-    );
-    if (isPubNotif) {
+    // 3. Publication/commentaire/réaction → accueil + scroll + highlight
+    const isPubType = ["new_post","publication_comment","publication_reaction","debat_vote","comment_reaction"].includes(type);
+    if (isPubType && n.entity_id) {
       setActivePage("accueil");
-      setTimeout(() => {
-        const el = document.getElementById(`pub-${n.entity_id}`);
+      const pubId = String(n.entity_id);
+      // Retry scroll jusqu'à ce que l'élément existe dans le DOM
+      const tryScroll = (attempts = 0) => {
+        const el = document.getElementById(`pub-${pubId}`);
         if (el) {
-          el.scrollIntoView({ behavior:"smooth", block:"center" });
-          // highlight visuel
-          el.style.outline = "3px solid #7c3aed";
-          el.style.borderRadius = "12px";
-          setTimeout(() => { el.style.outline = "none"; }, 2500);
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.style.transition = "box-shadow .4s, outline .4s";
+          el.style.outline    = "3px solid #7c3aed";
+          el.style.boxShadow  = "0 0 0 4px rgba(124,58,237,.25)";
+          el.style.borderRadius = "14px";
+          setTimeout(() => {
+            el.style.outline   = "none";
+            el.style.boxShadow = "";
+          }, 2800);
+        } else if (attempts < 12) {
+          setTimeout(() => tryScroll(attempts + 1), 300);
         }
-      }, 500);
+      };
+      setTimeout(() => tryScroll(), 400);
       return;
     }
   };

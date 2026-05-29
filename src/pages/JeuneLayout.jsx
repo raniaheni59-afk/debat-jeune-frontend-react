@@ -956,20 +956,23 @@ const JeuneLayout = () => {
         };
 
         const handleNotifClick = async (n) => {
-          // Marquer comme lu
           const notifId = n.id_notification;
+          const type    = n.type_notification;
+
+          // Marquer comme lu immédiatement (UX)
           if (!n.is_read && notifId && !String(notifId).startsWith("live-")) {
-            try { await API.put(`/notifications/${notifId}/read`); } catch {}
-            setNotifications(prev => prev.map(x => x.id_notification === notifId ? { ...x, is_read: 1 } : x));
+            setNotifications(prev => prev.map(x =>
+              x.id_notification === notifId ? { ...x, is_read: 1 } : x
+            ));
             setUnreadNotifs(c => Math.max(0, c - 1));
+            try { await API.put(`/notifications/${notifId}/read`); } catch {}
           }
 
-          // 1. Live notification → navigate to live
-          if (n.type_notification === "live_started" || n._liveLink || n._roomCode) {
-            const liveLink = n._liveLink;
-            if (liveLink) {
+          // 1. LIVE → naviguer vers le live
+          if (type === "live_started" || n._liveLink || n._roomCode) {
+            if (n._liveLink) {
               try {
-                const url   = new URL(liveLink);
+                const url   = new URL(n._liveLink);
                 const parts = url.pathname.split("/").filter(Boolean);
                 const rc    = parts[parts.length - 1];
                 const vt    = url.searchParams.get("vt");
@@ -977,39 +980,58 @@ const JeuneLayout = () => {
               } catch {}
             }
             if (n._roomCode) { navigate(`/meet/${n._roomCode}`); return; }
+            // Chercher live actif depuis API
+            try {
+              const res = await API.get("/lives");
+              const live = Array.isArray(res.data) ? res.data.find(l => l.is_active) : null;
+              if (live?.stream_link) {
+                const url   = new URL(live.stream_link);
+                const parts = url.pathname.split("/").filter(Boolean);
+                const rc    = parts[parts.length - 1];
+                const vt    = url.searchParams.get("vt");
+                if (rc && vt) { navigate(`/meet/${rc}?vt=${vt}`); return; }
+              }
+              if (live?.room_code) { navigate(`/meet/${live.room_code}`); return; }
+            } catch {}
             goTo(PAGES.LIVE);
             return;
           }
 
-          // 2. Enquête → go to enquetes
-          if (n.type_notification === "enquete_response") {
+          // 2. ENQUÊTE → page enquêtes
+          if (type === "enquete_response") {
             goTo(PAGES.ENQUETE);
             return;
           }
 
-          // 3. Publication/commentaire/réaction/debat → scroll to publication
-          const isPubNotif = n.entity_id && (
-            n.entity_type === "publication" ||
-            ["new_post", "publication_comment", "publication_reaction", "debat_vote", "comment_reaction"].includes(n.type_notification)
-          );
-          if (isPubNotif) {
-            goTo(PAGES.HOME);
-            // scroll après le render du feed
-            setTimeout(() => {
-              const el = document.getElementById(`pub-${n.entity_id}`);
-              if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-              else {
-                // si la pub n'est pas encore chargée → highlight après fetchPublications
-                setHighlightedPub(parseInt(n.entity_id));
-                fetchPublications(true).then(() => {
-                  setTimeout(() => {
-                    document.getElementById(`pub-${n.entity_id}`)
-                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  }, 400);
-                });
-              }
-            }, 350);
+          // 3. PUBLICATION / COMMENTAIRE / RÉACTION / VOTE
+          // → naviguer vers la page publication dédiée (route /jeune/publication/:id)
+          const isPubType = [
+            "new_post", "publication_comment",
+            "publication_reaction", "debat_vote", "comment_reaction"
+          ].includes(type);
+
+          if (isPubType && n.entity_id) {
+            navigate(`/jeune/publication/${n.entity_id}`);
             return;
+          }
+
+          // Fallback : rester sur HOME avec scroll
+          if (n.entity_id) {
+            goTo(PAGES.HOME);
+            const pubId = String(n.entity_id);
+            const tryScroll = (attempts = 0) => {
+              const el = document.getElementById(`pub-${pubId}`);
+              if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+                el.style.transition   = "box-shadow .4s";
+                el.style.boxShadow    = "0 0 0 3px #7c3aed";
+                el.style.borderRadius = "16px";
+                setTimeout(() => { el.style.boxShadow = ""; }, 2500);
+              } else if (attempts < 10) {
+                setTimeout(() => tryScroll(attempts + 1), 300);
+              }
+            };
+            setTimeout(() => tryScroll(), 350);
           }
         };
 
