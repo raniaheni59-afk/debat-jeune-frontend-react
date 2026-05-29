@@ -203,13 +203,8 @@ const EditPublicationModal = ({ publication, onClose, onSaved }) => {
       medias.forEach(m=>{ const id=m.id_media??m.id??""; if(id!=="") form.append("kept_media_ids[]",String(id)); });
       newFiles.forEach(f=>form.append("medias",f.file));
       await API.patch(`/publications/${publication.id_publication}`, form);
-      // Re-fetch the full publication to get updated medias from server
-      let updatedPub = { titre_publication:titre, contenu, contenu_publication:contenu, medias };
-      try {
-        const res = await API.get(`/publications/${publication.id_publication}`);
-        if (res.data) updatedPub = res.data;
-      } catch {}
-      onSaved(updatedPub);
+      // Note: axios sets Content-Type + boundary automatically for FormData
+      onSaved({ titre_publication:titre, contenu, contenu_publication:contenu, medias });
       onClose();
     } catch(e) {
       const raw=e?.response?.data;
@@ -356,11 +351,11 @@ const Comment = ({ comment, pubId, onRefresh, depth=0 }) => {
   const stkRef  = useRef(null);
 
   const currentUser = getCurrentUser();
-  const isAdmin = currentUser?.role === "admin";
-  const isOwner = isAdmin || (currentUser && (
+  const isOwner = currentUser && (
     currentUser.id_user===comment.id_user || currentUser.id===comment.id_user ||
-    currentUser.id_user===comment.user_id || currentUser.id===comment.user_id
-  ));
+    currentUser.id_user===comment.user_id || currentUser.id===comment.user_id ||
+    currentUser.role==="admin"
+  );
 
   useEffect(()=>{
     const h=(e)=>{ if(picRef.current&&!picRef.current.contains(e.target)) setPickerOpen(false); };
@@ -545,9 +540,6 @@ export const PublicationSearchBar = ({ publications=[], onResult }) => {
 ═══════════════════════════════════════════════════════════════ */
 export default function PublicationCard({ publication, onUpdate, defaultShowComments=false }) {
   const [localPub,   setLocalPub]   = useState(publication);
-
-  // Sync localPub when parent re-fetches (fixes stale images/data after feed refresh)
-  useEffect(() => { setLocalPub(publication); }, [publication]);
   const [showCmts,   setShowCmts]   = useState(defaultShowComments);
   const [comments,   setComments]   = useState([]);
   const [cmtLoading, setCmtLoading] = useState(false);
@@ -562,6 +554,9 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
   const [cmtCount,   setCmtCount]   = useState(publication.nb_commentaires??0);
   const [editOpen,   setEditOpen]   = useState(false);
   const [imgErrors,  setImgErrors]  = useState({});
+
+  // Sync localPub when parent re-fetches (fixes stale images after feed refresh)
+  useEffect(()=>{ setLocalPub(publication); setImgErrors({}); }, [publication]);
 
   const currentUser = getCurrentUser();
   const pub         = localPub;
@@ -916,8 +911,8 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
         <EditPublicationModal
           publication={pub}
           onClose={()=>setEditOpen(false)}
-          onSaved={(updatedPub)=>{
-            if(updatedPub) setLocalPub(p=>({...p,...updatedPub}));
+          onSaved={(updatedFields)=>{
+            if(updatedFields) setLocalPub(p=>({...p,...updatedFields}));
             if(onUpdate) onUpdate();
           }}/>
       )}
