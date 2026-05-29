@@ -717,12 +717,12 @@ const JeuneLayout = () => {
     socketRef.current.on("connect_error", (e) => console.error("Socket:", e.message));
     socketRef.current.on("new_message", () => setUnreadMessages((n) => n + 1));
 
-    // ✅ Notification générale (publication, commentaire, réaction, enquête)
+    // ✅ Notification générale (publication, commentaire, réaction, enquête, live)
     socketRef.current.on("new_notification", (notif) => {
-      // Ignorer les live_started ici — géré séparément dans live-started
-      if (notif?.type_notification === "live_started") return;
+      const type = notif?.type_notification;
+      // live_started géré séparément via "live-started" event
+      if (type === "live_started") return;
       setNotifications((prev) => {
-        // Éviter les doublons
         if (prev.some(n => n.id_notification === notif.id_notification)) return prev;
         return [{ ...notif, is_read: false }, ...prev];
       });
@@ -930,13 +930,14 @@ const JeuneLayout = () => {
       case PAGES.NOTIFS: {
         const BACK_URL = BACKEND;
         const getNotifIcon = (type) => ({
-          new_post: "📢",
-          publication_comment: "💬",
+          new_post:             "📢",
+          publication_comment:  "💬",
           publication_reaction: "❤️",
-          debat_vote: "⚖️",
-          comment_reaction: "👍",
-          live_started: "🔴",
-          enquete_response: "📋",
+          debat_vote:           "⚖️",
+          comment_reaction:     "👍",
+          live_started:         "🔴",
+          enquete_response:     "📋",
+          new_enquete:          "📋",
         }[type] || "🔔");
 
         const getNotifBg = (type, isRead) => {
@@ -997,8 +998,8 @@ const JeuneLayout = () => {
             return;
           }
 
-          // 2. ENQUÊTE → page enquêtes
-          if (type === "enquete_response") {
+          // 2. ENQUÊTE → page enquêtes (réponse admin ou nouvelle enquête)
+          if (type === "enquete_response" || type === "new_enquete") {
             goTo(PAGES.ENQUETE);
             return;
           }
