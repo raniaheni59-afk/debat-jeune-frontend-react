@@ -141,7 +141,7 @@ const ModalProfile = ({ onSaved }) => {
     setSaving(true); setError(""); setSaved(false);
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => { if (v) fd.append(k, v); });
+      Object.entries(form).forEach(([k, v]) => { if (v !== undefined && v !== null) fd.append(k, v); });
       if (photoFile) fd.append("photo", photoFile);
 
       const token = localStorage.getItem("token");
@@ -889,8 +889,9 @@ const JeuneLayout = () => {
       });
       const reply = res.data.reply || "Je n'ai pas compris. Pouvez-vous reformuler ?";
       setCbMsgs((m) => [...m, { from:"bot", text: reply }]);
-    } catch {
-      setCbMsgs((m) => [...m, { from:"bot", text:"❌ Erreur de connexion. Réessayez dans un instant." }]);
+    } catch (err) {
+      const fallback = err?.response?.data?.reply || "❌ Erreur de connexion. Réessayez dans un instant.";
+      setCbMsgs((m) => [...m, { from:"bot", text: fallback }]);
     } finally {
       setCbLoading(false);
     }
