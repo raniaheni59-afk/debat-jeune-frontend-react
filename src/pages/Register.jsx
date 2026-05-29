@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import API from "../services/api";
 import "./Register.css";
@@ -9,20 +9,19 @@ export default function Register() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: "", text: "" });
+  const codeSentRef = useRef(false); // prevent double send
 
   const [form, setForm] = useState({
     nom_user: "", prenom_user: "", date_naissance: "", sexe: "",
     gouvernorat: "", delegation: "", delegation_custom: "", ville: "",
     etablissement: "", statut: "",
     email_user: "", mot_de_passe_user: "",
-    // Parent fields (used when age < 12)
+    // Parent fields (informative — don't block registration)
     nom_parent: "", prenom_parent: "", lien_parent: "", tel_parent: ""
   });
 
   const [age, setAge] = useState(null);
-  const [isMineur, setIsMineur] = useState(false);       // < 12 ans
-  const [showParentForm, setShowParentForm] = useState(false); // show parent section
-  const [ownerConfirmed, setOwnerConfirmed] = useState(false);
+  const [isMineur, setIsMineur] = useState(false);
   const [codeSent, setCodeSent] = useState(false);
 
   // ── Age calculation ──────────────────────────────────
@@ -30,20 +29,12 @@ export default function Register() {
     if (form.date_naissance) {
       const birth = new Date(form.date_naissance);
       const today = new Date();
-      let calculatedAge = today.getFullYear() - birth.getFullYear();
-      if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) {
-        calculatedAge--;
-      }
-      setAge(calculatedAge);
-      if (calculatedAge < 12) {
-        setIsMineur(true);
-        setShowParentForm(true);
-        setMessage({ type: "error", text: "⚠️ Tu as moins de 12 ans. Les informations du parent sont requises." });
-      } else {
-        setIsMineur(false);
-        setShowParentForm(false);
-        setMessage({ type: "", text: "" });
-      }
+      let a = today.getFullYear() - birth.getFullYear();
+      if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) a--;
+      setAge(a);
+      setIsMineur(a < 12);
+      // Clear any previous age-related error
+      if (a >= 12) setMessage({ type: "", text: "" });
     }
   }, [form.date_naissance]);
 
@@ -60,17 +51,36 @@ export default function Register() {
       } else {
         setForm(prev => ({ ...prev, email_user: emailParam }));
       }
-      setOwnerConfirmed(true);
       setStep(3);
-      API.post("/auth/send-password-code", { email: emailParam })
-        .then(() => {
-          setCodeSent(true);
-          setMessage({ type: "success", text: "✅ Code secret envoyé à votre email !" });
-        })
-        .catch((err) => {
-          const msg = err.response?.data?.message || "Erreur envoi code.";
-          setMessage({ type: "error", text: msg });
-        });
+
+      // Guard: only send code once even if effect re-runs
+      if (codeSentRef.current) return;
+      codeSentRef.current = true;
+
+      // Retry logic: Render may be cold-starting — retry up to 4x with delay
+      const sendWithRetry = async (attempts = 4, delayMs = 3000) => {
+        for (let i = 0; i < attempts; i++) {
+          try {
+            await API.post("/auth/send-password-code", { email: emailParam });
+            setCodeSent(true);
+            setMessage({ type: "success", text: "✅ Code secret envoyé à votre email !" });
+            return;
+          } catch (err) {
+            const isLast = i === attempts - 1;
+            if (isLast) {
+              setMessage({
+                type: "error",
+                text: err.response?.data?.message || "❌ Erreur envoi code. Rechargez la page."
+              });
+            } else {
+              setMessage({ type: "", text: `⏳ Connexion au serveur... (tentative ${i + 2}/${attempts})` });
+              await new Promise(r => setTimeout(r, delayMs));
+            }
+          }
+        }
+      };
+
+      sendWithRetry();
     }
   }, []);
 
@@ -78,47 +88,38 @@ export default function Register() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => {
-      const newForm = { ...prev, [name]: value };
-      if (name === "gouvernorat") {
-        newForm.delegation = "";
-        newForm.delegation_custom = "";
-        newForm.ville = "";
-        newForm.etablissement = "";
-      }
-      if (name === "delegation") {
-        newForm.delegation_custom = "";
-        newForm.ville = "";
-        newForm.etablissement = "";
-      }
-      return newForm;
+      const f = { ...prev, [name]: value };
+      if (name === "gouvernorat") { f.delegation = ""; f.delegation_custom = ""; f.ville = ""; f.etablissement = ""; }
+      if (name === "delegation") { f.delegation_custom = ""; f.ville = ""; f.etablissement = ""; }
+      return f;
     });
   };
 
-  // The effective delegation value (either selected or custom text)
-  const effectiveDelegation = form.delegation === "Autre"
-    ? form.delegation_custom
-    : form.delegation;
-
-  // Établissement is disabled & not required when statut = "autre"
+  const effectiveDelegation = form.delegation === "Autre" ? form.delegation_custom : form.delegation;
   const etablissementDisabled = form.statut === "autre";
 
+  // Step 1 → Step 2
   const handleNextToEmail = (e) => {
     e.preventDefault();
 
-    // If mineur, require parent fields before proceeding
-    if (isMineur) {
-      if (!form.nom_parent || !form.prenom_parent || !form.lien_parent || !form.tel_parent) {
-        setMessage({ type: "error", text: "⚠️ Veuillez remplir toutes les informations du parent/tuteur." });
-        return;
-      }
+    // If mineur, parent fields must be filled
+    if (isMineur && (!form.nom_parent || !form.prenom_parent || !form.lien_parent || !form.tel_parent)) {
+      setMessage({ type: "error", text: "⚠️ Veuillez remplir les informations du parent/tuteur." });
+      return;
     }
 
-    sessionStorage.setItem("registerForm", JSON.stringify({ ...form, delegation: effectiveDelegation }));
+    // Save form (with effective delegation) to sessionStorage for after email redirect
+    sessionStorage.setItem("registerForm", JSON.stringify({
+      ...form,
+      delegation: effectiveDelegation
+    }));
+    setMessage({ type: "", text: "" });
     setStep(2);
   };
 
+  // Step 2: send owner-check email
   const sendOwnerCheck = async () => {
-    if (!form.email_user.includes("@")) return alert("Email invalide");
+    if (!form.email_user.includes("@")) return setMessage({ type: "error", text: "Email invalide." });
     setLoading(true);
     setMessage({ type: "", text: "" });
     try {
@@ -129,15 +130,15 @@ export default function Register() {
       });
       setMessage({ type: "success", text: res.data.message });
     } catch (err) {
-      const msg = err.response?.data?.message || "Erreur envoi email.";
-      setMessage({ type: "error", text: msg });
+      setMessage({ type: "error", text: err.response?.data?.message || "Erreur envoi email." });
     }
     setLoading(false);
   };
 
+  // Step 3: final submit
   const handleFinalSubmit = async (e) => {
     e.preventDefault();
-    if (!form.mot_de_passe_user) return alert("Veuillez coller le code reçu.");
+    if (!form.mot_de_passe_user) return setMessage({ type: "error", text: "Veuillez coller le code reçu." });
     setLoading(true);
     try {
       await API.post("/auth/register-final", {
@@ -152,11 +153,25 @@ export default function Register() {
       localStorage.setItem("token", loginRes.data.token);
       localStorage.setItem("user", JSON.stringify(loginRes.data.user));
       sessionStorage.removeItem("registerForm");
-      alert("🎉 Inscription réussie !");
-      navigate("/jeune");
+      setMessage({ type: "success", text: "🎉 Inscription réussie !" });
+      setTimeout(() => navigate("/jeune"), 1000);
     } catch (err) {
-      const msg = err.response?.data?.message || "Erreur inscription.";
-      setMessage({ type: "error", text: msg });
+      setMessage({ type: "error", text: err.response?.data?.message || "Erreur inscription." });
+    }
+    setLoading(false);
+  };
+
+  // Manual retry for step 3 if code send failed
+  const handleResendCode = async () => {
+    if (!form.email_user) return;
+    setLoading(true);
+    setMessage({ type: "", text: "" });
+    try {
+      await API.post("/auth/send-password-code", { email: form.email_user });
+      setCodeSent(true);
+      setMessage({ type: "success", text: "✅ Code renvoyé !" });
+    } catch (err) {
+      setMessage({ type: "error", text: err.response?.data?.message || "Erreur. Réessayez." });
     }
     setLoading(false);
   };
@@ -193,7 +208,6 @@ export default function Register() {
             {step === 1 && (
               <form onSubmit={handleNextToEmail} className="register-form-grid">
 
-                {/* Nom / Prénom */}
                 <div className="input-group">
                   <label>Nom *</label>
                   <input name="nom_user" value={form.nom_user} onChange={handleChange} required />
@@ -203,14 +217,12 @@ export default function Register() {
                   <input name="prenom_user" value={form.prenom_user} onChange={handleChange} required />
                 </div>
 
-                {/* Date naissance */}
                 <div className="input-group">
                   <label>Date Naissance *</label>
                   <input type="date" name="date_naissance" value={form.date_naissance} onChange={handleChange} required />
                   {age !== null && <span className="age-badge">{age} ans</span>}
                 </div>
 
-                {/* Sexe */}
                 <div className="input-group">
                   <label>Sexe *</label>
                   <select name="sexe" value={form.sexe} onChange={handleChange} required>
@@ -220,67 +232,41 @@ export default function Register() {
                   </select>
                 </div>
 
-                {/* ── SECTION PARENT (si age < 12) ──────── */}
-                {showParentForm && (
+                {/* ── SECTION PARENT (si age < 12) — informatif, ne bloque pas ── */}
+                {isMineur && (
                   <div className="parent-section full-width">
                     <div className="parent-section-title">
-                       Informations du Parent / Tuteur
+                      👨‍👩‍👦 Informations du Parent / Tuteur
                     </div>
                     <div className="register-form-grid" style={{ padding: 0, marginTop: 12 }}>
-
                       <div className="input-group">
                         <label>Nom du parent *</label>
-                        <input
-                          name="nom_parent"
-                          value={form.nom_parent}
-                          onChange={handleChange}
-                          placeholder="Nom de famille"
-                          required={isMineur}
-                        />
+                        <input name="nom_parent" value={form.nom_parent} onChange={handleChange}
+                          placeholder="Nom de famille" required />
                       </div>
-
                       <div className="input-group">
                         <label>Prénom du parent *</label>
-                        <input
-                          name="prenom_parent"
-                          value={form.prenom_parent}
-                          onChange={handleChange}
-                          placeholder="Prénom"
-                          required={isMineur}
-                        />
+                        <input name="prenom_parent" value={form.prenom_parent} onChange={handleChange}
+                          placeholder="Prénom" required />
                       </div>
-
                       <div className="input-group">
                         <label>Lien de parenté *</label>
-                        <select
-                          name="lien_parent"
-                          value={form.lien_parent}
-                          onChange={handleChange}
-                          required={isMineur}
-                        >
+                        <select name="lien_parent" value={form.lien_parent} onChange={handleChange} required>
                           <option value="">Choisir...</option>
                           <option value="pere">Père</option>
                           <option value="mere">Mère</option>
                           <option value="tuteur">Tuteur légal</option>
                         </select>
                       </div>
-
                       <div className="input-group">
                         <label>Téléphone du parent *</label>
-                        <input
-                          name="tel_parent"
-                          value={form.tel_parent}
-                          onChange={handleChange}
-                          placeholder=""
-                          type="tel"
-                          required={isMineur}
-                        />
+                        <input name="tel_parent" value={form.tel_parent} onChange={handleChange}
+                          placeholder="Ex: 55 123 456" type="tel" required />
                       </div>
                     </div>
                   </div>
                 )}
 
-                {/* Statut */}
                 <div className="input-group full-width">
                   <label>Statut *</label>
                   <select name="statut" value={form.statut} onChange={handleChange} required>
@@ -293,83 +279,53 @@ export default function Register() {
                   </select>
                 </div>
 
-                {/* Gouvernorat */}
                 <div className="input-group">
                   <label>Gouvernorat *</label>
                   <select name="gouvernorat" value={form.gouvernorat} onChange={handleChange} required>
                     <option value="">Choisir...</option>
-                    {DATA_TUNISIE_COMPLETE.gouvernorats.map(g => (
-                      <option key={g} value={g}>{g}</option>
-                    ))}
+                    {DATA_TUNISIE.gouvernorats.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
 
-                {/* Délégation — with "Autre" option */}
                 <div className="input-group">
                   <label>Délégation *</label>
-                  <select
-                    name="delegation"
-                    value={form.delegation}
-                    onChange={handleChange}
-                    disabled={!form.gouvernorat}
-                    required
-                  >
+                  <select name="delegation" value={form.delegation} onChange={handleChange}
+                    disabled={!form.gouvernorat} required>
                     <option value="">Choisir...</option>
-                    {form.gouvernorat && DATA_TUNISIE_COMPLETE.delegations[form.gouvernorat]?.map(d => (
+                    {form.gouvernorat && DATA_TUNISIE.delegations[form.gouvernorat]?.map(d =>
                       <option key={d} value={d}>{d}</option>
-                    ))}
+                    )}
                     <option value="Autre">Autre...</option>
                   </select>
-
-                  {/* Custom delegation input when "Autre" is selected */}
                   {form.delegation === "Autre" && (
-                    <input
-                      name="delegation_custom"
-                      value={form.delegation_custom}
-                      onChange={handleChange}
-                      placeholder="Saisissez votre délégation..."
-                      style={{ marginTop: 8 }}
-                      required
-                    />
+                    <input name="delegation_custom" value={form.delegation_custom} onChange={handleChange}
+                      placeholder="Saisissez votre délégation..." style={{ marginTop: 8 }} required />
                   )}
                 </div>
 
-                {/* Ville */}
                 <div className="input-group">
                   <label>Ville *</label>
-                  <input
-                    name="ville"
-                    placeholder="Ex: Carthage, El Menzah..."
-                    value={form.ville}
-                    onChange={handleChange}
-                    disabled={!effectiveDelegation}
-                    required
-                  />
+                  <input name="ville" placeholder="Ex: Carthage, El Menzah..."
+                    value={form.ville} onChange={handleChange}
+                    disabled={!effectiveDelegation} required />
                 </div>
 
-                {/* Établissement — disabled & not required when statut = "autre" */}
                 <div className="input-group full-width">
                   <label>
                     Établissement {etablissementDisabled ? "" : "*"}
-                    {etablissementDisabled && (
-                      <span style={{ fontSize: 12, color: "#999", marginLeft: 8 }}>(optionnel pour "Autre")</span>
-                    )}
+                    {etablissementDisabled && <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginLeft: 8 }}>(non requis)</span>}
                   </label>
-                  <input
-                    name="etablissement"
-                    placeholder={etablissementDisabled ? "Non applicable" : "Nom de ton école/fac/entreprise..."}
+                  <input name="etablissement"
+                    placeholder={etablissementDisabled ? "Non applicable" : "Nom de ton école/fac..."}
                     value={etablissementDisabled ? "" : form.etablissement}
                     onChange={handleChange}
                     disabled={etablissementDisabled || !effectiveDelegation}
-                    required={!etablissementDisabled}
-                  />
+                    required={!etablissementDisabled} />
                 </div>
 
-                {/* Submit / block */}
                 <button type="submit" className="register-submit-btn full-width">
                   Suivant →
                 </button>
-
               </form>
             )}
 
@@ -379,19 +335,14 @@ export default function Register() {
                 <p>Entrez votre email. Nous allons vérifier que c'est bien vous.</p>
                 <div className="input-group full-width">
                   <label>Email *</label>
-                  <input
-                    type="email"
-                    name="email_user"
-                    value={form.email_user}
-                    onChange={handleChange}
-                    placeholder="votre@email.com"
-                  />
+                  <input type="email" name="email_user" value={form.email_user}
+                    onChange={handleChange} placeholder="votre@email.com" />
                 </div>
                 <button onClick={sendOwnerCheck} className="register-submit-btn full-width" disabled={loading}>
                   {loading ? "Envoi..." : "Envoyer Vérification"}
                 </button>
-                <p style={{ marginTop: 15, color: "#666", fontSize: 14 }}>
-                  ✉️ Cliquez sur "OUI" dans l'email pour continuer automatiquement.
+                <p style={{ marginTop: 15, color: "rgba(255,255,255,0.7)", fontSize: 14 }}>
+                  ✉️ Cliquez sur <strong>"OUI"</strong> dans l'email pour continuer automatiquement.
                 </p>
               </div>
             )}
@@ -401,27 +352,29 @@ export default function Register() {
               <form onSubmit={handleFinalSubmit} className="step-content">
                 <p>Nous avons envoyé un <strong>Code Secret</strong> à votre email. Copiez-le et collez-le ici.</p>
 
-                {!codeSent && (
-                  <p style={{ color: "#667eea" }}>⏳ Envoi du code en cours...</p>
-                )}
-
-                {codeSent && (
+                {!codeSent ? (
+                  <div style={{ textAlign: "center" }}>
+                    <p style={{ color: "rgba(255,255,255,0.7)", fontSize: 14 }}>⏳ Envoi du code en cours...</p>
+                    <button type="button" onClick={handleResendCode} disabled={loading}
+                      className="register-submit-btn full-width" style={{ marginTop: 12 }}>
+                      {loading ? "Envoi..." : "🔄 Renvoyer le code"}
+                    </button>
+                  </div>
+                ) : (
                   <>
                     <div className="input-group full-width">
                       <label>Code Secret *</label>
-                      <input
-                        type="text"
-                        name="mot_de_passe_user"
-                        value={form.mot_de_passe_user}
-                        onChange={handleChange}
-                        placeholder="Collez le code ici..."
-                        autoComplete="off"
-                        required
-                      />
+                      <input type="text" name="mot_de_passe_user"
+                        value={form.mot_de_passe_user} onChange={handleChange}
+                        placeholder="Collez le code ici..." autoComplete="off" required />
                     </div>
                     <button type="submit" className="register-submit-btn full-width" disabled={loading}>
                       {loading ? "Création..." : "Confirmer & Accéder"}
                     </button>
+                    <p style={{ fontSize: 13, color: "rgba(255,255,255,0.5)", textAlign: "center", cursor: "pointer" }}
+                      onClick={handleResendCode}>
+                      Code non reçu ? Cliquez ici pour renvoyer
+                    </p>
                   </>
                 )}
               </form>
@@ -438,7 +391,7 @@ export default function Register() {
 }
 
 // ── Data ──────────────────────────────────────────────
-const DATA_TUNISIE_COMPLETE = {
+const DATA_TUNISIE = {
   gouvernorats: [
     "Ariana", "Béja", "Ben Arous", "Bizerte", "Gabès", "Gafsa", "Jendouba",
     "Kairouan", "Kasserine", "Kebili", "Kef", "Mahdia", "Manouba", "Medenine",
