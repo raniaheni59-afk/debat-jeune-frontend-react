@@ -115,6 +115,7 @@ export default function App() {
         <Route path="/publier"    element={<ProtectedRoute><PublierPage /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="/jeune/publication/:id" element={<PublicationDetail />} />
+        <Route path="/publication/:id" element={<PublicationDetail />} />
         <Route path="/settings"   element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/contact"    element={<ProtectedRoute><JeuneContact /></ProtectedRoute>} />
 

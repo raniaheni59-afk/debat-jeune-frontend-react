@@ -43,49 +43,95 @@ const Notifications = () => {
   const [liveNotifs, setLiveNotifs] = useState([]);
 
   useEffect(() => {
-    const handler = (e) => {
+    // Écouter les live notifications via "live-started" (émis par App.jsx depuis socket)
+    const handleLiveStarted = (e) => {
+      const d = e.detail;
+      setLiveNotifs(prev => [{
+        id_notification:   `live-${Date.now()}`,
+        type_notification: "live_started",
+        message:    d.message || `🔴 Un live a démarré — rejoignez maintenant !`,
+        created_at: d.created_at || new Date().toISOString(),
+        is_read:    false,
+        roomCode:   d.roomCode,
+        _isLive:    true,
+      }, ...prev]);
+    };
+
+    // Écouter aussi "new_notification" pour les live_started qui arrivent via socket direct
+    const handleNewNotif = (e) => {
       const d = e.detail;
       if (d?.type_notification === "live_started" || d?.roomCode) {
         setLiveNotifs(prev => [{
-          id_notification: `live-${Date.now()}`,
+          id_notification:   `live-${Date.now()}`,
           type_notification: "live_started",
-          message: d.message || `🔴 Un live a démarré — rejoignez maintenant !`,
+          message:    d.message || `🔴 Un live a démarré — rejoignez maintenant !`,
           created_at: d.created_at || new Date().toISOString(),
-          is_read: false,
-          roomCode: d.roomCode,
-          _isLive: true,
+          is_read:    false,
+          roomCode:   d.roomCode,
+          _isLive:    true,
         }, ...prev]);
       }
     };
-    window.addEventListener("new_notification", handler);
-    return () => window.removeEventListener("new_notification", handler);
+
+    window.addEventListener("live-started",    handleLiveStarted);
+    window.addEventListener("new_notification", handleNewNotif);
+    return () => {
+      window.removeEventListener("live-started",    handleLiveStarted);
+      window.removeEventListener("new_notification", handleNewNotif);
+    };
   }, []);
 
   const allNotifs = [...liveNotifs, ...notifications];
 
   const handleClick = async (n) => {
-    // Live notification → aller au live
-    if (n._isLive && n.roomCode) {
-      try {
-        const res = await API.get("/lives");
-        const live = Array.isArray(res.data) ? res.data.find(l => l.room_code === n.roomCode && l.is_active) : null;
-        if (live?.stream_link) {
-          const url = new URL(live.stream_link);
-          const code = url.pathname.split("/").pop();
-          const vt   = url.searchParams.get("vt");
-          if (code && vt) { navigate(`/meet/${code}?vt=${vt}`); return; }
-        }
-      } catch {}
+    // 1. Live notification → aller au live
+    if (n.type_notification === "live_started" || n._isLive) {
+      const roomCode = n.roomCode || n.entity_id;
+      if (roomCode) {
+        try {
+          const res = await API.get("/lives");
+          const live = Array.isArray(res.data)
+            ? res.data.find(l => l.room_code === roomCode && l.is_active)
+            : null;
+          if (live?.stream_link) {
+            const url  = new URL(live.stream_link);
+            const code = url.pathname.split("/").pop();
+            const vt   = url.searchParams.get("vt");
+            if (code && vt) { navigate(`/meet/${code}?vt=${vt}`); return; }
+          }
+          if (live?.room_code) { navigate(`/meet/${live.room_code}`); return; }
+        } catch {}
+      }
       navigate("/jeune");
       return;
     }
 
-    await markRead(n.id_notification);
+    // Marquer comme lu avant navigation
+    if (n.id_notification && !String(n.id_notification).startsWith("live-")) {
+      await markRead(n.id_notification);
+    }
+
+    // 2. Publications : new_post, publication_comment, publication_reaction, debat_vote
     const isPubNotif =
       n.entity_id &&
       (n.entity_type === "publication" ||
-        ["new_post","publication_comment","publication_reaction","debat_vote"].includes(n.type_notification));
-    if (isPubNotif) navigate(`/publication/${n.entity_id}`);
+        ["new_post", "publication_comment", "publication_reaction", "debat_vote"].includes(n.type_notification));
+    if (isPubNotif) {
+      navigate(`/jeune/publication/${n.entity_id}`);
+      return;
+    }
+
+    // 3. Enquête (admin reçoit quand jeune répond)
+    if (n.type_notification === "enquete_response" && n.entity_id) {
+      navigate(`/admin/dashboard`); // ou /enquetes/${n.entity_id} si la route existe
+      return;
+    }
+
+    // 4. Commentaire reaction
+    if (n.type_notification === "comment_reaction" && n.entity_id) {
+      navigate(`/jeune/publication/${n.entity_id}`);
+      return;
+    }
   };
 
   return (
