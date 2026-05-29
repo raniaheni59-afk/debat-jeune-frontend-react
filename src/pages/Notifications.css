@@ -1,34 +1,19 @@
-.notif-page-container {
-  background-color: #f0f2f5;
-  padding: 20px;
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@keyframes notifCardIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.notif-card {
-  background: white;
-  width: 100%;
-  max-width: 600px;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+@keyframes notifItemIn {
+  from { opacity: 0; transform: translateX(-10px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
-.notif-header {
-  padding: 15px 20px;
-  border-bottom: 1px solid #ddd;
+@keyframes notifSpin {
+  to { transform: rotate(360deg); }
 }
 
-.notif-item {
-  display: flex;
-  align-items: center;
-  padding: 15px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  position: relative;@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-/* ══════════════════════════════════════════
-   PAGE SHELL
-══════════════════════════════════════════ */
 .notif-page-container {
   min-height: 100vh;
   background: linear-gradient(145deg, #0f0820 0%, #1e0a3c 35%, #2d1060 65%, #3b0e6e 100%);
@@ -40,7 +25,6 @@
   overflow: hidden;
 }
 
-/* glows */
 .notif-glow {
   position: fixed;
   border-radius: 50%;
@@ -59,9 +43,6 @@
   bottom: -100px; right: -80px;
 }
 
-/* ══════════════════════════════════════════
-   CARD
-══════════════════════════════════════════ */
 .notif-card {
   position: relative;
   z-index: 1;
@@ -72,21 +53,12 @@
   max-width: 620px;
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, .1);
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, .35),
-    0 0 0 1px rgba(196, 77, 255, .08);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, .35), 0 0 0 1px rgba(196, 77, 255, .08);
   overflow: hidden;
   height: fit-content;
   animation: notifCardIn .4s cubic-bezier(.4, 0, .2, 1) both;
 }
-@keyframes notifCardIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
 
-/* ══════════════════════════════════════════
-   HEADER
-══════════════════════════════════════════ */
 .notif-header {
   display: flex;
   align-items: center;
@@ -114,7 +86,6 @@
   min-width: 0;
 }
 
-/* back button */
 .notif-back-btn {
   width: 38px; height: 38px;
   border-radius: 12px;
@@ -131,14 +102,12 @@
   color: #fff;
 }
 
-/* title */
 .notif-title {
   font-size: 17px; font-weight: 800;
   color: #fff; margin: 0;
   letter-spacing: -.01em;
 }
 
-/* unread badge */
 .notif-badge {
   display: inline-flex; align-items: center;
   background: rgba(196, 77, 255, .2);
@@ -149,7 +118,6 @@
   width: fit-content;
 }
 
-/* mark all button */
 .notif-mark-all {
   background: transparent;
   border: 1.5px solid rgba(196, 77, 255, .35);
@@ -169,9 +137,6 @@
   color: #e9d5ff;
 }
 
-/* ══════════════════════════════════════════
-   LIST
-══════════════════════════════════════════ */
 .notif-list {
   display: flex;
   flex-direction: column;
@@ -184,9 +149,6 @@
   border-radius: 4px;
 }
 
-/* ══════════════════════════════════════════
-   ITEM
-══════════════════════════════════════════ */
 .notif-item {
   display: flex;
   align-items: center;
@@ -200,10 +162,6 @@
   opacity: 0;
   animation: notifItemIn .35s cubic-bezier(.4, 0, .2, 1) forwards;
 }
-@keyframes notifItemIn {
-  from { opacity: 0; transform: translateX(-10px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
 .notif-item:hover { background: rgba(255, 255, 255, .04); }
 .notif-item.unread { background: rgba(196, 77, 255, .07); }
 .notif-item.unread:hover { background: rgba(196, 77, 255, .11); }
@@ -211,7 +169,6 @@
 .notif-item.live:hover { background: rgba(239, 68, 68, .13); }
 .notif-item-last { border-bottom: none; }
 
-/* unread left accent */
 .notif-item__accent {
   position: absolute;
   left: 0; top: 0; bottom: 0;
@@ -220,7 +177,6 @@
   opacity: .8;
 }
 
-/* ── Avatar ── */
 .notif-avatar-wrap {
   position: relative;
   flex-shrink: 0;
@@ -263,7 +219,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
 }
 
-/* ── Text ── */
 .notif-text { flex: 1; min-width: 0; }
 .notif-message {
   margin: 0 0 5px;
@@ -276,10 +231,7 @@
   overflow: hidden;
 }
 .notif-item.unread .notif-message { color: rgba(240, 236, 255, .95); }
-.notif-message strong {
-  font-weight: 700;
-  color: #e9d5ff;
-}
+.notif-message strong { font-weight: 700; color: #e9d5ff; }
 .notif-message span { color: rgba(240, 236, 255, .6); }
 .notif-item.unread .notif-message span { color: rgba(240, 236, 255, .75); }
 
@@ -303,7 +255,6 @@
   border: 1px solid rgba(239, 68, 68, .25);
 }
 
-/* ── Unread dot ── */
 .notif-dot {
   width: 9px; height: 9px;
   border-radius: 50%;
@@ -311,9 +262,6 @@
   box-shadow: 0 0 8px currentColor;
 }
 
-/* ══════════════════════════════════════════
-   EMPTY / LOADING
-══════════════════════════════════════════ */
 .notif-empty {
   display: flex;
   flex-direction: column;
@@ -342,7 +290,6 @@
   margin: 0; text-align: center;
 }
 
-/* spinner */
 .notif-spinner {
   width: 36px; height: 36px;
   border: 3px solid rgba(255, 255, 255, .08);
@@ -350,11 +297,7 @@
   border-radius: 50%;
   animation: notifSpin .8s linear infinite;
 }
-@keyframes notifSpin { to { transform: rotate(360deg); } }
 
-/* ══════════════════════════════════════════
-   RESPONSIVE
-══════════════════════════════════════════ */
 @media (max-width: 500px) {
   .notif-page-container { padding: 16px 10px 40px; }
   .notif-card { border-radius: 18px; }
@@ -362,60 +305,4 @@
   .notif-title { font-size: 16px; }
   .notif-item { padding: 13px 16px; gap: 11px; }
   .notif-mark-all { font-size: 11px; padding: 5px 11px; }
-}
-  transition: 0.2s;
-}
-
-.notif-item.unread {
-  background-color: #e7f3ff;
-}
-
-.notif-img {
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  margin-right: 15px;
-  object-fit: cover;
-}
-
-.notif-text p {
-  margin: 0;
-  font-size: 14px;
-}
-
-.notif-date {
-  font-size: 12px;
-  color: #65676b;
-}
-
-.blue-dot {
-  width: 10px;
-  height: 10px;
-  background-color: #1877f2;
-  border-radius: 50%;
-  margin-left: auto;
-}
-/* ✅ scope عام تاع body فقط وقت ما نكون داخل /messenger */
-body.ms-body {
-  margin: 0;
-  overflow: hidden; /* اختياري كي نحب scroll يكون داخل messenger */
-  background: #0b1220;
-}
-
-/* المهم: ما نلمسوش body / html بدون .ms-body */
-
-.ms-page {
-  min-height: 100vh;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 24px;
-  color: #e8ecff;
-  box-sizing: border-box;
-  background:
-    radial-gradient(900px 500px at 20% 0%, rgba(88,101,242,.45), transparent 60%),
-    radial-gradient(900px 500px at 80% 20%, rgba(34,197,94,.25), transparent 55%),
-    linear-gradient(120deg, rgba(18,24,38,1), rgba(12,18,30,1));
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
 }
