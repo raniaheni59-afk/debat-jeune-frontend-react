@@ -956,9 +956,16 @@ const JeuneLayout = () => {
         };
 
         const handleNotifClick = async (n) => {
-          // Live notification → navigate to live
+          // Marquer comme lu
+          const notifId = n.id_notification;
+          if (!n.is_read && notifId && !String(notifId).startsWith("live-")) {
+            try { await API.put(`/notifications/${notifId}/read`); } catch {}
+            setNotifications(prev => prev.map(x => x.id_notification === notifId ? { ...x, is_read: 1 } : x));
+            setUnreadNotifs(c => Math.max(0, c - 1));
+          }
+
+          // 1. Live notification → navigate to live
           if (n.type_notification === "live_started" || n._liveLink || n._roomCode) {
-            if (!n.is_read) { try { await API.put(`/notifications/${n.id_notification}/read`); } catch {} }
             const liveLink = n._liveLink;
             if (liveLink) {
               try {
@@ -973,14 +980,37 @@ const JeuneLayout = () => {
             goTo(PAGES.LIVE);
             return;
           }
-          // Enquête → go to enquetes
+
+          // 2. Enquête → go to enquetes
           if (n.type_notification === "enquete_response") {
-            await markNotifRead(n.id_notification || n);
             goTo(PAGES.ENQUETE);
             return;
           }
-          // Publication/commentaire/réaction → markRead then navigate
-          await markNotifRead(n);
+
+          // 3. Publication/commentaire/réaction/debat → scroll to publication
+          const isPubNotif = n.entity_id && (
+            n.entity_type === "publication" ||
+            ["new_post", "publication_comment", "publication_reaction", "debat_vote", "comment_reaction"].includes(n.type_notification)
+          );
+          if (isPubNotif) {
+            goTo(PAGES.HOME);
+            // scroll après le render du feed
+            setTimeout(() => {
+              const el = document.getElementById(`pub-${n.entity_id}`);
+              if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+              else {
+                // si la pub n'est pas encore chargée → highlight après fetchPublications
+                setHighlightedPub(parseInt(n.entity_id));
+                fetchPublications(true).then(() => {
+                  setTimeout(() => {
+                    document.getElementById(`pub-${n.entity_id}`)
+                      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }, 400);
+                });
+              }
+            }, 350);
+            return;
+          }
         };
 
         return (

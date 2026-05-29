@@ -1317,12 +1317,20 @@ const navItems = [
 
   const handleNotifClick = async (n) => {
     await markNotifRead(n.id_notification);
-    // Live notification → aller au live
+
+    // 1. Live → aller au live
     if (n.type_notification === "live_started") {
       setActivePage("live");
       return;
     }
-    // Publication/commentaire/réaction → aller à accueil et scroller
+
+    // 2. Enquête → aller à enquêtes
+    if (n.type_notification === "enquete_response") {
+      setActivePage("enquetes");
+      return;
+    }
+
+    // 3. Publication/commentaire/réaction → accueil + scroll
     const isPubNotif = n.entity_id && (
       n.entity_type === "publication" ||
       ["new_post","publication_comment","publication_reaction","debat_vote","comment_reaction"].includes(n.type_notification)
@@ -1331,12 +1339,15 @@ const navItems = [
       setActivePage("accueil");
       setTimeout(() => {
         const el = document.getElementById(`pub-${n.entity_id}`);
-        if (el) el.scrollIntoView({ behavior:"smooth", block:"center" });
-      }, 400);
-    }
-    // Enquête → aller à enquêtes
-    if (n.type_notification === "enquete_response") {
-      setActivePage("enquetes");
+        if (el) {
+          el.scrollIntoView({ behavior:"smooth", block:"center" });
+          // highlight visuel
+          el.style.outline = "3px solid #7c3aed";
+          el.style.borderRadius = "12px";
+          setTimeout(() => { el.style.outline = "none"; }, 2500);
+        }
+      }, 500);
+      return;
     }
   };
 
