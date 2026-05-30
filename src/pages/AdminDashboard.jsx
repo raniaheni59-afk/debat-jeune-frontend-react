@@ -19,6 +19,8 @@ import PublicationCard from "../components/PublicationCard";
 
 
 import AdminContact from "./AdminContact";
+import Participants from "./Participants";
+import Suivi from "./suivi";
 import EnquetePage from "./EnquetePage";
 import CalendarPage from "./CalendarPage";
 import ArchivePage from "./ArchivePage";
@@ -876,23 +878,22 @@ const opts = {
   
   // ── NAV ITEMS ── ✅ ENQUETES AJOUTÉ
 const navItems = [
-  { key:"accueil",      label: t("accueil") },
-  { key:"dashboard",    label: t("dashboard") },
-  { key:"messages",     label: t("messages") },
-  { key:"publier",      label: t("publier") },
-  { key:"calendrier",   label: t("calendrier") },
-  { key:"swafyMeet",    label: "Swafy Meet" },
-  { key:"enquetes",     label: "Enquêtes", icon: "📋" }, 
-  { key:"participant",  label: t("participants") },
-  { key:"notification", label: t("notifications"), badge: adminUnread || null },
-  { key:"archive",      label: t("archive") },
-  
+  { key:"accueil",      icon:"🏠", label: t("accueil") },
+  { key:"dashboard",    icon:"📊", label: t("dashboard") },
+  { key:"messages",     icon:"💬", label: t("messages") },
+  { key:"publier",      icon:"✍️",  label: t("publier") },
+  { key:"calendrier",   icon:"📅", label: t("calendrier") },
+  { key:"swafyMeet",    icon:"🎥", label: "Swafy Meet" },
+  { key:"enquetes",     icon:"📋", label: "Enquêtes" },
+  { key:"participant",  icon:"👥", label: t("participants") },
+  { key:"suivi",        icon:"📈", label: "Suivi" },
+  { key:"notification", icon:"🔔", label: t("notifications"), badge: adminUnread || null },
+  { key:"archive",      icon:"📁", label: t("archive") },
 ];
 
   // ── Empty pages ──
  const emptyPages = {
-  participant:  { icon:"👥" },
-  parametre:    { icon:"⚙️" },
+  parametre: { icon:"⚙️" },
 };
 
   // ── Helpers ──
@@ -944,7 +945,9 @@ const navItems = [
   "parametreContact",
   "publier",
   "enquetes",
-  "notification", // ✅ page full avec sidebar
+  "participant",
+  "suivi",
+  "notification",
 ];
 
   const isFullPage = fullPages.includes(activePage);
@@ -1414,6 +1417,39 @@ const navItems = [
     }}
   >
     <ParametreContact onBack={() => setActivePage("messages")} />
+  </div>
+)}
+
+{/* ══════════════════════════════════
+     PARTICIPANTS PAGE
+══════════════════════════════════ */}
+{activePage === "participant" && (
+  <div
+    style={{
+      marginLeft: sidebarVisible ? 240 : 0,
+      transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+      minHeight: "100vh",
+      background: "linear-gradient(135deg,#f5f3fb,#ede9ff)",
+      padding: "30px 40px 80px",
+      boxSizing: "border-box",
+    }}
+  >
+    <Participants />
+  </div>
+)}
+
+{/* ══════════════════════════════════
+     SUIVI PAGE
+══════════════════════════════════ */}
+{activePage === "suivi" && (
+  <div
+    style={{
+      marginLeft: sidebarVisible ? 240 : 0,
+      transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
+      minHeight: "100vh",
+    }}
+  >
+    <Suivi goDashboard={() => setActivePage("dashboard")} />
   </div>
 )}
 

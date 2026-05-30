@@ -1,31 +1,79 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import API from "../services/api";
 
 export default function ArchivePage() {
   const [showAllLives, setShowAllLives] = useState(false);
   const [showAllEnquetes, setShowAllEnquetes] = useState(false);
 
-  const lives = [
-    { id: 1, title: "Live Innovation", description: "Startup & Tech", date: "12 Mars 2026" },
-    { id: 2, title: "Live Orientation", description: "Choix universitaire", date: "05 Février 2026" },
-    { id: 3, title: "Live Jeunesse", description: "Engagement citoyen", date: "20 Janvier 2026" },
-    { id: 4, title: "Live Digital", description: "Transformation digitale", date: "10 Janvier 2026" },
-  ];
+  const [lives, setLives] = useState([]);
+  const [enquetes, setEnquetes] = useState([]);
 
-  const enquetes = [
-    { id: 1, title: "Enquête Satisfaction", description: "Avis global", date: "20 Février 2026" },
-    { id: 2, title: "Enquête Étudiants", description: "Vie universitaire", date: "10 Janvier 2026" },
-    { id: 3, title: "Enquête Plateforme", description: "UX & Performance", date: "02 Janvier 2026" },
-  ];
+  useEffect(() => {
+  // ✅ LIVES ARCHIVÉS — depuis la table live_archives (server.js l.786)
+  API.get("/live-archives")
+    .then(res => {
+      const data = Array.isArray(res.data) ? res.data : [];
+      setLives(data);
+    })
+    .catch(() => {
+      // Fallback: si /live-archives n'existe pas encore, filtre par status
+      API.get("/lives")
+        .then(res => {
+          const archived = (Array.isArray(res.data) ? res.data : []).filter(item =>
+            item.status === "Terminé" || item.is_active === 0
+          );
+          setLives(archived);
+        })
+        .catch(err => console.error("lives fallback error:", err));
+    });
 
-  const renderCards = (data, badge, color) =>
-    data.map((item) => (
-      <div key={item.id} className="archive-card">
+  // ✅ ENQUÊTES ARCHIVÉES — filtre par date_fin ou date_creation < aujourd'hui
+  API.get("/enquetes")
+    .then(res => {
+      const today = new Date().setHours(0, 0, 0, 0);
+      const data = Array.isArray(res.data) ? res.data : [];
+      const archived = data.filter(item => {
+        // Priorité: date_fin si elle existe
+        const dateRef = item.date_fin || item.date_creation;
+        if (!dateRef) return false;
+        return new Date(dateRef).setHours(0, 0, 0, 0) < today;
+      });
+      setEnquetes(archived);
+    })
+    .catch(err => console.error("enquetes error:", err));
+}, []);
+
+
+ const renderCards = (data, badge, color) =>
+  data.map((item, idx) => {
+    // live_archives fields: title, room_code, host_name, started_at, ended_at, duration_seconds, participants_count
+    // lives fields: title_live, date, thematique
+    // enquetes fields: titre, description, date_creation, date_fin
+    const title = item.title || item.title_live || item.titre || "Sans titre";
+    const description = item.description || item.thematique || "";
+    const dateVal = item.ended_at || item.started_at || item.date || item.date_fin || item.date_creation;
+    const duration = item.duration_seconds ? `⏱ ${Math.floor(item.duration_seconds / 60)} min` : null;
+    const participants = item.participants_count != null ? `👥 ${item.participants_count} participants` : null;
+    const host = item.host_name ? `🎙 ${item.host_name}` : null;
+
+    return (
+      <div key={item.id || item.id_live || item.id_enquete || idx} className="archive-card">
         <span className={`badge ${color}`}>{badge}</span>
-        <h3>{item.title}</h3>
-        <p>{item.description}</p>
-        <span className="date">📅 {item.date}</span>
+        <h3>{title}</h3>
+        {description && <p>{description}</p>}
+        {(duration || participants || host) && (
+          <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginTop:"10px" }}>
+            {host        && <span style={{ fontSize:11, background:"#f0ebff", color:"#5a3fa0", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{host}</span>}
+            {duration    && <span style={{ fontSize:11, background:"#f0ebff", color:"#5a3fa0", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{duration}</span>}
+            {participants && <span style={{ fontSize:11, background:"#e0f2fe", color:"#0369a1", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{participants}</span>}
+          </div>
+        )}
+        <span className="date">
+          📅 {dateVal ? new Date(dateVal).toLocaleDateString("fr-FR", { day:"numeric", month:"long", year:"numeric" }) : "—"}
+        </span>
       </div>
-    ));
+    );
+  });
 
   return (
     <div className="archive-page">
@@ -59,6 +107,10 @@ export default function ArchivePage() {
           {renderCards(showAllEnquetes ? enquetes : enquetes.slice(0, 3), "ENQUÊTE", "enquete")}
         </div>
       </section>
+
+      {/* ⚠️ CSS متاعك خليه كيف ما هو ✅ */}
+
+    
 
       {/* ===== STYLES ===== */}
       <style>{`

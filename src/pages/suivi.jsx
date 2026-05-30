@@ -5,16 +5,13 @@ import {
   Chart as ChartJS,
   CategoryScale, LinearScale,
   PointElement, LineElement,
-  BarElement, ArcElement,
+  BarElement, 
   Filler, Tooltip, Legend,
 } from "chart.js";
-import { Line, Bar, Doughnut } from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import API from "../services/api";
 
-ChartJS.register(
-  CategoryScale, LinearScale, PointElement, LineElement,
-  BarElement, ArcElement, Filler, Tooltip, Legend
-);
+
 
 const C = {
   purple:  "#7c5cbf",
@@ -116,7 +113,7 @@ export default function Suivi({ goDashboard }) {
   
   const [year,          setYear]          = useState(new Date().getFullYear());
   const [eventsData,    setEventsData]    = useState(new Array(24).fill(0));
-  const [participantN,  setParticipantN]  = useState(null);
+  
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [loadingPart,   setLoadingPart]   = useState(true);
   const [lastSync,      setLastSync]      = useState(null);
@@ -134,7 +131,7 @@ export default function Suivi({ goDashboard }) {
   const [customCharts, setCustomCharts] = useState([]);
   const [addCustomOpen, setAddCustomOpen] = useState(false);
   const [newCustom, setNewCustom] = useState({ type:"bar", title:"", labels:"Jan,Fév,Mar,Avr", values:"0,0,0,0", color: C.blue });
-
+  const [totalUsers, setTotalUsers] = useState(0);
 
   const fetchEvents = useCallback(async () => {
     setLoadingEvents(true);
@@ -155,26 +152,10 @@ export default function Suivi({ goDashboard }) {
     }
   }, [year]);
 
-  const fetchParticipants = useCallback(async () => {
-    setLoadingPart(true);
-    try {
-      const res = await API.get("/users/count/jeune-profiles");
-      if (res.data?.count != null) setParticipantN(res.data.count);
-    } catch (err) {
-      console.error("fetchParticipants:", err);
-    } finally {
-      setLoadingPart(false);
-    }
-  }, []);
+
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
-  useEffect(() => { fetchParticipants(); }, [fetchParticipants]);
-
  
-  useEffect(() => {
-    const iv = setInterval(fetchParticipants, 30_000);
-    return () => clearInterval(iv);
-  }, [fetchParticipants]);
 
  
   const handleAddEvent = async () => {
@@ -251,24 +232,6 @@ export default function Suivi({ goDashboard }) {
     },
   };
 
-  const partDoughnutData = {
-    labels: ["Jeunes", "Autres"],
-    datasets: [{
-      data: [participantN ?? 0, 0],
-      backgroundColor: [C.purple, "#e0d9f5"],
-      borderWidth: 3, borderColor:"#fff", hoverOffset:10,
-    }],
-  };
-
-  const partDoughnutOpts = {
-    responsive:true, maintainAspectRatio:false, cutout:"68%",
-    plugins:{
-      legend:{ position:"bottom", labels:{ padding:16, usePointStyle:true, font:{size:12} } },
-      tooltip:{ callbacks:{ label: ctx => ` ${ctx.label} : ${ctx.parsed}` } },
-    },
-  };
-
-  
   const buildCustomData = (c) => {
     if (c.type === "doughnut") {
       const colors = [C.purple, C.teal, C.pink, C.amber, C.blue];
@@ -288,8 +251,11 @@ export default function Suivi({ goDashboard }) {
       datasets: [{ label:c.title, data:c.values, backgroundColor:`${c.color}cc`, borderRadius:6 }],
     };
   };
+useEffect(() => {
+  setCustomCharts([]);
+}, []);
 
-  const Comp = { line:Line, bar:Bar, doughnut:Doughnut };
+  const Comp = { line:Line, bar:Bar };
 
   return (
     <div style={S.root}>
@@ -438,60 +404,8 @@ export default function Suivi({ goDashboard }) {
         )}
       </div>
 
-      {/* ════════ DIAGRAMME 2 — Participants ════════ */}
-      <div style={{ ...S.card, display:"flex", gap:32, alignItems:"center", flexWrap:"wrap" }}>
-        <div style={{ flex:"1 1 220px" }}>
-          <div style={S.cardTitle}> Participants Jeunes</div>
-          <div style={S.cardSub}>Source : table <code style={S.code}>utilisateurs</code> WHERE <code style={S.code}>role = 'jeune'</code></div>
-          <div style={{ marginTop:24, display:"flex", flexDirection:"column", gap:10 }}>
-            <div style={S.statRow}>
-              <span style={S.statRowLabel}>Total jeunes</span>
-              <span style={{ ...S.statRowVal, color:C.purple }}>
-                {loadingPart ? "…" : (participantN ?? 0).toLocaleString("fr-FR")}
-              </span>
-            </div>
-            <div style={S.statRow}>
-              <span style={S.statRowLabel}>Sync automatique</span>
-              <span style={{ fontSize:12, fontWeight:600, color:"#16a34a", display:"flex", alignItems:"center", gap:6 }}>
-                <span style={S.liveDot} /> toutes les 30s
-              </span>
-            </div>
-            <div style={S.statRow}>
-              <span style={S.statRowLabel}>Endpoint</span>
-              <code style={{ ...S.code, fontSize:11 }}>/users/count/jeune-profiles</code>
-            </div>
-          </div>
-        </div>
-        <div style={{ flex:"0 0 220px", height:220 }}>
-          {loadingPart ? <Spin /> : (
-            <Doughnut data={partDoughnutData} options={partDoughnutOpts} />
-          )}
-        </div>
-      </div>
 
-      {/* ════════ CUSTOM CHARTS ════════ */}
-      {customCharts.length > 0 && (
-        <div style={S.grid}>
-          {customCharts.map(chart => {
-            const Ch = Comp[chart.type];
-            if (!Ch) return null;
-            return (
-              <div key={chart.id} style={S.card}>
-                <div style={S.cardHeader}>
-                  <div style={S.cardTitle}>{chart.title}</div>
-                  <div style={{ display:"flex", gap:6 }}>
-                    
-                  </div>
-                </div>
-                <div style={{ height:220 }}>
-                  <Ch data={buildCustomData(chart)} options={{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display: chart.type==="doughnut" } } }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
+   
       {/* ════════ MODAL AJOUT ÉVÉNEMENT ════════ */}
      
  {addEventOpen && (
