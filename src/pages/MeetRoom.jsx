@@ -935,7 +935,7 @@ export default function MeetRoom() {
       )}
 
       {/* BODY */}
-      <div style={{ flex:1,display:"flex",overflow:"hidden",gap:8,padding:8,minHeight:0 }}>
+      <div style={{ flex:1,display:"flex",overflow:"hidden",gap:8,padding:8,minHeight:0,background:"#ffffff" }}>
 
         {/* VIDEO AREA — Google Meet layout */}
         <div style={{ flex:1,display:"flex",flexDirection:"column",gap:6,overflow:"hidden",minWidth:0,position:"relative" }}>
@@ -971,13 +971,11 @@ export default function MeetRoom() {
 
               {/* Right strip */}
               <div style={{ width:160,display:"flex",flexDirection:"column",gap:6,overflowY:"auto",flexShrink:0 }}>
-                {/* Self tile */}
-                {myRole==="host" ? (
+                {/* Self tile — host only */}
+                {myRole==="host" && (
                   <div style={{ position:"relative",flexShrink:0 }}>
                     <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} />
                   </div>
-                ) : (
-                  <GuestSelfTile name={myName} camOn={camOn} micOn={micOn} hand={hand} camStream={localStr.current} />
                 )}
                 {/* Strip peers */}
                 {stripPeers.map(p => (
@@ -999,49 +997,79 @@ export default function MeetRoom() {
               </div>
             </div>
           ) : (
-            /* ── GRID MODE: equal tiles ── */
+            /* ── GRID MODE: admin tile is always large/main ── */
             (() => {
-              const allTiles = myRole==="host"
-                ? [{ id:"__local__" }, ...visiblePeers]
-                : [{ id:"__self__" }, ...visiblePeers];
-              const total = allTiles.length;
-              const cols  = total<=1?1:total<=4?2:total<=9?3:4;
-              return (
-                <div style={{ flex:1,display:"grid",gap:8,alignContent:"center",overflow:"hidden",
-                  gridTemplateColumns:`repeat(${cols},1fr)`, gridAutoRows:"1fr" }}>
+              const peerCount = visiblePeers.length;
 
-                  {/* Self tile */}
-                  {myRole==="host" ? (
-                    <div style={{ position:"relative" }}
-                      onClick={()=>{ if(peers.length>0){ setSpotlightId(null); } }}>
-                      <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} />
+              /* HOST layout: big admin tile on left, guest strip on right */
+              if (myRole === "host") {
+                return (
+                  <div style={{ flex:1,display:"flex",gap:8,overflow:"hidden",minHeight:0 }}>
+                    {/* Big admin tile */}
+                    <div style={{ flex:1,position:"relative",minWidth:0 }}>
+                      <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} fillHeight />
+                    </div>
+                    {/* Guest strip — only if there are guests */}
+                    {peerCount > 0 && (
+                      <div style={{ width:180,display:"flex",flexDirection:"column",gap:6,overflowY:"auto",flexShrink:0 }}>
+                        {visiblePeers.map(p => (
+                          <div key={p.id} style={{ position:"relative",flexShrink:0,cursor:"pointer" }}
+                            onClick={()=>{ setSpotlightId(p.id); emit("spotlight-set",{roomCode,socketId:p.id}); }}>
+                            <Tile stream={p.stream}
+                              name={nameMap.current[p.id]||p.name||"Invité"}
+                              role={ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id]||"guest"}
+                              camOff={pState[p.id]?.video===false}
+                              hand={pState[p.id]?.hand}
+                              screenShare={pState[p.id]?.screen}
+                              micOn={pState[p.id]?.audio!==false}
+                              muted={false} />
+                            <div style={{ position:"absolute",inset:0,cursor:"pointer",borderRadius:14,border:"2px solid transparent",transition:"border .15s" }}
+                              onMouseEnter={e=>e.currentTarget.style.border="2px solid rgba(255,255,255,.35)"}
+                              onMouseLeave={e=>e.currentTarget.style.border="2px solid transparent"} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              /* GUEST layout: show only the admin/remote streams — no guest self-tile */
+              return (
+                <div style={{ flex:1,display:"flex",overflow:"hidden",minHeight:0 }}>
+                  {peerCount === 0 ? (
+                    <div style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,
+                      background:"rgba(0,0,0,.03)",borderRadius:14,border:"1px dashed rgba(0,0,0,.1)" }}>
+                      <div style={{ width:44,height:44,border:"3px solid rgba(0,0,0,.1)",borderTopColor:"#1a73e8",
+                        borderRadius:"50%",animation:"spin .8s linear infinite" }} />
+                      <p style={{ color:"#555",fontSize:14 }}>En attente du flux vidéo de l\'admin…</p>
+                    </div>
+                  ) : peerCount === 1 ? (
+                    <div style={{ flex:1,position:"relative",minWidth:0 }}>
+                      <Tile stream={visiblePeers[0].stream}
+                        name={nameMap.current[visiblePeers[0].id]||visiblePeers[0].name||"Admin"}
+                        role={ptcps.find(x=>x.socketId===visiblePeers[0].id)?.role||roleMap.current[visiblePeers[0].id]||"host"}
+                        camOff={pState[visiblePeers[0].id]?.video===false}
+                        hand={pState[visiblePeers[0].id]?.hand}
+                        screenShare={pState[visiblePeers[0].id]?.screen}
+                        micOn={pState[visiblePeers[0].id]?.audio!==false}
+                        muted={false} fillHeight />
                     </div>
                   ) : (
-                    <GuestSelfTile name={myName} camOn={camOn} micOn={micOn} hand={hand} camStream={localStr.current} />
-                  )}
-
-                  {/* Remote tiles */}
-                  {visiblePeers.map(p => (
-                    <div key={p.id} style={{ position:"relative",cursor:myRole==="host"?"pointer":"default" }}
-                      onClick={()=>{ if(myRole==="host"){ setSpotlightId(p.id); emit("spotlight-set",{roomCode,socketId:p.id}); } }}>
-                      <Tile stream={p.stream}
-                        name={nameMap.current[p.id]||p.name||"Invité"}
-                        role={ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id]||"guest"}
-                        camOff={pState[p.id]?.video===false}
-                        hand={pState[p.id]?.hand}
-                        screenShare={pState[p.id]?.screen}
-                        micOn={pState[p.id]?.audio!==false}
-                        muted={false} />
-                    </div>
-                  ))}
-
-                  {/* Waiting for admin */}
-                  {myRole==="guest" && visiblePeers.length===0 && (
-                    <div style={{ display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,
-                      minHeight:260,background:"rgba(255,255,255,.02)",borderRadius:14,border:"1px dashed rgba(255,255,255,.1)" }}>
-                      <div style={{ width:44,height:44,border:"3px solid rgba(255,255,255,.1)",borderTopColor:"#8ab4f8",
-                        borderRadius:"50%",animation:"spin .8s linear infinite" }} />
-                      <p style={{ color:"#9aa0a6",fontSize:14 }}>En attente du flux vidéo de l'admin…</p>
+                    <div style={{ flex:1,display:"grid",gap:8,alignContent:"center",overflow:"hidden",
+                      gridTemplateColumns:`repeat(${peerCount<=4?2:3},1fr)`,gridAutoRows:"1fr" }}>
+                      {visiblePeers.map(p => (
+                        <div key={p.id} style={{ position:"relative" }}>
+                          <Tile stream={p.stream}
+                            name={nameMap.current[p.id]||p.name||"Invité"}
+                            role={ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id]||"guest"}
+                            camOff={pState[p.id]?.video===false}
+                            hand={pState[p.id]?.hand}
+                            screenShare={pState[p.id]?.screen}
+                            micOn={pState[p.id]?.audio!==false}
+                            muted={false} />
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
