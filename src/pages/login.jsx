@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import API from "../services/api";
 import "./Login.css"
+
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -11,13 +12,13 @@ const Login = () => {
   // Forgot password states
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
-  const [forgotStep, setForgotStep] = useState(1); // 1=email, 2=verification, 3=new password
+  const [forgotStep, setForgotStep] = useState(1); // 1=email input, 2=enter code
   const [forgotCode, setForgotCode] = useState("");
-  const [newPassword, setNewPassword] = useState("");
   const [forgotMsg, setForgotMsg] = useState({ type: "", text: "" });
 
   const navigate = useNavigate();
 
+  // ── LOGIN ─────────────────────────────────────────────
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -50,67 +51,83 @@ const Login = () => {
     setLoading(false);
   };
 
-  // ── FORGOT PASSWORD FLOW ──────────────────────────
+  // ── FORGOT PASSWORD FLOW ──────────────────────────────
 
-  // Step 1: Send verification email (OUI/NON)
-  const handleForgotSendVerif = async () => {
-    if (!forgotEmail.includes("@")) return setForgotMsg({ type: "error", text: "Email invalide." });
-    setLoading(true);
-    setForgotMsg({ type: "", text: "" });
-    try {
-      await API.post("/auth/send-owner-check", {
-        email: forgotEmail,
-        nom: "",
-        prenom: "Utilisateur",
-        isForgotPassword: true
-      });
-      setForgotMsg({ type: "success", text: "✅ Email de vérification envoyé ! Cliquez sur OUI dans l'email." });
-      setForgotStep(2);
-    } catch (err) {
-      setForgotMsg({ type: "error", text: err.response?.data?.message || "Erreur envoi email." });
-    }
-    setLoading(false);
-  };
-
-  // Step 2: After user clicks OUI — send new password code
+  // Step 1 → Envoyer le code au mail
   const handleForgotSendCode = async () => {
+    if (!forgotEmail.includes("@"))
+      return setForgotMsg({ type: "error", text: "Adresse email invalide." });
+
     setLoading(true);
     setForgotMsg({ type: "", text: "" });
     try {
       await API.post("/auth/send-password-code", { email: forgotEmail });
-      setForgotMsg({ type: "success", text: "✅ Code secret envoyé à votre email !" });
-      setForgotStep(3);
+      setForgotMsg({
+        type: "success",
+        text: "✅ Un code secret a été envoyé à votre email. Vérifiez votre boîte de réception.",
+      });
+      setForgotStep(2);
     } catch (err) {
-      setForgotMsg({ type: "error", text: err.response?.data?.message || "Erreur envoi code." });
+      setForgotMsg({
+        type: "error",
+        text: err.response?.data?.message || "Email introuvable ou erreur serveur.",
+      });
     }
     setLoading(false);
   };
 
-  // Step 3: Submit new password
+  // Step 2 → Confirmer le code → met à jour le mot de passe → connecte automatiquement
   const handleForgotSubmit = async () => {
-    if (!forgotCode) return setForgotMsg({ type: "error", text: "Veuillez entrer le code reçu." });
+    if (!forgotCode.trim())
+      return setForgotMsg({ type: "error", text: "Veuillez coller le code reçu par email." });
+
     setLoading(true);
     setForgotMsg({ type: "", text: "" });
     try {
-      // Use register-final endpoint to update password
+      // Met à jour le mot de passe avec le code reçu
       await API.post("/auth/register-final", {
         email_user: forgotEmail,
-        mot_de_passe_user: forgotCode,
+        mot_de_passe_user: forgotCode.trim(),
       });
-      setForgotMsg({ type: "success", text: "✅ Mot de passe mis à jour ! Vous pouvez vous connecter." });
+
+      // Connexion automatique avec le nouveau mot de passe
+      const loginRes = await API.post("/auth/login", {
+        email_user: forgotEmail,
+        mot_de_passe_user: forgotCode.trim(),
+      });
+
+      localStorage.setItem("token", loginRes.data.token);
+      localStorage.setItem("user", JSON.stringify(loginRes.data.user));
+
+      setForgotMsg({ type: "success", text: "✅ Mot de passe mis à jour ! Redirection..." });
+
       setTimeout(() => {
-        setShowForgot(false);
-        setForgotStep(1);
-        setForgotEmail("");
-        setForgotCode("");
-        setEmail(forgotEmail);
-      }, 2000);
+        const role = loginRes.data.user?.role;
+        if (role === "admin" || role === "superadmin") {
+          navigate("/admin/dashboard");
+        } else {
+          navigate("/jeune");
+        }
+      }, 1500);
     } catch (err) {
-      setForgotMsg({ type: "error", text: err.response?.data?.message || "Code incorrect." });
+      setForgotMsg({
+        type: "error",
+        text: err.response?.data?.message || "Code incorrect ou expiré. Réessayez.",
+      });
     }
     setLoading(false);
   };
 
+  // Reset le flow forgot
+  const resetForgot = () => {
+    setShowForgot(false);
+    setForgotStep(1);
+    setForgotEmail("");
+    setForgotCode("");
+    setForgotMsg({ type: "", text: "" });
+  };
+
+  // ── RENDER ────────────────────────────────────────────
   return (
     <div className="auth-page">
       <div className="shape shape-top-left"></div>
@@ -126,6 +143,7 @@ const Login = () => {
       <div className="auth-card">
         <h1>SWAFY</h1>
 
+        {/* ══ LOGIN NORMAL ══════════════════════════════ */}
         {!showForgot ? (
           <>
             <p>Connectez-vous pour continuer.</p>
@@ -148,8 +166,10 @@ const Login = () => {
               />
               <div
                 className="forgot-password"
-                style={{ cursor: "pointer", color: "#667eea" }}
-                onClick={() => { setShowForgot(true); setForgotEmail(email); }}
+                onClick={() => {
+                  setShowForgot(true);
+                  setForgotEmail(email); // pré-remplir si déjà saisi
+                }}
               >
                 Mot de passe oublié ?
               </div>
@@ -160,66 +180,89 @@ const Login = () => {
             {error && <div className="error-msg">{error}</div>}
           </>
         ) : (
+          /* ══ FORGOT PASSWORD FLOW ══════════════════════ */
           <>
             <p>Réinitialisation du mot de passe</p>
 
+            {/* Message feedback */}
             {forgotMsg.text && (
-              <div className={`error-msg`} style={{
-                background: forgotMsg.type === "success" ? "#d4edda" : "#f8d7da",
-                color: forgotMsg.type === "success" ? "#155724" : "#721c24",
-                padding: 10, borderRadius: 8, marginBottom: 10
-              }}>
+              <div
+                className="error-msg"
+                style={{
+                  background: forgotMsg.type === "success"
+                    ? "rgba(40,167,69,0.2)"
+                    : "rgba(220,50,50,0.2)",
+                  borderColor: forgotMsg.type === "success"
+                    ? "rgba(40,167,69,0.4)"
+                    : "rgba(220,50,50,0.4)",
+                  color: forgotMsg.type === "success" ? "#a8ffb8" : "#ffaaaa",
+                }}
+              >
                 {forgotMsg.text}
               </div>
             )}
 
-            {/* Step 1: Email */}
+            {/* ── Étape 1 : Saisir l'email ── */}
             {forgotStep === 1 && (
               <>
-                <label>Votre email</label>
+                <label>Votre adresse email</label>
                 <input
                   type="email"
                   placeholder="votre@email.com"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
+                  autoFocus
                 />
-                <button onClick={handleForgotSendVerif} disabled={loading} style={{ marginTop: 10 }}>
-                  {loading ? "Envoi..." : "Envoyer vérification"}
+                <button onClick={handleForgotSendCode} disabled={loading}>
+                  {loading ? "Envoi en cours..." : "Envoyer le code"}
                 </button>
               </>
             )}
 
-            {/* Step 2: Waiting for OUI click */}
+            {/* ── Étape 2 : Entrer le code reçu ── */}
             {forgotStep === 2 && (
               <>
-                <p style={{ color: "#666", fontSize: 14 }}>
-                  📧 Cliquez sur <strong>"OUI, c'est moi"</strong> dans l'email reçu, puis cliquez ci-dessous.
-                </p>
-                <button onClick={handleForgotSendCode} disabled={loading} style={{ marginTop: 10 }}>
-                  {loading ? "Envoi..." : "✅ J'ai confirmé, envoyer le code"}
-                </button>
-              </>
-            )}
-
-            {/* Step 3: Enter code */}
-            {forgotStep === 3 && (
-              <>
-                <label>Code secret reçu par email</label>
+                <label>Code reçu par email</label>
                 <input
                   type="text"
-                  placeholder="Collez le code ici..."
+                  placeholder="Collez le code secret ici..."
                   value={forgotCode}
                   onChange={(e) => setForgotCode(e.target.value)}
+                  autoFocus
                 />
-                <button onClick={handleForgotSubmit} disabled={loading} style={{ marginTop: 10 }}>
-                  {loading ? "Mise à jour..." : "Confirmer nouveau mot de passe"}
+                <button onClick={handleForgotSubmit} disabled={loading}>
+                  {loading ? "Mise à jour..." : "Confirmer et se connecter"}
                 </button>
+                {/* Renvoyer le code */}
+                <div
+                  style={{
+                    marginTop: 12,
+                    textAlign: "center",
+                    fontSize: 13,
+                    color: "rgba(255,255,255,0.6)",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => {
+                    setForgotStep(1);
+                    setForgotCode("");
+                    setForgotMsg({ type: "", text: "" });
+                  }}
+                >
+                  Code non reçu ? Renvoyer →
+                </div>
               </>
             )}
 
+            {/* Retour au login */}
             <div
-              style={{ marginTop: 15, cursor: "pointer", color: "#667eea", fontSize: 14 }}
-              onClick={() => { setShowForgot(false); setForgotStep(1); setForgotMsg({ type: "", text: "" }); }}
+              style={{
+                marginTop: 18,
+                cursor: "pointer",
+                color: "rgba(255,255,255,0.7)",
+                fontSize: 14,
+                textAlign: "center",
+              }}
+              onClick={resetForgot}
             >
               ← Retour à la connexion
             </div>
