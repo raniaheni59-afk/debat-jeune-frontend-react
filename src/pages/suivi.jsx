@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -155,9 +154,38 @@ export default function Suivi({ goDashboard }) {
 
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
- 
 
- 
+  // ── Participants count ────────────────────────────────
+  const [participantN, setParticipantN] = useState(null);
+
+  const fetchParticipants = useCallback(async () => {
+    setLoadingPart(true);
+    try {
+      const res = await API.get("/users", {
+        params: { role: "jeune" },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      const data = Array.isArray(res.data)        ? res.data
+                 : Array.isArray(res.data?.users) ? res.data.users
+                 : [];
+      setParticipantN(data.length);
+      setTotalUsers(data.length);
+    } catch {
+      // fallback: try count endpoint
+      try {
+        const r2 = await API.get("/users/count/jeune-profiles");
+        if (r2.data?.count != null) {
+          setParticipantN(r2.data.count);
+          setTotalUsers(r2.data.count);
+        }
+      } catch { setParticipantN(0); }
+    } finally {
+      setLoadingPart(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchParticipants(); }, [fetchParticipants]);
+
   const handleAddEvent = async () => {
     if (!evForm.titre.trim() || !evForm.date) {
       push("Remplissez tous les champs", "err"); return;
