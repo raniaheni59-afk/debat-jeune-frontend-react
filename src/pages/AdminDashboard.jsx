@@ -44,7 +44,7 @@ export default function AdminDashboard() {
   const [calSplash, setCalSplash] = useState(false);
   const [archiveSplash, setArchiveSplash] = useState(false);
   const [paramSplash, setParamSplash] = useState(false);
-  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sidebarVisible] = useState(true); // sidebar toujours visible
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedCard, setHighlightedCard] = useState(null);
@@ -205,9 +205,7 @@ export default function AdminDashboard() {
     }
   }, [year]);
 
-  const lastScrollY = useRef(0);
-  const prevDir      = useRef(null);
-  const suggestTimer = useRef(null);
+  
 
   // ── CSS injection ──
   useEffect(() => {
@@ -247,20 +245,7 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Scroll → sidebar hide/show ──
-  useEffect(() => {
-    const onScroll = () => {
-      const y = window.scrollY;
-      const dir = y > lastScrollY.current ? "down" : "up";
-      if (dir !== prevDir.current && y > 80) {
-        setSidebarVisible(dir === "up");
-        prevDir.current = dir;
-      }
-      lastScrollY.current = y;
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  // ── Scroll → sidebar toujours visible (scroll ne cache plus le menu) ──
   useEffect(() => {
   if (activePage !== "calendrier") return;
 
@@ -742,10 +727,7 @@ const navItems = [
         ))}
       </div>
 
-      {/* ── FAB ── */}
-      {!sidebarVisible && (
-        <button style={S.fab} onClick={() => setSidebarVisible(true)}>☰</button>
-      )}
+      {/* FAB supprimé — sidebar toujours visible */}
 
       {/* ── SIDEBAR ── */}
       <aside style={{
@@ -753,7 +735,7 @@ const navItems = [
         transform: sidebarVisible ? "translateX(0)" : "translateX(-100%)",
         opacity:   sidebarVisible ? 1 : 0,
       }}>
-        <button style={S.menuBtn} onClick={() => setSidebarVisible(!sidebarVisible)}>
+        <button style={S.menuBtn} onClick={() => {}}>
           ☰ Menu
         </button>
 
@@ -812,7 +794,7 @@ const navItems = [
 
     <div
       style={{
-        marginLeft: sidebarVisible ? 240 : 0,
+        marginLeft: 240,
         transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
         minHeight: "100vh",
         background: "#f8f7fc",
@@ -829,7 +811,7 @@ const navItems = [
       ══════════════════════════════════ */}
       {activePage === "messages" && (
         <div style={{
-          marginLeft: sidebarVisible ? 240 : 0,
+          marginLeft: 240,
           transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
           minHeight: "100vh",
         }}>
@@ -842,7 +824,7 @@ const navItems = [
       ══════════════════════════════════ */}
       {activePage === "newlive" && (
         <div style={{
-          marginLeft: sidebarVisible ? 240 : 0,
+          marginLeft: 240,
           transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
           minHeight: "100vh",
         }}>
@@ -865,7 +847,7 @@ const navItems = [
 {activePage === "live" && (
   <div
     style={{
-      marginLeft: sidebarVisible ? 240 : 0,
+      marginLeft: 240,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
       background: "#f8f7fc",
@@ -879,7 +861,7 @@ const navItems = [
 {activePage === "swafyMeet" && (
   <div
     style={{
-      marginLeft: sidebarVisible ? 240 : 0,
+      marginLeft: 240,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
       background: "#fff",
@@ -895,7 +877,7 @@ const navItems = [
 {activePage === "enquetes" && (
   <div
     style={{
-      marginLeft: sidebarVisible ? 240 : 0,
+      marginLeft: 240,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
       background: "linear-gradient(135deg,#b8a9e0,#9b89d0 20%,#8b7bc8 40%,#7c6cbf 60%,#9584cf 80%,#a897da)",
@@ -985,7 +967,7 @@ const navItems = [
 
   return (
     <div style={{
-      marginLeft: sidebarVisible ? 240 : 0,
+      marginLeft: 240,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
       background: "linear-gradient(135deg,#1a0e3b 0%,#2d1b69 40%,#3b1f7a 70%,#2a1060 100%)",
@@ -1124,7 +1106,7 @@ const navItems = [
 
     <div
       style={{
-        marginLeft: sidebarVisible ? 240 : 0,
+        marginLeft: 240,
         transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
         minHeight: "100vh",
         background: "#f8f7fc",
@@ -1168,7 +1150,7 @@ const navItems = [
 
     <div
       style={{
-        marginLeft: sidebarVisible ? 240 : 0,
+        marginLeft: 240,
         transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
         minHeight: "100vh",
         background: "#f6f5ff",
@@ -1181,7 +1163,7 @@ const navItems = [
 {activePage === "parametreContact" && (
   <div
     style={{
-      marginLeft: sidebarVisible ? 240 : 0,
+      marginLeft: 240,
       transition: "margin-left .5s",
       minHeight: "100vh",
       background: "#f8f7fc",
@@ -1197,7 +1179,7 @@ const navItems = [
 {activePage === "participant" && (
   <div
     style={{
-      marginLeft: sidebarVisible ? 240 : 0,
+      marginLeft: 240,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
       background: "linear-gradient(135deg,#f5f3fb,#ede9ff)",
@@ -1215,7 +1197,7 @@ const navItems = [
 {activePage === "suivi" && (
   <div
     style={{
-      marginLeft: sidebarVisible ? 240 : 0,
+      marginLeft: 240,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
     }}
@@ -1226,7 +1208,7 @@ const navItems = [
 
 {activePage === "accueil" && (
   <div style={{
-    marginLeft: sidebarVisible ? 240 : 0,
+    marginLeft: 240,
     transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
     minHeight: "100vh",
     padding: "20px 30px 80px",
@@ -1277,7 +1259,7 @@ const navItems = [
 {activePage === "publier" && (
   <div
     style={{
-      marginLeft: sidebarVisible ? 240 : 0,
+      marginLeft: 240,
       transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
       minHeight: "100vh",
       background: "linear-gradient(135deg, #f5f2ff 0%, #ede9ff 100%)",
@@ -1310,7 +1292,7 @@ const navItems = [
        emptyPages[activePage] && (
         <div style={{
           ...S.empty,
-          marginLeft: sidebarVisible ? 240 : 0,
+          marginLeft: 240,
           transition: "margin-left .5s cubic-bezier(.4,0,.2,1)",
         }}>
           <div style={S.emptyIco}>{emptyPages[activePage].icon}</div>
@@ -1323,7 +1305,7 @@ const navItems = [
            M A I N  (dashboard)
       ══════════════════════════════════ */}
       {!isFullPage && (
-        <div style={{ ...S.main, marginLeft: sidebarVisible ? 240 : 0 }}>
+        <div style={{ ...S.main, marginLeft: 240 }}>
 
           {/* TOP BAR */}
           <div style={S.topBar}>
