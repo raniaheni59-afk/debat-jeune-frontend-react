@@ -905,7 +905,7 @@ const JeuneLayout = () => {
     { icon:"radio",    label:"Live",            page:PAGES.LIVE,      live:true },
     { icon:"pencil",   label:"Enquêtes",        page:PAGES.ENQUETE },
     { icon:"bell",     label:"Notifications",   page:PAGES.NOTIFS,    badge:unreadNotifs||null },
-    { icon:"settings", label:"Paramètres",      page:PAGES.SETTINGS },
+    
   ];
 
   /* ── MODAL ── */
