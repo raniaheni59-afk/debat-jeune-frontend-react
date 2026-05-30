@@ -8,6 +8,9 @@ const GOUVERNORATS = [
   "Gafsa","Tozeur","Kebili",
 ];
 
+// ── Avatar SVG par défaut (pas besoin de fichier externe) ──
+const DEFAULT_AVATAR_SVG = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='90' height='90' viewBox='0 0 90 90'><rect width='90' height='90' rx='45' fill='%23e2d9f3'/><circle cx='45' cy='34' r='18' fill='%239b8abf'/><ellipse cx='45' cy='75' rx='28' ry='20' fill='%239b8abf'/></svg>`;
+
 export default function Participants() {
   const [users, setUsers]               = useState([]);
   const [loading, setLoading]           = useState(true);
@@ -15,11 +18,10 @@ export default function Participants() {
   const [gouvernorat, setGouvernorat]   = useState("Tous");
   const [statusFilter, setStatusFilter] = useState("tous");
 
-  // ── Fetch ────────────────────────────────────────────
+  // ── Fetch ─────────────────────────────────────────────
   const fetchParticipants = async () => {
     setLoading(true);
     try {
-      // FIX 1: use the correct endpoint that your UserRoutes exposes
       const res = await API.get("/users", { params: { role: "jeune" } });
       const data = Array.isArray(res.data) ? res.data
                  : Array.isArray(res.data?.users) ? res.data.users
@@ -35,7 +37,7 @@ export default function Participants() {
 
   useEffect(() => { fetchParticipants(); }, []);
 
-  // ── Actions ──────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────
   const deleteUser = async (id) => {
     if (!window.confirm("Supprimer ce participant ?")) return;
     try {
@@ -50,12 +52,9 @@ export default function Participants() {
   const blockUser = async (id) => {
     if (!window.confirm("Bloquer ce participant ?")) return;
     try {
-      // FIX 2: correct block route — matches server.js admin-block socket or REST route
       await API.put(`/users/${id}/block`);
       fetchParticipants();
     } catch (err) {
-      console.error(err);
-      // Fallback: try the other possible route shape
       try {
         await API.patch(`/users/${id}`, { status_user: "bloqué" });
         fetchParticipants();
@@ -66,7 +65,7 @@ export default function Participants() {
     }
   };
 
-  // ── Filter ───────────────────────────────────────────
+  // ── Filter ────────────────────────────────────────────
   const filtered = users.filter(u => {
     const q = search.toLowerCase().trim();
     const matchSearch = !q ||
@@ -76,7 +75,6 @@ export default function Participants() {
 
     const matchGouv = gouvernorat === "Tous" || u.gouvernorat === gouvernorat;
 
-    // FIX 3: case-insensitive status comparison + handle null/undefined
     const userStatus = (u.status_user ?? "").toLowerCase().trim();
     const matchStatus =
       statusFilter === "tous" ||
@@ -85,7 +83,17 @@ export default function Participants() {
     return matchSearch && matchGouv && matchStatus;
   });
 
-  // ── Render ───────────────────────────────────────────
+  // ── Helper: résoudre l'URL de la photo ───────────────
+  const resolvePhoto = (photo_user) => {
+    if (!photo_user) return null;
+    // Déjà une URL complète (Cloudinary, http...)
+    if (photo_user.startsWith("http")) return photo_user;
+    // Chemin relatif → construire l'URL backend
+    const BACKEND = import.meta.env.VITE_BACKEND_URL || "https://debat-jeune.onrender.com";
+    return `${BACKEND}/${photo_user.replace(/^\//, "")}`;
+  };
+
+  // ── Render ────────────────────────────────────────────
   return (
     <div style={{ padding: "30px" }}>
       <h1 style={{ marginBottom: "20px", fontFamily: "Poppins,sans-serif", color: "#2d2555" }}>
@@ -134,7 +142,7 @@ export default function Participants() {
       {/* ── STATES ── */}
       {loading ? (
         <div style={{ textAlign: "center", padding: "60px 0", color: "#bbb", fontFamily: "Poppins,sans-serif" }}>
-          <div style={{ fontSize: 36, marginBottom: 12, animation: "spin 1s linear infinite" }}>⏳</div>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>⏳</div>
           <p style={{ fontSize: 14 }}>Chargement des participants…</p>
         </div>
       ) : filtered.length === 0 ? (
@@ -151,70 +159,68 @@ export default function Participants() {
         </div>
       ) : (
         <div style={gridStyle}>
-          {filtered.map((u) => (
-            <div key={u.id_user} style={card}>
-              {/* Actions */}
-              <div style={topActions}>
-                <button
-                  style={btnBlock}
-                  title="Bloquer ce participant"
-                  onClick={() => blockUser(u.id_user)}
-                >
-                  🔒 Bloquer
-                </button>
-                <button
-                  style={btnDelete}
-                  title="Supprimer ce participant"
-                  onClick={() => deleteUser(u.id_user)}
-                >
-                  🗑
-                </button>
+          {filtered.map((u) => {
+            const photoUrl = resolvePhoto(u.photo_user);
+            const statusColor =
+              (u.status_user ?? "").toLowerCase() === "actif"   ? "#16a34a" :
+              (u.status_user ?? "").toLowerCase() === "bloqué"  ? "#dc2626" : "#f59e0b";
+
+            return (
+              <div key={u.id_user} style={card}>
+                {/* Actions */}
+                <div style={topActions}>
+                  <button style={btnBlock} onClick={() => blockUser(u.id_user)}>🔒 Bloquer</button>
+                  <button style={btnDelete} onClick={() => deleteUser(u.id_user)}>🗑</button>
+                </div>
+
+                {/* Avatar */}
+                <div style={avatarContainer}>
+                  {photoUrl ? (
+                    <img
+                      src={photoUrl}
+                      alt="avatar"
+                      style={avatarStyle}
+                      onError={e => {
+                        e.target.onerror = null;
+                        e.target.src = DEFAULT_AVATAR_SVG;
+                      }}
+                    />
+                  ) : (
+                    /* SVG avatar par défaut — initiales ou icône générique */
+                    <div style={avatarFallback}>
+                      <span style={{ fontSize: 28, color: "#7c5cbf", fontWeight: 700, fontFamily: "Poppins,sans-serif", lineHeight: 1 }}>
+                        {(u.prenom_user?.[0] ?? u.nom_user?.[0] ?? "?").toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  {u.sexe === "femme" && (
+                    <span style={flowerBadge} title="Femme">🌸</span>
+                  )}
+                </div>
+
+                <h3 style={nameStyle}>{u.nom_user} {u.prenom_user}</h3>
+                <p style={emailStyle}>{u.email_user}</p>
+
+                <div style={infoBox}>
+                  {u.statut        && <span style={tag}>{u.statut}</span>}
+                  {u.etablissement && <span style={tag}>🏫 {u.etablissement}</span>}
+                  {u.gouvernorat   && <span style={tag}>📍 {u.gouvernorat}</span>}
+                  {u.age           && <span style={tag}>🎂 {u.age} ans</span>}
+                </div>
+
+                <p style={{ marginTop: "8px", fontSize: "11px", fontWeight: 600, color: statusColor }}>
+                  ● {u.status_user ?? "inconnu"}
+                </p>
               </div>
-
-              {/* Avatar */}
-              {/* FIX 4: flower was covering the avatar — now properly positioned as a border ring */}
-              <div style={avatarContainer}>
-                <img
-                  src={u.photo_user || "/default-avatar.png"}
-                  alt="avatar"
-                  style={avatarStyle}
-                  onError={e => { e.target.src = "/default-avatar.png"; }}
-                />
-                {u.sexe === "femme" && (
-                  <span style={flowerBadge} title="Femme">🌸</span>
-                )}
-              </div>
-
-              <h3 style={nameStyle}>{u.nom_user} {u.prenom_user}</h3>
-              <p style={emailStyle}>{u.email_user}</p>
-
-              <div style={infoBox}>
-                {u.statut        && <span style={tag}>{u.statut}</span>}
-                {u.etablissement && <span style={tag}>🏫 {u.etablissement}</span>}
-                {u.gouvernorat   && <span style={tag}>📍 {u.gouvernorat}</span>}
-                {u.age           && <span style={tag}>🎂 {u.age} ans</span>}
-              </div>
-
-              {/* FIX 5: normalize status display so "bloqué" with accent renders consistently */}
-              <p style={{
-                marginTop: "8px",
-                fontSize: "11px",
-                fontWeight: 600,
-                color: u.status_user === "actif" ? "#16a34a"
-                     : u.status_user === "bloqué" ? "#dc2626"
-                     : "#f59e0b",
-              }}>
-                ● {u.status_user ?? "inconnu"}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-/* ── STYLES ─────────────────────────────────────────── */
+/* ── STYLES ──────────────────────────────────────────── */
 
 const gridStyle = {
   display: "grid",
@@ -223,12 +229,15 @@ const gridStyle = {
 };
 
 const card = {
-  background: "#fff",
+  /* ✅ FIX: background blanc forcé + couleur texte sombre — override du theme admin violet */
+  background: "#ffffff !important",
+  backgroundColor: "#ffffff",
   borderRadius: "16px",
   padding: "20px",
   textAlign: "center",
   boxShadow: "0 6px 25px rgba(0,0,0,0.08)",
   position: "relative",
+  color: "#333",
 };
 
 const topActions = {
@@ -271,10 +280,23 @@ const avatarStyle = {
   height: "90px",
   borderRadius: "50%",
   objectFit: "cover",
-  border: "3px solid #f1f5f9",
+  border: "3px solid #e2d9f3",
+  display: "block",
+  background: "#f1f5f9",
 };
 
-// FIX 4: flower is now a small emoji badge, not a white circle covering the photo
+/* ✅ FIX: avatar fallback avec initiale — remplace l'image cassée */
+const avatarFallback = {
+  width: "90px",
+  height: "90px",
+  borderRadius: "50%",
+  background: "linear-gradient(135deg, #e2d9f3, #c4b5e8)",
+  border: "3px solid #e2d9f3",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
 const flowerBadge = {
   position: "absolute",
   bottom: 0,
@@ -287,12 +309,15 @@ const nameStyle = {
   fontSize: "16px",
   fontWeight: "600",
   margin: "0 0 4px",
+  color: "#2d2555",
+  fontFamily: "Poppins,sans-serif",
 };
 
 const emailStyle = {
   fontSize: "12px",
   color: "#777",
   margin: "0 0 8px",
+  fontFamily: "Poppins,sans-serif",
 };
 
 const infoBox = {
@@ -308,4 +333,6 @@ const tag = {
   padding: "5px 8px",
   borderRadius: "6px",
   fontSize: "11px",
+  color: "#555",
+  fontFamily: "Poppins,sans-serif",
 };
