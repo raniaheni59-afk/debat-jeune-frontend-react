@@ -142,7 +142,18 @@ export default function JeuneContact() {
   const fetchConvs = useCallback(async () => {
     try {
       const r = await API.get("/messenger/conversations");
-      setConvs(safe(r.data));
+      const all = safe(r.data);
+
+      // ✅ Dédupliquer côté frontend aussi: une seule conv par admin (id_user unique)
+      const seen = new Set();
+      const deduped = all.filter(c => {
+        const key = Number(c.id_user);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      setConvs(deduped);
     } catch(e) { console.error(e); }
   }, []);
   useEffect(() => { fetchConvs(); }, [fetchConvs]);
@@ -247,8 +258,7 @@ export default function JeuneContact() {
 
   const isGroup        = sel==="group";
   const isSearch       = !!query.trim();
-  const listItems      = isSearch?results:convs;
-  const adminNotInConv = safe(admins).filter(a=>!safe(convs).find(c=>Number(c.id_user)===Number(a.id_user)));
+  const listItems      = isSearch ? results : convs;
   const activeMsgs     = safe(isGroup?grpMsgs:msgs);
   const canSend        = !!(text.trim()||filePrev)&&!sending;
 
