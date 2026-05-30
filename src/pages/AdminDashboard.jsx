@@ -237,8 +237,6 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [highlightedCard, setHighlightedCard] = useState(null);
-  const [year, setYear] = useState(2026);
-  const [period, setPeriod] = useState("7");
   const [toasts, setToasts] = useState([]);
   const toastId = useRef(0);
 
@@ -336,30 +334,6 @@ export default function AdminDashboard() {
  
   const [charts, setCharts] = useState([
     {
-      id: "chart-event",
-      type: "line",
-      title: "Événements par Gouvernorat (par an)",
-      keywords: "evenement Gouvernaurat tunisie annuel statistique",
-      labels: [
-        "Tunis","Ariana","Ben Arous","Manouba",
-        "Nabeul","Zaghouan","Bizerte",
-        "Beja","Jendouba","Kef","Siliana",
-        "Sousse","Monastir","Mahdia",
-        "Sfax","Kairouan","Kasserine","Sidi Bouzid",
-        "Gabes","Mednine","Tataouine",
-        "Gafsa","Tozeur","Kebili"
-      ],
-      datasets: [
-        {
-          label: "Nombre d'événements / an",
-          data: [4,6,3,7,2,5,4,6,3,2,4,7,5,6,8,4,3,5,2,6,4,3,2,1],
-          color: "#4285f4",
-          dashed: false,
-        },
-      ],
-    },
-   
-    {
       id: "chart-donut", type: "doughnut", title: "Catégorie",
       subtitle: "From 1-6 Dec, 2021",
       keywords: "categorie donut pie etudiant eleve parent camembert pourcentage",
@@ -367,58 +341,23 @@ export default function AdminDashboard() {
       datasets: [{ data:[40,32,28], colors:["#4a5568","#7c5cbf","#ec4899"] }],
     },
     {
-  id: "chart-enquete-satisfaction",
-  type: "line",
-  title: "Évolution de la satisfaction (Enquête)",
-  keywords: "enquete satisfaction evolution",
-  labels: ["Jan", "Feb", "Mar", "Apr"],
-  datasets: [
-    {
-      label: "Satisfaction moyenne",
-      data: [5, 4, 3, 4],
-      color: "#7c5cbf",
-      dashed: false,
-    },
-  ],
-},
-
-  ]);
-
-  const [statCards, setStatCards] = useState([
-    {
-      id:"stat-participant", label:"Nombre participant", value:4000,
-      gradient:"linear-gradient(135deg,#3498db,#2980b9)",
-      keywords:"nombre participant nbr jeune bleu users", autoSync:true,
-    },
-    {
-      id:"stat-gouvernant", label:"Nombre gouvernant", value:24,
-      gradient:"linear-gradient(135deg,#6ab04c,#78c850)",
-      keywords:"nombre gouvernant vert admin", autoSync:false,
+      id: "chart-enquete-satisfaction",
+      type: "line",
+      title: "Évolution de la satisfaction (Enquête)",
+      keywords: "enquete satisfaction evolution",
+      labels: ["Jan", "Feb", "Mar", "Apr"],
+      datasets: [
+        {
+          label: "Satisfaction moyenne",
+          data: [5, 4, 3, 4],
+          color: "#7c5cbf",
+          dashed: false,
+        },
+      ],
     },
   ]);
-  // ✅ FETCH STATS EVENEMENTS (من DB)
-const fetchGouvernoratStats = useCallback(async () => {
-  try {
-    const res = await API.get(`/events/stats-gouvernorat?year=${year}`);
 
-    const data = new Array(24).fill(0);
-
-    res.data.forEach((e) => {
-      const i = e.id_gouvernorat - 1;
-      if (i >= 0 && i < 24) data[i] = e.total;
-    });
-
-    setCharts((prev) =>
-      prev.map((c) =>
-        c.id === "chart-event"
-          ? { ...c, datasets: [{ ...c.datasets[0], data }] }
-          : c
-      )
-    );
-  } catch (err) {
-    console.error("❌ fetchGouvernoratStats error", err);
-  }
-}, [year]);
+  const [statCards, setStatCards] = useState([]);
   const lastScrollY  = useRef(0);
   const prevDir      = useRef(null);
   const suggestTimer = useRef(null);
@@ -443,23 +382,6 @@ const fetchGouvernoratStats = useCallback(async () => {
     return () => document.head.removeChild(style);
   }, []);
 
-
-  // ── Auto-sync participant count ──//
-  useEffect(() => {
-    const sync = async () => {
-      try {
-       const res = await API.get("/users/count/jeune-profiles");
-        if (res.data?.count != null) {
-          setStatCards((p) =>
-            p.map((c) => c.id === "stat-participant" ? { ...c, value: res.data.count } : c)
-          );
-        }
-      } catch {}
-    };
-    sync();
-    const interval = setInterval(sync, 30000);
-    return () => clearInterval(interval);
-  }, []);
 
   // ── Scroll → sidebar hide/show ──
   useEffect(() => {
@@ -510,11 +432,7 @@ useEffect(() => {
   return () => clearInterval(interval);
 }, []);
 
-// ✅ events من DB
-useEffect(() => {
-  fetchGouvernoratStats();
-}, [fetchGouvernoratStats]);
-
+// ✅ events من DB — removed (chart-event deleted)
 
 useEffect(() => {
   if (activePage !== "archive") return;
@@ -602,12 +520,6 @@ useEffect(() => {
     setTimeout(() => setHighlightedCard(null), 3500);
   };
 
-  const changeYear = (dir) => {
-    const y = year + dir;
-    setYear(y);
-    toast(` Année ${y} chargée`);
-  };
-
   // ── Chart CRUD ──
 const openEditChart = (chart) => {
   const copy = JSON.parse(JSON.stringify(chart));
@@ -629,48 +541,8 @@ const openAddData = (chart) => {
   setEditModal({ open:true, mode:"add-data", targetId:chart.id, data:copy });
 }; 
 
-  const openEditStat = (stat) =>
-    setEditModal({ open:true, mode:"edit-stat", targetId:stat.id, data:{ ...stat } });
-
   const saveModal = async () => {
   const { mode, targetId, data } = editModal;
-
-  if (targetId === "chart-event" && mode === "add-data") {
-    try {
-      const payload = {
-        titre_evenement: data.titre_evenement,
-        id_gouvernorat: data.id_gouvernorat ?? 1,
-        date_evenement: data.date_evenement,
-        id_user: user?.id_user || user?.id || user?.userId,
-      };
-
-      if (
-        !payload.titre_evenement?.trim() ||
-        !payload.id_gouvernorat ||
-        !payload.date_evenement
-      ) {
-        toast("❌ Tous les champs sont obligatoires.", "error");
-        return;
-      }
-
-      const token = localStorage.getItem("token");
-      await API.post("/events", payload, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      toast("✅ Événement ajouté avec succès !");
-      await fetchGouvernoratStats();
-      closeModal();
-      return;
-    } catch (error) {
-      toast(
-        error.response?.data?.message ||
-          "❌ Erreur serveur lors de l'ajout de l'événement",
-        "error"
-      );
-      return;
-    }
-  }
 
   if (mode === "edit-stat" && targetId?.startsWith("stat-")) {
     setStatCards((p) =>
@@ -929,10 +801,6 @@ const navItems = [
     });
   };
 
-  const firstChart = charts[0] || null;
-  const restCharts = charts.slice(1);
-
-  
   const fullPages = [
   "accueil",
   "calendrier",
@@ -1605,123 +1473,57 @@ const navItems = [
           {activePage === "dashboard" && (
             <div style={{ animation:"fadeUp .5s ease" }}>
 
-              {/* ROW 1 */}
-              <div style={S.row1}>
-                {firstChart && (() => {
-  const C = Comp[firstChart.type];
-  // ✅ Sécuriser l'accès aux datasets
-  const safeDatasets = firstChart.datasets || [];
-  
-  return (
-    <div id={firstChart.id}
-      style={cardStyle(firstChart.id, firstChart.keywords, { flex:1.6, padding:24 })}>
-      <div style={S.hdr}>
-        <span style={S.hdrTitle}>{firstChart.title}</span>
-        <div style={S.yearNav}>
-          <button style={S.yBtn} onClick={() => changeYear(-1)}>◀</button>
-          <span style={S.yLabel}>{year}</span>
-          <button style={S.yBtn} onClick={() => changeYear(1)}>▶</button>
-        </div>
-        <select style={S.sel} value={period}
-          onChange={(e) => { setPeriod(e.target.value); toast(`📆 Période : ${e.target.value} jours`); }}>
-          <option value="7">7 days</option>
-          <option value="30">30 days</option>
-          <option value="90">90 days</option>
-        </select>
-      </div>
-      <div style={{ height:220 }}>
-        {(firstChart.labels?.length > 0 || firstChart.type === "doughnut")
-          ? <C 
-  data={buildData(firstChart) || { labels: [], datasets: [] }} 
-  options={opts[firstChart.type] || {}} 
-/>
-          : <div style={{height:"100%",display:"flex",alignItems:"center",justifyContent:"center",color:"#bbb",fontSize:13}}>Chargement…</div>
-        }
-      </div>
-      {/* ✅ CORRECTION: protéger le map avec safeDatasets */}
-      {firstChart.type === "line" && safeDatasets.length > 0 && (
-        <div style={S.legend}>
-          {safeDatasets.map((ds, i) => (
-            <span key={i} style={S.legendItem}>
-              <span style={{ ...S.dot, background: ds?.color || "#7c5cbf", opacity: ds?.dashed ? 0.5 : 1 }} />
-              {ds?.label || ""}
-            </span>
-          ))}
-        </div>
-      )}
-      <div style={S.actions}>
-        <button style={S.actBtn} onClick={() => openEditChart(firstChart)}>✏️ Modifier</button>
-        <button style={{ ...S.actBtn, ...S.actDel }}
-          onClick={() => setConfirmDel({ open:true, id:firstChart.id, title:firstChart.title })}>
-          🗑 Supprimer
-        </button>
-        <button style={{ ...S.actBtn, ...S.actAdd }} onClick={() => openAddData(firstChart)}>
-          ➕ Ajouter
-        </button>
-      </div>
-    </div>
-  );
-})()}
-
-                <div style={S.statsCol}>
-                  {statCards.map((s) => (
-                    <div key={s.id} id={s.id}
-                      style={{ ...cardStyle(s.id, s.keywords), ...S.statCard, background:s.gradient }}
-                      onClick={() => openEditStat(s)}>
-                      <div style={S.statEdit}>✏️</div>
-                      {s.autoSync && <div style={S.autoSync ? { ...S.autoTag } : {}}>🔄 Auto-sync</div>}
-                      <div style={S.statLabel}>{s.label}</div>
-                      <div style={S.statNum}>{s.value.toLocaleString()}</div>
-                      <div style={S.circle1} /><div style={S.circle2} />
-                    </div>
-                  ))}
+              {/* CHARTS GRID — tous les diagrammes en grille */}
+              {charts.length > 0 && (
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(420px,1fr))", gap:20, marginBottom:20, animation:"fadeUp .5s ease" }}>
+                  {charts.map((chart) => {
+                    if (!chart) return null;
+                    const ChartComp = Comp[chart.type] || Line;
+                    const chartOptions = opts[chart.type] || opts.line;
+                    const safeDatasets = chart.datasets || [];
+                    return (
+                      <div key={chart.id} id={chart.id}
+                        style={cardStyle(chart.id, chart.keywords, { padding:24 })}>
+                        <div style={S.hdr}>
+                          <span style={S.hdrTitle}>{chart.title}</span>
+                          {chart.type === "doughnut" && (
+                            <button style={S.reportBtn} onClick={() => toast("📄 Rapport généré !")}>
+                              View Report
+                            </button>
+                          )}
+                        </div>
+                        {chart.subtitle && <p style={S.sub}>{chart.subtitle}</p>}
+                        <div style={{ height: chart.type === "doughnut" ? 200 : 250 }}>
+                          <ChartComp
+                            data={buildData(chart) || { labels:[], datasets:[] }}
+                            options={chartOptions}
+                          />
+                        </div>
+                        {chart.type === "line" && safeDatasets.length > 0 && (
+                          <div style={S.legend}>
+                            {safeDatasets.map((ds, i) => (
+                              <span key={i} style={S.legendItem}>
+                                <span style={{ ...S.dot, background: ds?.color || "#7c5cbf", opacity: ds?.dashed ? 0.5 : 1 }} />
+                                {ds?.label || ""}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div style={S.actions}>
+                          <button style={S.actBtn} onClick={() => openEditChart(chart)}>✏️ Modifier</button>
+                          <button style={{ ...S.actBtn, ...S.actDel }}
+                            onClick={() => setConfirmDel({ open:true, id:chart.id, title:chart.title })}>
+                            🗑 Supprimer
+                          </button>
+                          <button style={{ ...S.actBtn, ...S.actAdd }} onClick={() => openAddData(chart)}>
+                            ➕ Ajouter
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-
-              {/* GRID */}
-{restCharts.length > 0 && (
-  <div style={S.grid}>
-    {restCharts.map((chart) => {
-      // ✅ Guard: vérifier que chart existe
-      if (!chart) return null;
-      
-      const chartType = chart.type;
-      const chartOptions = opts[chartType] || opts.line;
-      const C = Comp[chartType] || Line;
-      
-      return (
-        <div
-          key={chart.id}
-          id={chart.id}
-          style={cardStyle(chart.id, chart.keywords, { padding: 24 })}
-        >
-          <div style={S.hdr}>
-            <span style={S.hdrTitle}>{chart.title}</span>
-            {chart.type === "doughnut" && (
-              <button style={S.reportBtn} onClick={() => toast("📄 Rapport généré !")}>
-                View Report
-              </button>
-            )}
-          </div>
-          {chart.subtitle && <p style={S.sub}>{chart.subtitle}</p>}
-          <div style={{ height: chart.type === "doughnut" ? 200 : 250 }}>
-            <C data={buildData(chart)} options={chartOptions} />
-          </div>
-          <div style={S.actions}>
-            <button style={S.actBtn} onClick={() => openEditChart(chart)}>✏️ Modifier</button>
-            <button style={{ ...S.actBtn, ...S.actDel }}
-              onClick={() => setConfirmDel({ open: true, id: chart.id, title: chart.title })}>
-              🗑 Supprimer
-            </button>
-            <button style={{ ...S.actBtn, ...S.actAdd }} onClick={() => openAddData(chart)}>
-              ➕ Ajouter
-            </button>
-          </div>
-        </div>
-      );
-    })}
-  </div>
-)}
+              )}
 
               {/* ADD CHART */}
               <div style={S.addSection}>
