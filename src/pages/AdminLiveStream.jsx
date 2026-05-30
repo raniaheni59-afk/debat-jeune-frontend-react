@@ -11,7 +11,12 @@ export default function AdminLiveStream() {
 
  const SOCKET_URL = "https://swafy-backend.onrender.com";
   const socket = useRef(null);
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState(() => {
+    try {
+      // liveCode is not yet known at init time, so we defer — see useEffect below
+      return [];
+    } catch { return []; }
+  });
   const [chatInput, setChatInput] = useState("");
   // ✅ States Live sécurisés
   const [liveCode, setLiveCode] = useState("");
@@ -32,13 +37,23 @@ export default function AdminLiveStream() {
  useEffect(() => {
   if (!liveCode || !hostAccessToken) return;
 
+  // ✅ Load persisted chat history from sessionStorage
+  try {
+    const saved = sessionStorage.getItem(`chat_admin_${liveCode}`);
+    if (saved) setMessages(JSON.parse(saved));
+  } catch {}
+
   if (!socket.current) {
     socket.current = io(SOCKET_URL, {
       transports: ["websocket"],
     });
 
     socket.current.on("receive-message", (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        const next = [...prev, msg];
+        try { sessionStorage.setItem(`chat_admin_${liveCode}`, JSON.stringify(next)); } catch {}
+        return next;
+      });
     });
   }
 
@@ -225,6 +240,8 @@ useEffect(() => {
   streamRef.current?.getTracks().forEach((t) => t.stop());
   screenStreamRef.current?.getTracks().forEach((t) => t.stop());
   if (recIntervalRef.current) clearInterval(recIntervalRef.current);
+
+  try { sessionStorage.removeItem(`chat_admin_${liveCode}`); } catch {}
 
   navigate("/");
 };

@@ -162,7 +162,12 @@ export default function MeetRoom() {
   const [partOpen,    setPartOpen]  = useState(false);
   const [emojiOpen,   setEmojiOpen] = useState(false);
   const [linkOpen,    setLinkOpen]  = useState(false);
-  const [msgs,        setMsgs]      = useState([]);
+  const [msgs,        setMsgs]      = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(`chat_${roomCode}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [chatInput,   setChatInput] = useState("");
   const [unread,      setUnread]    = useState(0);
   const [peers,       setPeers]     = useState([]);
@@ -195,6 +200,15 @@ export default function MeetRoom() {
   const timerRef  = useRef(null);
   const lsRef     = useRef(null);
   const msgsRef   = useRef([]);
+
+  // Sync msgsRef with persisted messages on first render
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(`chat_${roomCode}`);
+      if (saved) msgsRef.current = JSON.parse(saved);
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { live: subtitle, saved: transcript } = useSubtitles(subsOn);
 
@@ -449,7 +463,12 @@ export default function MeetRoom() {
 
       sock.on("receive-message", msg => {
         const m = { ...msg, id:Date.now()+Math.random() };
-        setMsgs(prev => { const n=[...prev,m]; msgsRef.current=n; return n; });
+        setMsgs(prev => {
+          const n = [...prev, m];
+          msgsRef.current = n;
+          try { sessionStorage.setItem(`chat_${roomCode}`, JSON.stringify(n)); } catch {}
+          return n;
+        });
         setChatOpen(o => { if(!o) setUnread(n=>n+1); return o; });
         setTimeout(() => chatEnd.current?.scrollIntoView({ behavior:"smooth" }), 50);
       });
@@ -523,6 +542,7 @@ export default function MeetRoom() {
     pcMap.current = {};
     localStr.current?.getTracks().forEach(t=>t.stop());
     screenStr.current?.getTracks().forEach(t=>t.stop());
+    try { sessionStorage.removeItem(`chat_${roomCode}`); } catch {}
   };
 
   const emit = (ev, d) => sockRef.current?.emit(ev, d);
