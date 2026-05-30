@@ -461,6 +461,27 @@ export default function MeetRoom() {
 
       sock.on("participants-update", list => setPtcps(list||[]));
 
+      // ✅ Historique chat reçu du serveur à l'entrée dans la room
+      sock.on("chat-history", history => {
+        if (!Array.isArray(history) || !history.length) return;
+        setMsgs(prev => {
+          // Garder les messages locaux (sessionStorage) + fusionner avec le serveur
+          // On déduplique par ts (timestamp) pour éviter les doublons
+          const existingTs = new Set(prev.map(m => m.ts));
+          const newMsgs = history
+            .filter(m => !existingTs.has(m.ts))
+            .map(m => ({ ...m, id: Date.now() + Math.random() }));
+          if (!newMsgs.length) return prev;
+          const merged = [...history.map(m => ({ ...m, id: m.ts || (Date.now()+Math.random()) })), ...prev.filter(m => !history.some(h => h.ts === m.ts))];
+          // Sort by ts
+          merged.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+          msgsRef.current = merged;
+          try { sessionStorage.setItem(`chat_${roomCode}`, JSON.stringify(merged)); } catch {}
+          return merged;
+        });
+        setTimeout(() => chatEnd.current?.scrollIntoView({ behavior: "smooth" }), 100);
+      });
+
       sock.on("receive-message", msg => {
         const m = { ...msg, id:Date.now()+Math.random() };
         setMsgs(prev => {
