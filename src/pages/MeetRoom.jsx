@@ -55,18 +55,20 @@ function useSubtitles(on) {
 
 // ══ TILE ══════════════════════════════════════════════
 function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
-                hand=false, isLocal=false, localRef, screenShare=false, micOn=true }) {
+                hand=false, isLocal=false, localRef, screenShare=false, micOn=true, fillHeight=false }) {
   const ref  = useRef(null);
   const vRef = isLocal ? localRef : ref;
 
   useEffect(() => {
     const el = vRef?.current;
     if (!el) return;
-    if (stream && el.srcObject !== stream) {
+    if (stream) {
       el.srcObject = stream;
       el.play().catch(() => {});
+    } else if (!isLocal) {
+      el.srcObject = null;
     }
-  }, [stream]);
+  }, [stream, isLocal]);
 
   const init  = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const isH   = role === "host";
@@ -74,7 +76,7 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
 
   return (
     <div style={{ position:"relative", background:"#111", borderRadius:14, overflow:"hidden",
-      aspectRatio:"16/9", minHeight:110,
+      ...(fillHeight ? { height:"100%", width:"100%" } : { aspectRatio:"16/9", minHeight:110 }),
       boxShadow: hand?"0 0 0 3px #fbbc04":isH?"0 0 0 2px rgba(26,115,232,.5)":"0 2px 12px rgba(0,0,0,.4)" }}>
       <video ref={vRef} autoPlay playsInline muted={muted}
         style={{ width:"100%", height:"100%", objectFit:"cover", display: showV?"block":"none" }} />
@@ -133,6 +135,52 @@ function Modal({ emoji, title, desc, onCancel, confirmLabel, onConfirm, confirmC
   );
 }
 
+
+// ══ GUEST SELF TILE ══════════════════════════════════
+function GuestSelfTile({ name, camOn, micOn, hand, camStream }) {
+  const vRef = useRef(null);
+
+  useEffect(() => {
+    if (!vRef.current || !camStream) return;
+    const track = camStream.getVideoTracks()[0];
+    if (camOn && track?.enabled) {
+      vRef.current.srcObject = camStream;
+      vRef.current.play().catch(() => {});
+    } else {
+      vRef.current.srcObject = null;
+    }
+  }, [camOn, camStream]);
+
+  const init = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+
+  return (
+    <div style={{ position:"relative",background:"#111",borderRadius:14,overflow:"hidden",
+      aspectRatio:"16/9",minHeight:90,boxShadow:"0 2px 12px rgba(0,0,0,.4)" }}>
+      <video ref={vRef} autoPlay playsInline muted
+        style={{ width:"100%",height:"100%",objectFit:"cover",display:camOn?"block":"none" }} />
+      {!camOn && (
+        <div style={{ position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",
+          flexDirection:"column",gap:8,background:"radial-gradient(circle at 35% 30%,#1a1a2e,#0d0d1a)" }}>
+          <div style={{ width:52,height:52,borderRadius:"50%",display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",
+            background:"linear-gradient(135deg,#34a853,#1a6e38)",boxShadow:"0 4px 16px rgba(0,0,0,.5)" }}>
+            {init}
+          </div>
+          <span style={{ color:"#9aa0a6",fontSize:10,background:"rgba(0,0,0,.5)",
+            padding:"3px 10px",borderRadius:20 }}>{micOn?"🎤":"🔇"}</span>
+        </div>
+      )}
+      <div style={{ position:"absolute",bottom:6,left:6,display:"flex",gap:4,alignItems:"center" }}>
+        <span style={{ background:"rgba(0,0,0,.75)",color:"#fff",fontSize:10,padding:"2px 7px",borderRadius:6 }}>
+          {name} (Vous)
+        </span>
+        {!micOn && <span style={{ background:"rgba(234,67,53,.85)",color:"#fff",fontSize:9,padding:"2px 5px",borderRadius:5 }}>🔇</span>}
+      </div>
+      {hand && <div style={{ position:"absolute",top:6,left:6,fontSize:18,animation:"wave .7s infinite" }}>✋</div>}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ══════════════════════════════════════════════════════
@@ -186,6 +234,9 @@ export default function MeetRoom() {
   const [permDenied,  setPermDenied]= useState(false);
   const [endModal,    setEndModal]  = useState(false);
   const [liveInfo,    setLiveInfo]  = useState(null);
+  const [guestScreenAllowed, setGuestScreenAllowed] = useState(false);
+  const [pinnedId,    setPinnedId]  = useState(null); // socket id pinned as main view
+  const [spotlightId, setSpotlightId] = useState(null); // who is spotlighted (screen share)
 
   // ── Refs ──
   const sockRef   = useRef(null);
@@ -512,6 +563,19 @@ export default function MeetRoom() {
         showToast(`Admin a coupé votre ${type==="audio"?"micro":"caméra"}`, "#ea4335", "🔇");
       });
 
+      // ✅ Admin autorise le guest à partager son écran
+      sock.on("screen-share-allowed", ({ targetSocketId }) => {
+        if (targetSocketId === sock.id) {
+          setGuestScreenAllowed(true);
+          showToast("🖥️ Admin vous autorise à partager votre écran", "#34a853");
+        }
+      });
+
+      // ✅ Spotlight: admin épingle un participant en grand
+      sock.on("spotlight-set", ({ socketId }) => {
+        setSpotlightId(socketId || null);
+      });
+
       sock.on("mic-allowed", ({ targetSocketId }) => {
         if (targetSocketId === sock.id) {
           const trk = localStr.current?.getAudioTracks()[0];
@@ -605,7 +669,10 @@ export default function MeetRoom() {
 
   // ✅ FIX Partage d'écran: remplacer track vidéo dans tous les peer connections
   const toggleScreen = async () => {
-    if (myRole!=="host") { showToast("Seul l'admin peut partager l'écran","#fbbc04"); return; }
+    if (myRole!=="host" && !guestScreenAllowed) {
+      showToast("L'admin doit vous autoriser à partager l'écran","#fbbc04");
+      return;
+    }
     if (screenOn) {
       screenStr.current?.getTracks().forEach(t=>t.stop());
       screenStr.current = null;
@@ -655,10 +722,50 @@ export default function MeetRoom() {
           }
         };
         setScreenOn(true);
-        emit("screen-share-started", { roomCode });
+        emit("screen-share-started", { roomCode, sharerRole: myRole });
         showToast("Écran partagé — visible par tous ✅","#34a853","🖥️");
       } catch { showToast("Partage d'écran annulé","#5f6368"); }
     }
+  };
+
+  // ✅ Guest can toggle own camera (small self-view only)
+  const toggleGuestCam = async () => {
+    if (myRole === "host") return;
+    if (localStr.current?.getVideoTracks().length) {
+      const track = localStr.current.getVideoTracks()[0];
+      const nxt = !track.enabled;
+      track.enabled = nxt;
+      setCamOn(nxt);
+      emit("toggle-media", { roomCode, type:"video", enabled: nxt });
+    } else {
+      // First time: request camera
+      try {
+        const camStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+        const camTrack  = camStream.getVideoTracks()[0];
+        if (localStr.current) {
+          // Add video track to existing audio stream
+          localStr.current.addTrack(camTrack);
+          lsRef.current = localStr.current;
+          // Push to all existing peers
+          Object.values(pcMap.current).forEach(pc => {
+            try { pc.addTrack(camTrack, localStr.current); } catch {}
+          });
+        } else {
+          localStr.current = camStream;
+          lsRef.current    = camStream;
+        }
+        setCamOn(true);
+        emit("toggle-media", { roomCode, type:"video", enabled:true });
+        showToast("Caméra activée 📷","#34a853");
+      } catch { showToast("Caméra non disponible","#ea4335","📷"); }
+    }
+  };
+
+  // ✅ Admin grants screen share to a guest
+  const adminAllowScreen = sid => {
+    if (myRole !== "host") return;
+    emit("allow-screen", { roomCode, targetSocketId: sid });
+    showToast("Partage d'écran autorisé 🖥️","#34a853");
   };
 
   const sendReaction = emoji => {
@@ -723,12 +830,27 @@ export default function MeetRoom() {
     navigate("/admin/dashboard", { state:{ archived:true, aiSummary, liveTitle:liveInfo?.title_live } });
   };
 
-  // ── Grid ──
-  // Jeune voit UNIQUEMENT le stream de l'admin
-  const hostPeer    = peers.find(p => (ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id])==="host");
-  const visiblePeers= myRole==="host" ? peers : (hostPeer?[hostPeer]:[]);
-  const total       = 1 + visiblePeers.length;
-  const cols        = total<=1?1:total<=4?2:3;
+  // ── Google Meet style layout ──
+  const hostPeer     = peers.find(p => (ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id])==="host");
+  // Guest sees admin + any guest sharing screen; Admin sees everyone
+  const guestScrPeer = peers.find(p => pState[p.id]?.screen === true);
+  const visiblePeers = myRole === "host" ? peers : [hostPeer, guestScrPeer].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i);
+
+  // Spotlight = pinned || screen sharer || host (for guests)
+  const getMainPeer = () => {
+    if (spotlightId) return peers.find(p=>p.id===spotlightId) || null;
+    if (guestScrPeer) return guestScrPeer;
+    if (myRole === "guest") return hostPeer || null;
+    if (screenOn) return null; // host is main locally
+    const scrPeer = peers.find(p => pState[p.id]?.screen);
+    return scrPeer || null;
+  };
+  const mainPeer  = getMainPeer();
+  // Strip = everyone except the main spotlight
+  const stripPeers = myRole === "host"
+    ? visiblePeers.filter(p => p.id !== mainPeer?.id)
+    : visiblePeers.filter(p => p.id !== mainPeer?.id);
+  const useSpotlight = !!mainPeer || (myRole === "host" && screenOn);
 
   // ── Loading / Error ──
   if (status==="loading") return (
@@ -815,47 +937,116 @@ export default function MeetRoom() {
       {/* BODY */}
       <div style={{ flex:1,display:"flex",overflow:"hidden",gap:8,padding:8,minHeight:0 }}>
 
-        {/* VIDEO GRID */}
-        <div style={{ flex:1,display:"grid",gap:8,alignContent:"center",overflow:"hidden",minWidth:0,gridTemplateColumns:`repeat(${cols},1fr)` }}>
+        {/* VIDEO AREA — Google Meet layout */}
+        <div style={{ flex:1,display:"flex",flexDirection:"column",gap:6,overflow:"hidden",minWidth:0,position:"relative" }}>
 
-          {/* Tile local admin */}
-          {myRole==="host" ? (
-            <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} />
+          {useSpotlight ? (
+            /* ── SPOTLIGHT MODE: big main + strip on right ── */
+            <div style={{ flex:1,display:"flex",gap:6,overflow:"hidden",minHeight:0 }}>
+
+              {/* Main / Spotlight tile */}
+              <div style={{ flex:1,position:"relative",minWidth:0 }}>
+                {mainPeer ? (
+                  <Tile key={mainPeer.id} stream={mainPeer.stream}
+                    name={nameMap.current[mainPeer.id]||mainPeer.name||"Invité"}
+                    role={ptcps.find(x=>x.socketId===mainPeer.id)?.role||roleMap.current[mainPeer.id]||"guest"}
+                    camOff={pState[mainPeer.id]?.video===false}
+                    hand={pState[mainPeer.id]?.hand}
+                    screenShare={pState[mainPeer.id]?.screen}
+                    micOn={pState[mainPeer.id]?.audio!==false}
+                    muted={false}
+                    fillHeight />
+                ) : myRole==="host" && screenOn ? (
+                  /* Host is sharing screen — local stream is the main */
+                  <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={false} micOn={micOn} screenShare fillHeight />
+                ) : null}
+                {/* Unpin button */}
+                {spotlightId && myRole==="host" && (
+                  <button onClick={()=>{ setSpotlightId(null); emit("spotlight-set",{roomCode,socketId:null}); }}
+                    style={{ position:"absolute",top:10,right:10,background:"rgba(0,0,0,.6)",border:"none",borderRadius:8,color:"#fff",padding:"5px 10px",cursor:"pointer",fontSize:12,zIndex:10 }}>
+                    📌 Désépingler
+                  </button>
+                )}
+              </div>
+
+              {/* Right strip */}
+              <div style={{ width:160,display:"flex",flexDirection:"column",gap:6,overflowY:"auto",flexShrink:0 }}>
+                {/* Self tile */}
+                {myRole==="host" ? (
+                  <div style={{ position:"relative",flexShrink:0 }}>
+                    <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} />
+                  </div>
+                ) : (
+                  <GuestSelfTile name={myName} camOn={camOn} micOn={micOn} hand={hand} camStream={localStr.current} />
+                )}
+                {/* Strip peers */}
+                {stripPeers.map(p => (
+                  <div key={p.id} style={{ position:"relative",flexShrink:0 }}
+                    onClick={()=>{ if(myRole==="host"){ setSpotlightId(p.id); emit("spotlight-set",{roomCode,socketId:p.id}); } }}>
+                    <Tile stream={p.stream}
+                      name={nameMap.current[p.id]||p.name||"Invité"}
+                      role={ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id]||"guest"}
+                      camOff={pState[p.id]?.video===false}
+                      hand={pState[p.id]?.hand}
+                      screenShare={pState[p.id]?.screen}
+                      micOn={pState[p.id]?.audio!==false}
+                      muted={false} />
+                    {myRole==="host" && <div style={{ position:"absolute",inset:0,cursor:"pointer",borderRadius:14,border:"2px solid transparent",transition:"border .15s" }}
+                      onMouseEnter={e=>e.currentTarget.style.border="2px solid rgba(255,255,255,.3)"}
+                      onMouseLeave={e=>e.currentTarget.style.border="2px solid transparent"} />}
+                  </div>
+                ))}
+              </div>
+            </div>
           ) : (
-            // Tile local guest (avatar)
-            <div style={{ position:"relative",background:"#111",borderRadius:14,overflow:"hidden",aspectRatio:"16/9",minHeight:90 }}>
-              <div style={{ position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:10,background:"radial-gradient(circle at 35% 30%,#1a1a2e,#0d0d1a)" }}>
-                <div style={{ width:64,height:64,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontWeight:800,color:"#fff",background:"linear-gradient(135deg,#34a853,#1a6e38)" }}>
-                  {myName.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
+            /* ── GRID MODE: equal tiles ── */
+            (() => {
+              const allTiles = myRole==="host"
+                ? [{ id:"__local__" }, ...visiblePeers]
+                : [{ id:"__self__" }, ...visiblePeers];
+              const total = allTiles.length;
+              const cols  = total<=1?1:total<=4?2:total<=9?3:4;
+              return (
+                <div style={{ flex:1,display:"grid",gap:8,alignContent:"center",overflow:"hidden",
+                  gridTemplateColumns:`repeat(${cols},1fr)`, gridAutoRows:"1fr" }}>
+
+                  {/* Self tile */}
+                  {myRole==="host" ? (
+                    <div style={{ position:"relative" }}
+                      onClick={()=>{ if(peers.length>0){ setSpotlightId(null); } }}>
+                      <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} />
+                    </div>
+                  ) : (
+                    <GuestSelfTile name={myName} camOn={camOn} micOn={micOn} hand={hand} camStream={localStr.current} />
+                  )}
+
+                  {/* Remote tiles */}
+                  {visiblePeers.map(p => (
+                    <div key={p.id} style={{ position:"relative",cursor:myRole==="host"?"pointer":"default" }}
+                      onClick={()=>{ if(myRole==="host"){ setSpotlightId(p.id); emit("spotlight-set",{roomCode,socketId:p.id}); } }}>
+                      <Tile stream={p.stream}
+                        name={nameMap.current[p.id]||p.name||"Invité"}
+                        role={ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id]||"guest"}
+                        camOff={pState[p.id]?.video===false}
+                        hand={pState[p.id]?.hand}
+                        screenShare={pState[p.id]?.screen}
+                        micOn={pState[p.id]?.audio!==false}
+                        muted={false} />
+                    </div>
+                  ))}
+
+                  {/* Waiting for admin */}
+                  {myRole==="guest" && visiblePeers.length===0 && (
+                    <div style={{ display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,
+                      minHeight:260,background:"rgba(255,255,255,.02)",borderRadius:14,border:"1px dashed rgba(255,255,255,.1)" }}>
+                      <div style={{ width:44,height:44,border:"3px solid rgba(255,255,255,.1)",borderTopColor:"#8ab4f8",
+                        borderRadius:"50%",animation:"spin .8s linear infinite" }} />
+                      <p style={{ color:"#9aa0a6",fontSize:14 }}>En attente du flux vidéo de l'admin…</p>
+                    </div>
+                  )}
                 </div>
-                <span style={{ color:"#9aa0a6",fontSize:11,background:"rgba(0,0,0,.5)",padding:"4px 12px",borderRadius:20 }}>{micOn?"🎤 Micro actif":"🔇 Muet"}</span>
-              </div>
-              <div style={{ position:"absolute",bottom:8,left:8 }}>
-                <span style={{ background:"rgba(0,0,0,.75)",color:"#fff",fontSize:11,padding:"3px 9px",borderRadius:7 }}>{myName} (Vous)</span>
-              </div>
-              {hand && <div style={{ position:"absolute",top:8,left:8,fontSize:20,animation:"wave .7s infinite" }}>✋</div>}
-            </div>
-          )}
-
-          {/* Tiles des autres */}
-          {visiblePeers.map(p => (
-            <Tile key={p.id} stream={p.stream}
-              name={nameMap.current[p.id]||p.name||"Invité"}
-              role={ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id]||"guest"}
-              camOff={pState[p.id]?.video===false}
-              hand={pState[p.id]?.hand}
-              screenShare={pState[p.id]?.screen}
-              micOn={pState[p.id]?.audio!==false}
-              muted={false} />
-          ))}
-
-          {/* Attente admin pour les jeunes */}
-          {myRole==="guest" && visiblePeers.length===0 && (
-            <div style={{ display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,minHeight:300,background:"rgba(255,255,255,.02)",borderRadius:14,border:"1px dashed rgba(255,255,255,.1)" }}>
-              <div style={{ width:44,height:44,border:"3px solid rgba(255,255,255,.1)",borderTopColor:"#8ab4f8",borderRadius:"50%",animation:"spin .8s linear infinite" }} />
-              <p style={{ color:"#9aa0a6",fontSize:14 }}>En attente du flux vidéo de l'admin…</p>
-              <p style={{ color:"#5f6368",fontSize:12 }}>La vidéo apparaîtra automatiquement</p>
-            </div>
+              );
+            })()
           )}
         </div>
 
@@ -907,10 +1098,12 @@ export default function MeetRoom() {
                   </div>
                   {myRole==="host" && p.socketId!==sockRef.current?.id && (
                     <div style={{ display:"flex",gap:3 }}>
-                      <button title="Autoriser micro" onClick={()=>adminAllowMic(p.socketId)} style={{ background:"rgba(52,168,83,.15)",border:"1px solid rgba(52,168,83,.3)",borderRadius:6,color:"#34a853",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🎤</button>
-                      <button title="Couper micro"    onClick={()=>adminMute(p.socketId,"audio")} style={{ background:"rgba(251,188,4,.1)",border:"1px solid rgba(251,188,4,.3)",borderRadius:6,color:"#fbbc04",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🔇</button>
-                      <button title="Retirer"         onClick={()=>adminKick(p.socketId)}          style={{ background:"rgba(234,67,53,.1)",border:"1px solid rgba(234,67,53,.3)",borderRadius:6,color:"#ea4335",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🚪</button>
-                      <button title="Bloquer"         onClick={()=>adminBlock(p.socketId)}         style={{ background:"rgba(234,67,53,.2)",border:"1px solid rgba(234,67,53,.5)",borderRadius:6,color:"#ea4335",padding:"4px 7px",cursor:"pointer",fontSize:11,fontWeight:700 }}>🚫</button>
+                      <button title="Autoriser micro"   onClick={()=>adminAllowMic(p.socketId)}    style={{ background:"rgba(52,168,83,.15)",border:"1px solid rgba(52,168,83,.3)",borderRadius:6,color:"#34a853",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🎤</button>
+                      <button title="Couper micro"      onClick={()=>adminMute(p.socketId,"audio")} style={{ background:"rgba(251,188,4,.1)",border:"1px solid rgba(251,188,4,.3)",borderRadius:6,color:"#fbbc04",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🔇</button>
+                      <button title="Partage écran"     onClick={()=>adminAllowScreen(p.socketId)} style={{ background:"rgba(138,180,248,.1)",border:"1px solid rgba(138,180,248,.3)",borderRadius:6,color:"#8ab4f8",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🖥️</button>
+                      <button title="Épingler"          onClick={()=>{ setSpotlightId(p.socketId); emit("spotlight-set",{roomCode,socketId:p.socketId}); }} style={{ background:"rgba(251,188,4,.1)",border:"1px solid rgba(251,188,4,.3)",borderRadius:6,color:"#fbbc04",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>📌</button>
+                      <button title="Retirer"           onClick={()=>adminKick(p.socketId)}         style={{ background:"rgba(234,67,53,.1)",border:"1px solid rgba(234,67,53,.3)",borderRadius:6,color:"#ea4335",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🚪</button>
+                      <button title="Bloquer"           onClick={()=>adminBlock(p.socketId)}        style={{ background:"rgba(234,67,53,.2)",border:"1px solid rgba(234,67,53,.5)",borderRadius:6,color:"#ea4335",padding:"4px 7px",cursor:"pointer",fontSize:11,fontWeight:700 }}>🚫</button>
                     </div>
                   )}
                 </div>
@@ -964,10 +1157,13 @@ export default function MeetRoom() {
       <div style={{ background:"#2d2f31",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,flexWrap:"wrap",borderTop:"1px solid rgba(255,255,255,.05)" }}>
         <div style={{ display:"flex",gap:5 }}>
           <Btn icon={micOn?"🎤":"🔇"} label={micOn?"Micro":"Muet"} onClick={toggleMic} active={micOn} />
-          {myRole==="host" && <Btn icon={camOn?"📷":"🚫"} label={camOn?"Caméra":"Off"} onClick={toggleCam} active={camOn} />}
+          {myRole==="host"
+            ? <Btn icon={camOn?"📷":"🚫"} label={camOn?"Caméra":"Off"} onClick={toggleCam} active={camOn} />
+            : <Btn icon={camOn?"📷":"🚫"} label={camOn?"Cam":"Cam"} onClick={toggleGuestCam} active={camOn} />
+          }
         </div>
         <div style={{ display:"flex",gap:5 }}>
-          {myRole==="host" && <Btn icon="🖥️" label={screenOn?"Arrêter":"Partager"} onClick={toggleScreen} active={!screenOn} />}
+          {(myRole==="host" || guestScreenAllowed) && <Btn icon="🖥️" label={screenOn?"Arrêter":"Partager"} onClick={toggleScreen} active={!screenOn} />}
           {myRole==="guest" && <Btn icon="✋" label={hand?"Baisser":"Main"} onClick={toggleHand} active={!hand} pulse={hand} />}
           <Btn icon="😄" label="Réactions" onClick={()=>setEmojiOpen(o=>!o)} active />
           <Btn icon="💬" label="Chat" onClick={()=>{setChatOpen(o=>!o);setUnread(0);setPartOpen(false);setAiOpen(false);}} active badge={unread} />
