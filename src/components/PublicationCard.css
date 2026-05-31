@@ -80,8 +80,8 @@
 
 /* 1 image — pleine largeur, hauteur auto */
 .pc-media-1 { grid-template-columns:1fr; }
-.pc-media-1 .pc-media-item { height:auto; min-height:60px; background:#000; }
-.pc-media-1 .pc-media-item.pc-media-solo img { object-fit:contain; width:100%; height:auto; max-height:580px; position:relative; display:block; inset:unset; }
+.pc-media-1 .pc-media-item { height:auto; background:#000; overflow:hidden; }
+.pc-media-1 .pc-media-item img { position:static !important; width:100% !important; height:auto !important; max-height:600px; object-fit:contain !important; display:block !important; }
 
 /* 2 images */
 .pc-media-2 { grid-template-columns:1fr 1fr; }
@@ -104,7 +104,7 @@
   width:100%; height:100%; object-fit:cover; display:block;
   transition:transform .3s ease;
 }
-.pc-media-1 .pc-media-solo img { object-fit:contain; background:#000; }
+/* .pc-media-1 single image handled above */
 .pc-media-item:hover img { transform:scale(1.03); }
 
 .pc-img-fallback {
