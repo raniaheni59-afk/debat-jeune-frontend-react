@@ -802,9 +802,21 @@ const JeuneLayout = () => {
     } catch {}
   }, []);
 
+  // ✅ Charger le nombre de messages non lus au démarrage
+  const fetchUnreadMessages = useCallback(async () => {
+    try {
+      const r = await API.get("/messenger/conversations/unread-counts");
+      if (Array.isArray(r.data)) {
+        const total = r.data.reduce((sum, row) => sum + (Number(row.unread_count) || 0), 0);
+        setUnreadMessages(total);
+      }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     fetchPublications();
     fetchNotifications();
+    fetchUnreadMessages();
     const params = new URLSearchParams(window.location.search);
     const pubId  = params.get("publication");
     if (pubId) {
@@ -830,8 +842,9 @@ const JeuneLayout = () => {
   const goTo = (page) => {
     setActivePage(page);
     setMobileOpen(false);
-    // ✅ Sauvegarder la page active pour la restaurer après refresh
     localStorage.setItem("jeune_activePage", page);
+    // ✅ Vider le badge messages quand on ouvre la page
+    if (page === PAGES.MESSAGES) setUnreadMessages(0);
   };
 
   const markNotifRead = async (notif) => {
@@ -1383,7 +1396,7 @@ const JeuneLayout = () => {
 
         {/* Content */}
         {activePage === PAGES.MESSAGES ? (
-          <div className="jl-messages-full"><JeuneContact/></div>
+          <div className="jl-messages-full"><JeuneContact onUnreadChange={(n) => setUnreadMessages(n)}/></div>
         ) : (
           <div className="jl-scroll">{renderContent()}</div>
         )}

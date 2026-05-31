@@ -98,6 +98,7 @@ export default function AdminDashboard() {
   // ── Notifications ──
   const [adminNotifs, setAdminNotifs]   = useState([]);
   const [adminUnread, setAdminUnread]   = useState(0);
+  const [adminMsgUnread, setAdminMsgUnread] = useState(0); // ✅ unread messages badge
 
   const fetchAdminNotifs = useCallback(async () => {
     try {
@@ -392,6 +393,7 @@ export default function AdminDashboard() {
     setActivePage(page);
     setSearchQuery("");
     setHighlightedCard(null);
+    if (page === "messages") setAdminMsgUnread(0); // ✅ vider le badge quand on ouvre messages
     localStorage.setItem("admin_activePage", page);
   };
 
@@ -617,7 +619,7 @@ export default function AdminDashboard() {
   const navItems = [
     { key:"accueil",      label:"Accueil",        icon: <NavIcon d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.5523 5.44772 21 6 21H9M19 10L21 12M19 10V20C19 20.5523 18.5523 21 18 21H15M9 21C9 21 9 15 12 15C15 15 15 21 15 21M9 21H15"/> },
     { key:"dashboard",    label:"Dashboard",      icon: <NavIcon d={["M4 5C4 4.44772 4.44772 4 5 4H9C9.55228 4 10 4.44772 10 5V9C10 9.55228 9.55228 10 9 10H5C4.44772 10 4 9.55228 4 9V5Z","M14 5C14 4.44772 14.4477 4 15 4H19C19.5523 4 20 4.44772 20 5V9C20 9.55228 19.5523 10 19 10H15C14.4477 10 14 9.55228 14 9V5Z","M4 15C4 14.4477 4.44772 14 5 14H9C9.55228 14 10 14.4477 10 15V19C10 19.5523 9.55228 20 9 20H5C4.44772 20 4 19.5523 4 19V15Z","M14 15C14 14.4477 14.4477 14 15 14H19C19.5523 14 20 14.4477 20 15V19C20 19.5523 19.5523 20 19 20H15C14.4477 20 14 19.5523 14 19V15Z"]}/> },
-    { key:"messages",     label:"Messages",       icon: <NavIcon d={["M8 10H8.01","M12 10H12.01","M16 10H16.01","M9 16H5C3.89543 16 3 15.1046 3 14V6C3 4.89543 3.89543 4 5 4H19C20.1046 4 21 4.89543 21 6V14C21 15.1046 20.1046 16 19 16H14L9 21V16Z"]}/> },
+    { key:"messages",     label:"Messages",       icon: <NavIcon d={["M8 10H8.01","M12 10H12.01","M16 10H16.01","M9 16H5C3.89543 16 3 15.1046 3 14V6C3 4.89543 3.89543 4 5 4H19C20.1046 4 21 4.89543 21 6V14C21 15.1046 20.1046 16 19 16H14L9 21V16Z"]}/>, badge: adminMsgUnread || null },
     { key:"publier",      label:"Publier",        icon: <NavIcon d={["M11 4H4C3.44772 4 3 4.44772 3 5V20C3 20.5523 3.44772 21 4 21H19C19.5523 21 20 20.5523 20 20V13","M18.5 2.5C19.3284 1.67157 20.6716 1.67157 21.5 2.5C22.3284 3.32843 22.3284 4.67157 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z"]}/> },
     { key:"calendrier",   label:"Calendrier",     icon: <NavIcon d={["M8 2V6","M16 2V6","M3 10H21","M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z","M8 14H8.01","M12 14H12.01","M16 14H16.01","M8 18H8.01","M12 18H12.01","M16 18H16.01"]}/> },
     { key:"swafyMeet",    label:"Swafy Meet",     icon: <NavIcon d="M15 10L19.5528 7.72361C20.2177 7.39116 21 7.87465 21 8.61803V15.382C21 16.1253 20.2177 16.6088 19.5528 16.2764L15 14M3 8C3 6.89543 3.89543 6 5 6H13C14.1046 6 15 6.89543 15 8V16C15 17.1046 14.1046 18 13 18H5C3.89543 18 3 17.1046 3 16V8Z"/> },
@@ -718,7 +720,7 @@ export default function AdminDashboard() {
       {/* ══ MESSAGES ══ */}
       {activePage === "messages" && (
         <div style={{ marginLeft:240, minHeight:"100vh" }}>
-          <AdminContact setActivePage={setActivePage} />
+          <AdminContact setActivePage={setActivePage} onUnreadChange={(n) => setAdminMsgUnread(n)} />
         </div>
       )}
 

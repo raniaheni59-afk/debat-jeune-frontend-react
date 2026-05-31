@@ -59,7 +59,7 @@ function FileBubble({msg,isMe}) {
   );
 }
 
-export default function JeuneContact() {
+export default function JeuneContact({ onUnreadChange } = {}) {
   const [convs,       setConvs]       = useState([]);
   const [admins,      setAdmins]      = useState([]);
   const [sel,         setSel]         = useState(null);
@@ -74,6 +74,12 @@ export default function JeuneContact() {
   const [sending,     setSending]     = useState(false);
   const [deletingId,  setDeletingId]  = useState(null);
   const [unread,      setUnread]      = useState({}); // { [convId]: count }
+
+  // ✅ Notifier le parent (JeuneLayout) du total non lu
+  useEffect(() => {
+    const total = Object.values(unread).reduce((s, v) => s + (v || 0), 0);
+    onUnreadChange?.(total);
+  }, [unread, onUnreadChange]);
 
   const bottomRef = useRef(null);
   const sockRef   = useRef(null);
