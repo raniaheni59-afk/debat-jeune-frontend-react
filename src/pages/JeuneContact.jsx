@@ -72,6 +72,7 @@ export default function JeuneContact() {
   const [filePrev,    setFilePrev]    = useState(null);
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [sending,     setSending]     = useState(false);
+  const [deletingId,  setDeletingId]  = useState(null);
 
   const bottomRef = useRef(null);
   const sockRef   = useRef(null);
@@ -254,6 +255,21 @@ export default function JeuneContact() {
     } finally { setSending(false); }
   };
 
+  // ── Delete conversation ──────────────────────────────────────────
+  const deleteConv = async (e, convId) => {
+    e.stopPropagation();
+    if (!window.confirm("Supprimer cette conversation ?")) return;
+    setDeletingId(convId);
+    try {
+      await API.delete(`/messenger/conversation/${convId}`);
+      setConvs(p => safe(p).filter(c => Number(c.id) !== Number(convId)));
+      if (sel && sel !== "group" && Number(sel.id) === Number(convId)) {
+        setSel(null); setMsgs([]);
+      }
+    } catch(e) { console.error(e); }
+    finally { setDeletingId(null); }
+  };
+
   const isGroup        = sel==="group";
   const isSearch       = !!query.trim();
   const listItems      = isSearch?results:convs;
@@ -318,13 +334,15 @@ export default function JeuneContact() {
             if(!item) return null;
             const isAdmin  = item.role==="admin";
             const isActive = !isGroup&&sel&&sel!=="group"&&Number(sel.id)===Number(item.id);
+            const isDeleting = deletingId && Number(deletingId)===Number(item.id);
             return (
               <div key={item.id||item.id_user} className={`chat-item ${isActive?"active":""}`}
+                style={{position:"relative"}}
                 onClick={()=>isSearch?openConv(item):setSel(item)}>
                 {isAdmin?<AdminAv size={42}/>:<Av user={item} size={42}/>}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-                    <span style={{fontWeight:600,fontSize:13.5,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:140}}>
+                    <span style={{fontWeight:600,fontSize:13.5,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>
                       {isAdmin?"Swafy":`${item.prenom_user||""} ${item.nom_user||""}`}
                     </span>
                     {item.last_time&&<span style={{fontSize:10,color:"#b0a9d4",flexShrink:0,marginLeft:6}}>{fmtTime(item.last_time)}</span>}
@@ -333,6 +351,28 @@ export default function JeuneContact() {
                     {isSearch?"Équipe Swafy":(item.last_message||"Nouvelle conversation")}
                   </p>
                 </div>
+                {/* ✅ Bouton supprimer — visible seulement sur les convs existantes (pas search) */}
+                {!isSearch && item.id && (
+                  <button
+                    onClick={(e)=>deleteConv(e, item.id)}
+                    disabled={isDeleting}
+                    title="Supprimer la conversation"
+                    style={{
+                      position:"absolute", right:10, top:"50%", transform:"translateY(-50%)",
+                      width:26, height:26, borderRadius:"50%", border:"none",
+                      background:isDeleting?"#e8e3ff":"transparent",
+                      color:"#ef4444", cursor:"pointer", display:"flex",
+                      alignItems:"center", justifyContent:"center",
+                      fontSize:14, opacity:0, transition:"opacity .15s, background .15s",
+                      pointerEvents:"none",
+                    }}
+                    className="conv-delete-btn"
+                  >
+                    {isDeleting
+                      ? <div style={{width:12,height:12,borderRadius:"50%",border:"2px solid #c4bde8",borderTopColor:"#6d56c1",animation:"spin .7s linear infinite"}}/>
+                      : "✕"}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -454,6 +494,8 @@ export default function JeuneContact() {
       <style>{`
         @keyframes spin   { to { transform: rotate(360deg); } }
         @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+        .chat-item:hover .conv-delete-btn { opacity:1 !important; pointer-events:auto !important; }
+        .conv-delete-btn:hover { background:#fee2e2 !important; }
       `}</style>
     </div>
   );
