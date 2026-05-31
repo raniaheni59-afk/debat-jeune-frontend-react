@@ -594,7 +594,6 @@ export default function MeetRoom() {
               setGuestScreenAllowed(false);
               sockRef.current?.emit("guest-screen-ended", { roomCode });
               sockRef.current?.emit("screen-share-stopped", { roomCode });
-              // Notify admin to re-offer so guest's cam-less state is negotiated
               sockRef.current?.emit("request-reoffer", { roomCode });
             };
 
@@ -619,13 +618,13 @@ export default function MeetRoom() {
         }
       });
 
-      // ✅ Guest screen share ended → admin camera revient
+      // ✅ Guest screen share ended → admin camera revient automatiquement
       sock.on("guest-screen-ended", ({ socketId }) => {
         setGuestScreenActive(false);
         setSpotlightId(null);
         setPState(prev => ({ ...prev, [socketId]: { ...prev[socketId], screen: false } }));
-        // Admin re-offers so the connection reflects guest's state (no more screen track)
-        if (myRole === "host" && pcMap.current[socketId]) {
+        if (myRole === "host") {
+          showToast("Écran du participant arrêté — caméra restaurée 📷", "#5f6368");
           setTimeout(() => {
             if (sockRef.current?.connected) createOfferForPeer(socketId);
           }, 400);
@@ -704,8 +703,9 @@ export default function MeetRoom() {
         }
       });
       sock.on("screen-share-stopped", ({ socketId }) => {
-        setPState(prev=>({ ...prev,[socketId]:{ ...prev[socketId],screen:false } }));
+        setPState(prev => ({ ...prev,[socketId]:{ ...prev[socketId],screen:false } }));
         setGuestScreenActive(false);
+        setSpotlightId(null);
       });
 
     })();
@@ -917,11 +917,12 @@ export default function MeetRoom() {
     const guestScrPeer = peers.find(p => pState[p.id]?.screen === true);
     if (guestScrPeer) {
       emit("admin-stop-guest-screen", { roomCode, targetSocketId: guestScrPeer.id });
-      // Update pState locally for admin too
       setPState(prev => ({ ...prev, [guestScrPeer.id]: { ...prev[guestScrPeer.id], screen: false } }));
     }
     setGuestScreenActive(false);
     setSpotlightId(null);
+    // Broadcast to all that screen share is over → everyone reverts to admin camera view
+    emit("screen-share-stopped", { roomCode });
     showToast("Caméra admin restaurée ✅", "#1a73e8", "📷");
   };
 
@@ -1378,10 +1379,7 @@ export default function MeetRoom() {
       <div style={{ background:"#ffffff",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,flexWrap:"wrap",borderTop:"1px solid #e0e0e0",boxShadow:"0 -1px 4px rgba(0,0,0,.06)" }}>
         <div style={{ display:"flex",gap:5 }}>
           <Btn icon={micOn?"🎤":"🔇"} label={micOn?"Micro":"Muet"} onClick={toggleMic} active={micOn} />
-          {myRole==="host"
-            ? <Btn icon={camOn?"📷":"🚫"} label={camOn?"Caméra":"Off"} onClick={toggleCam} active={camOn} />
-            : <Btn icon={camOn?"📷":"🚫"} label={camOn?"Cam":"Cam"} onClick={toggleGuestCam} active={camOn} />
-          }
+          {myRole==="host" && <Btn icon={camOn?"📷":"🚫"} label={camOn?"Caméra":"Off"} onClick={toggleCam} active={camOn} />}
         </div>
         <div style={{ display:"flex",gap:5 }}>
           {(myRole==="host" || myRole==="guest") && <Btn icon="🖥️" label={screenOn?"Arrêter":"Partager"} onClick={toggleScreen} active={!screenOn} />}
