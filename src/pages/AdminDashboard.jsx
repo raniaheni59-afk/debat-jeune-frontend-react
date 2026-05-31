@@ -601,19 +601,25 @@ export default function AdminDashboard() {
 
   const Comp = { line: Line, bar: Bar, doughnut: Doughnut };
 
-  // ── Nav items ──
+  // ── Nav items ── SVG icons modernes
+  const NavIcon = ({ d, size=18, viewBox="0 0 24 24", fill="none", stroke="currentColor", sw=1.8 }) => (
+    <svg width={size} height={size} viewBox={viewBox} fill={fill} stroke={stroke} strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+      {Array.isArray(d) ? d.map((p,i) => <path key={i} d={p}/>) : <path d={d}/>}
+    </svg>
+  );
+
   const navItems = [
-    { key:"accueil",      icon:"🏠", label:"Accueil" },
-    { key:"dashboard",    icon:"📊", label:"Dashboard" },
-    { key:"messages",     icon:"💬", label:"Messages" },
-    { key:"publier",      icon:"✍️",  label:"Publier" },
-    { key:"calendrier",   icon:"📅", label:"Calendrier" },
-    { key:"swafyMeet",    icon:"🎥", label:"Swafy Meet" },
-    { key:"enquetes",     icon:"📋", label:"Enquêtes" },
-    { key:"participant",  icon:"👥", label:"Participants" },
-    { key:"suivi",        icon:"📈", label:"Suivi" },
-    { key:"notification", icon:"🔔", label:"Notifications", badge: adminUnread || null },
-    { key:"archive",      icon:"📁", label:"Archive" },
+    { key:"accueil",      label:"Accueil",        icon: <NavIcon d="M3 12L5 10M5 10L12 3L19 10M5 10V20C5 20.5523 5.44772 21 6 21H9M19 10L21 12M19 10V20C19 20.5523 18.5523 21 18 21H15M9 21C9 21 9 15 12 15C15 15 15 21 15 21M9 21H15"/> },
+    { key:"dashboard",    label:"Dashboard",      icon: <NavIcon d={["M4 5C4 4.44772 4.44772 4 5 4H9C9.55228 4 10 4.44772 10 5V9C10 9.55228 9.55228 10 9 10H5C4.44772 10 4 9.55228 4 9V5Z","M14 5C14 4.44772 14.4477 4 15 4H19C19.5523 4 20 4.44772 20 5V9C20 9.55228 19.5523 10 19 10H15C14.4477 10 14 9.55228 14 9V5Z","M4 15C4 14.4477 4.44772 14 5 14H9C9.55228 14 10 14.4477 10 15V19C10 19.5523 9.55228 20 9 20H5C4.44772 20 4 19.5523 4 19V15Z","M14 15C14 14.4477 14.4477 14 15 14H19C19.5523 14 20 14.4477 20 15V19C20 19.5523 19.5523 20 19 20H15C14.4477 20 14 19.5523 14 19V15Z"]}/> },
+    { key:"messages",     label:"Messages",       icon: <NavIcon d={["M8 10H8.01","M12 10H12.01","M16 10H16.01","M9 16H5C3.89543 16 3 15.1046 3 14V6C3 4.89543 3.89543 4 5 4H19C20.1046 4 21 4.89543 21 6V14C21 15.1046 20.1046 16 19 16H14L9 21V16Z"]}/> },
+    { key:"publier",      label:"Publier",        icon: <NavIcon d={["M11 4H4C3.44772 4 3 4.44772 3 5V20C3 20.5523 3.44772 21 4 21H19C19.5523 21 20 20.5523 20 20V13","M18.5 2.5C19.3284 1.67157 20.6716 1.67157 21.5 2.5C22.3284 3.32843 22.3284 4.67157 21.5 5.5L12 15L8 16L9 12L18.5 2.5Z"]}/> },
+    { key:"calendrier",   label:"Calendrier",     icon: <NavIcon d={["M8 2V6","M16 2V6","M3 10H21","M5 4H19C20.1046 4 21 4.89543 21 6V20C21 21.1046 20.1046 22 19 22H5C3.89543 22 3 21.1046 3 20V6C3 4.89543 3.89543 4 5 4Z","M8 14H8.01","M12 14H12.01","M16 14H16.01","M8 18H8.01","M12 18H12.01","M16 18H16.01"]}/> },
+    { key:"swafyMeet",    label:"Swafy Meet",     icon: <NavIcon d="M15 10L19.5528 7.72361C20.2177 7.39116 21 7.87465 21 8.61803V15.382C21 16.1253 20.2177 16.6088 19.5528 16.2764L15 14M3 8C3 6.89543 3.89543 6 5 6H13C14.1046 6 15 6.89543 15 8V16C15 17.1046 14.1046 18 13 18H5C3.89543 18 3 17.1046 3 16V8Z"/> },
+    { key:"enquetes",     label:"Enquêtes",       icon: <NavIcon d={["M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15","M9 5C9 4.44772 9.44772 4 10 4H14C14.5523 4 15 4.44772 15 5V7C15 7.55228 14.5523 8 14 8H10C9.44772 8 9 7.55228 9 7V5Z","M9 12H15","M9 16H13"]}/> },
+    { key:"participant",  label:"Participants",   icon: <NavIcon d={["M17 21V19C17 16.7909 15.2091 15 13 15H5C2.79086 15 1 16.7909 1 19V21","M9 11C11.2091 11 13 9.20914 13 7C13 4.79086 11.2091 3 9 3C6.79086 3 5 4.79086 5 7C5 9.20914 6.79086 11 9 11Z","M23 21V19C22.9986 17.1771 21.765 15.5857 20 15.13","M16 3.13C17.7699 3.58317 19.0078 5.17799 19.0078 7.005C19.0078 8.83201 17.7699 10.4268 16 10.88"]}/> },
+    { key:"suivi",        label:"Suivi",          icon: <NavIcon d={["M22 12H18L15 21L9 3L6 12H2"]}/> },
+    { key:"notification", label:"Notifications",  icon: <NavIcon d={["M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z","M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21"]}/>, badge: adminUnread || null },
+    { key:"archive",      label:"Archive",        icon: <NavIcon d={["M21 8V21H3V8","M23 3H1V8H23V3Z","M10 12H14"]}/> },
   ];
 
   const emptyPages = { parametre: { icon:"⚙️" } };
@@ -669,19 +675,25 @@ export default function AdminDashboard() {
 
       {/* SIDEBAR */}
       <aside style={{ ...S.sidebar, transform:"translateX(0)", opacity:1 }}>
-        <button style={S.menuBtn} onClick={() => {}}>☰ Menu</button>
+        <button style={S.menuBtn} onClick={() => {}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          Menu
+        </button>
         <div style={S.navList}>
           {navItems.map(n => (
             <button key={n.key}
               style={{ ...S.navItem, ...(activePage === n.key ? S.navActive : {}) }}
               onClick={() => goTo(n.key)}>
-              <span style={{ width:24, textAlign:"center", fontSize:16 }}>{n.icon}</span>
+              <span style={{ width:20, display:"flex", alignItems:"center", justifyContent:"center" }}>{n.icon}</span>
               <span>{n.label}</span>
               {n.badge && <span style={S.badge}>{n.badge}</span>}
             </button>
           ))}
         </div>
-        <button style={S.exitBtn} onClick={logout}>🚪 Déconnexion</button>
+        <button style={S.exitBtn} onClick={logout}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Déconnexion
+        </button>
       </aside>
 
       {/* ══ CALENDRIER ══ */}
