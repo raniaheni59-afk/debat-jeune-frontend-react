@@ -565,11 +565,46 @@ export default function MeetRoom() {
         showToast(`Admin a coupé votre ${type==="audio"?"micro":"caméra"}`, "#ea4335", "🔇");
       });
 
-      // ✅ Admin autorise le guest à partager son écran
+      // ✅ Admin autorise le guest à partager son écran → démarrer automatiquement
       sock.on("screen-share-allowed", ({ targetSocketId }) => {
         if (targetSocketId === sock.id) {
           setGuestScreenAllowed(true);
-          showToast("🖥️ Admin vous autorise à partager votre écran", "#34a853");
+          showToast("🖥️ Autorisé ! Sélectionnez votre écran…", "#34a853");
+          // Auto-trigger screen share immediately after permission granted
+          setTimeout(async () => {
+            try {
+              const ss = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+              screenStr.current = ss;
+              const scrTrack = ss.getVideoTracks()[0];
+              const replacePromises = Object.values(pcMap.current).map(pc => {
+                const sender = pc.getSenders().find(s => s.track?.kind === "video");
+                if (sender) return sender.replaceTrack(scrTrack).catch(() => {});
+                try { pc.addTrack(scrTrack, ss); } catch {}
+                return Promise.resolve();
+              });
+              await Promise.all(replacePromises);
+              scrTrack.onended = async () => {
+                screenStr.current = null;
+                setScreenOn(false);
+                setGuestScreenActive(false);
+                setGuestScreenAllowed(false);
+                sock.emit("guest-screen-ended", { roomCode });
+                sock.emit("screen-share-stopped", { roomCode });
+                const camTrack = localStr.current?.getVideoTracks()[0];
+                Object.values(pcMap.current).forEach(pc => {
+                  const sender = pc.getSenders().find(s => s.track?.kind === "video");
+                  if (sender && camTrack) sender.replaceTrack(camTrack).catch(() => {});
+                });
+              };
+              setScreenOn(true);
+              setGuestScreenActive(true);
+              sock.emit("screen-share-started", { roomCode, sharerRole: "guest" });
+              showToast("Écran partagé ✅", "#34a853", "🖥️");
+            } catch {
+              showToast("Partage d'écran annulé", "#5f6368");
+              setGuestScreenAllowed(false);
+            }
+          }, 300);
         }
       });
 
@@ -1185,7 +1220,7 @@ export default function MeetRoom() {
                 return (
                   <div key={m.id} style={{ alignSelf:isMe?"flex-end":"flex-start",maxWidth:"88%",animation:"fadeIn .2s ease" }}>
                     {!isMe && <div style={{ fontSize:10,color:"#9aa0a6",marginBottom:3,display:"flex",alignItems:"center",gap:4 }}>{m.role==="host"&&<span style={{ background:"#1a73e8",color:"#fff",padding:"1px 5px",borderRadius:4,fontSize:9 }}>ADMIN</span>}{m.user}</div>}
-                    <div style={{ padding:"8px 12px",borderRadius:12,fontSize:13,lineHeight:1.6,wordBreak:"break-word",background:isMe?"linear-gradient(135deg,#7c3aed,#5b21b6)":"rgba(255,255,255,.09)" }}>{m.text}</div>
+                    <div style={{ padding:"8px 12px",borderRadius:12,fontSize:13,lineHeight:1.6,wordBreak:"break-word",color:"#ffffff",background:isMe?"linear-gradient(135deg,#7c3aed,#5b21b6)":"rgba(255,255,255,.18)" }}>{m.text}</div>
                     <div style={{ fontSize:10,color:"#5f6368",marginTop:2,textAlign:isMe?"right":"left" }}>{m.time}</div>
                   </div>
                 );
