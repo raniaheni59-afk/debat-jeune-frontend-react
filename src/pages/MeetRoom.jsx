@@ -567,45 +567,49 @@ export default function MeetRoom() {
 
       // ✅ Admin autorise le guest à partager son écran → démarrer automatiquement
       sock.on("screen-share-allowed", ({ targetSocketId }) => {
-        if (targetSocketId === sock.id) {
-          setGuestScreenAllowed(true);
-          showToast("🖥️ Autorisé ! Sélectionnez votre écran…", "#34a853");
-          // Auto-trigger screen share immediately after permission granted
-          setTimeout(async () => {
-            try {
-              const ss = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-              screenStr.current = ss;
-              const scrTrack = ss.getVideoTracks()[0];
-              const replacePromises = Object.values(pcMap.current).map(pc => {
-                const sender = pc.getSenders().find(s => s.track?.kind === "video");
-                if (sender) return sender.replaceTrack(scrTrack).catch(() => {});
+        if (targetSocketId !== sock.id) return;
+        setGuestScreenAllowed(true);
+        showToast("🖥️ Autorisé ! Sélectionnez votre écran…", "#34a853");
+
+        setTimeout(async () => {
+          try {
+            const ss = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            screenStr.current = ss;
+            const scrTrack = ss.getVideoTracks()[0];
+
+            // Guest: add screen track to all peers (will trigger onnegotiationneeded on admin side)
+            for (const [peerId, pc] of Object.entries(pcMap.current)) {
+              const videoSender = pc.getSenders().find(s => s.track?.kind === "video");
+              if (videoSender) {
+                await videoSender.replaceTrack(scrTrack).catch(() => {});
+              } else {
                 try { pc.addTrack(scrTrack, ss); } catch {}
-                return Promise.resolve();
-              });
-              await Promise.all(replacePromises);
-              scrTrack.onended = async () => {
-                screenStr.current = null;
-                setScreenOn(false);
-                setGuestScreenActive(false);
-                setGuestScreenAllowed(false);
-                sock.emit("guest-screen-ended", { roomCode });
-                sock.emit("screen-share-stopped", { roomCode });
-                const camTrack = localStr.current?.getVideoTracks()[0];
-                Object.values(pcMap.current).forEach(pc => {
-                  const sender = pc.getSenders().find(s => s.track?.kind === "video");
-                  if (sender && camTrack) sender.replaceTrack(camTrack).catch(() => {});
-                });
-              };
-              setScreenOn(true);
-              setGuestScreenActive(true);
-              sock.emit("screen-share-started", { roomCode, sharerRole: "guest" });
-              showToast("Écran partagé ✅", "#34a853", "🖥️");
-            } catch {
-              showToast("Partage d'écran annulé", "#5f6368");
-              setGuestScreenAllowed(false);
+              }
             }
-          }, 300);
-        }
+
+            scrTrack.onended = async () => {
+              screenStr.current = null;
+              setScreenOn(false);
+              setGuestScreenActive(false);
+              setGuestScreenAllowed(false);
+              sockRef.current?.emit("guest-screen-ended", { roomCode });
+              sockRef.current?.emit("screen-share-stopped", { roomCode });
+              // Notify admin to re-offer so guest's cam-less state is negotiated
+              sockRef.current?.emit("request-reoffer", { roomCode });
+            };
+
+            setScreenOn(true);
+            setGuestScreenActive(true);
+            // Tell room about screen share — admin will re-offer to pick up the new track
+            sock.emit("screen-share-started", { roomCode, sharerRole: "guest" });
+            // Ask admin to create a fresh offer so the screen track is received properly
+            sock.emit("request-reoffer", { roomCode });
+            showToast("Écran partagé ✅ — visible par tous", "#34a853", "🖥️");
+          } catch {
+            showToast("Partage d'écran annulé", "#5f6368");
+            setGuestScreenAllowed(false);
+          }
+        }, 300);
       });
 
       // ✅ Guest demande partage d'écran → admin voit modal de confirmation
@@ -620,6 +624,21 @@ export default function MeetRoom() {
         setGuestScreenActive(false);
         setSpotlightId(null);
         setPState(prev => ({ ...prev, [socketId]: { ...prev[socketId], screen: false } }));
+        // Admin re-offers so the connection reflects guest's state (no more screen track)
+        if (myRole === "host" && pcMap.current[socketId]) {
+          setTimeout(() => {
+            if (sockRef.current?.connected) createOfferForPeer(socketId);
+          }, 400);
+        }
+      });
+
+      // ✅ Guest requests admin to re-offer (after adding screen track)
+      sock.on("request-reoffer", ({ roomCode: rc, fromSocketId }) => {
+        if (myRole === "host" && fromSocketId && pcMap.current[fromSocketId]) {
+          setTimeout(() => {
+            if (sockRef.current?.connected) createOfferForPeer(fromSocketId);
+          }, 500);
+        }
       });
 
       // ✅ Admin force-stops guest screen share
@@ -674,12 +693,19 @@ export default function MeetRoom() {
       });
 
       // ✅ FIX Partage d'écran: mettre à jour le stream dans le tile existant
-      sock.on("screen-share-started", ({ socketId }) => {
+      sock.on("screen-share-started", ({ socketId, sharerRole }) => {
         setPState(prev=>({ ...prev,[socketId]:{ ...prev[socketId],screen:true } }));
-        showToast("L'admin partage son écran 🖥️", "#34a853");
+        if (sharerRole === "guest") {
+          // Admin: auto-spotlight the guest's screen
+          setGuestScreenActive(true);
+          showToast("🖥️ Un participant partage son écran", "#1a73e8");
+        } else {
+          showToast("L'admin partage son écran 🖥️", "#34a853");
+        }
       });
       sock.on("screen-share-stopped", ({ socketId }) => {
         setPState(prev=>({ ...prev,[socketId]:{ ...prev[socketId],screen:false } }));
+        setGuestScreenActive(false);
       });
 
     })();
@@ -735,75 +761,112 @@ export default function MeetRoom() {
     r ? showToast("Main levée ✋ — admin notifié","#fbbc04") : showToast("Main baissée","#5f6368");
   };
 
-  // ✅ FIX Partage d'écran: remplacer track vidéo dans tous les peer connections
+  // ── Screen share ──
   const toggleScreen = async () => {
     if (myRole !== "host" && !guestScreenAllowed) {
-      // Guest demande l'autorisation à l'admin
+      // Guest: send request to admin
       emit("request-screen-share", { roomCode, userName: myName });
       showToast("Demande envoyée à l'admin ⏳", "#fbbc04", "🖥️");
       return;
     }
+
     if (screenOn) {
-      screenStr.current?.getTracks().forEach(t=>t.stop());
+      // Stop screen share
+      const scrTrack = screenStr.current?.getVideoTracks()[0];
+      screenStr.current?.getTracks().forEach(t => t.stop());
       screenStr.current = null;
       setScreenOn(false);
+
       if (myRole === "guest") {
         setGuestScreenActive(false);
+        setGuestScreenAllowed(false);
         emit("guest-screen-ended", { roomCode });
-        setGuestScreenAllowed(false); // reset permission after stopping
+        // Remove the screen track sender from all PCs
+        if (scrTrack) {
+          Object.values(pcMap.current).forEach(pc => {
+            const sender = pc.getSenders().find(s => s.track === scrTrack);
+            if (sender) { try { pc.removeTrack(sender); } catch {} }
+          });
+        }
+      } else {
+        // Host: restore cam track
+        const camTrack = localStr.current?.getVideoTracks()[0];
+        Object.values(pcMap.current).forEach(pc => {
+          const sender = pc.getSenders().find(s => s.track?.kind === "video");
+          if (sender && camTrack) sender.replaceTrack(camTrack).catch(() => {});
+        });
+        if (localVid.current && localStr.current) {
+          localVid.current.srcObject = localStr.current;
+          localVid.current.play().catch(() => {});
+        }
       }
       emit("screen-share-stopped", { roomCode });
 
-      // Remettre la caméra dans tous les peers
-      const camTrack = localStr.current?.getVideoTracks()[0];
-      Object.values(pcMap.current).forEach(pc => {
-        const sender = pc.getSenders().find(s => s.track?.kind==="video");
-        if (sender && camTrack) sender.replaceTrack(camTrack).catch(()=>{});
-      });
-      // Réassigner vidéo locale
-      if (localVid.current && localStr.current) {
-        localVid.current.srcObject = localStr.current;
-        localVid.current.play().catch(()=>{});
-      }
     } else {
+      // Start screen share
       try {
-        const ss = await navigator.mediaDevices.getDisplayMedia({ video:true, audio:true });
+        const ss = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
         screenStr.current = ss;
         const scrTrack = ss.getVideoTracks()[0];
 
-        // ✅ Remplacer OU ajouter track vidéo dans TOUS les peer connections actifs
-        const replacePromises = Object.values(pcMap.current).map(pc => {
-          const sender = pc.getSenders().find(s => s.track?.kind==="video");
-          if (sender) return sender.replaceTrack(scrTrack).catch(()=>{});
-          try { pc.addTrack(scrTrack, ss); } catch {}
-          return Promise.resolve();
-        });
-        await Promise.all(replacePromises);
+        if (myRole === "host") {
+          // Host has video senders → replace
+          const replacePromises = Object.values(pcMap.current).map(pc => {
+            const sender = pc.getSenders().find(s => s.track?.kind === "video");
+            if (sender) return sender.replaceTrack(scrTrack).catch(() => {});
+            try { pc.addTrack(scrTrack, ss); } catch {}
+            return Promise.resolve();
+          });
+          await Promise.all(replacePromises);
+        } else {
+          // Guest has NO video sender → add track + renegotiate with admin
+          for (const [peerId, pc] of Object.entries(pcMap.current)) {
+            const videoSender = pc.getSenders().find(s => s.track?.kind === "video");
+            if (videoSender) {
+              await videoSender.replaceTrack(scrTrack).catch(() => {});
+            } else {
+              try {
+                pc.addTrack(scrTrack, ss);
+                const offer = await pc.createOffer();
+                await pc.setLocalDescription(offer);
+                sockRef.current?.emit("offer", { target: peerId, sdp: offer });
+              } catch (e) { console.error("guest screen renegotiate:", e); }
+            }
+          }
+          setGuestScreenActive(true);
+        }
 
         scrTrack.onended = async () => {
           screenStr.current = null;
           setScreenOn(false);
           if (myRole === "guest") {
             setGuestScreenActive(false);
-            emit("guest-screen-ended", { roomCode });
             setGuestScreenAllowed(false);
+            emit("guest-screen-ended", { roomCode });
+            Object.values(pcMap.current).forEach(pc => {
+              const sender = pc.getSenders().find(s => s.track === scrTrack);
+              if (sender) { try { pc.removeTrack(sender); } catch {} }
+            });
+          } else {
+            const camTrack = localStr.current?.getVideoTracks()[0];
+            Object.values(pcMap.current).forEach(pc => {
+              const sender = pc.getSenders().find(s => s.track?.kind === "video");
+              if (sender && camTrack) sender.replaceTrack(camTrack).catch(() => {});
+            });
+            if (localVid.current && localStr.current) {
+              localVid.current.srcObject = localStr.current;
+              localVid.current.play().catch(() => {});
+            }
           }
           emit("screen-share-stopped", { roomCode });
-          const camTrack = localStr.current?.getVideoTracks()[0];
-          Object.values(pcMap.current).forEach(pc => {
-            const sender = pc.getSenders().find(s => s.track?.kind==="video");
-            if (sender && camTrack) sender.replaceTrack(camTrack).catch(()=>{});
-          });
-          if (localVid.current && localStr.current) {
-            localVid.current.srcObject = localStr.current;
-            localVid.current.play().catch(()=>{});
-          }
         };
+
         setScreenOn(true);
-        if (myRole === "guest") setGuestScreenActive(true);
         emit("screen-share-started", { roomCode, sharerRole: myRole });
-        showToast("Écran partagé — visible par tous ✅","#34a853","🖥️");
-      } catch { showToast("Partage d'écran annulé","#5f6368"); }
+        showToast("Écran partagé ✅", "#34a853", "🖥️");
+      } catch {
+        showToast("Partage d'écran annulé", "#5f6368");
+      }
     }
   };
 
@@ -851,13 +914,15 @@ export default function MeetRoom() {
   // ✅ Admin stops guest screen share and returns to his camera
   const adminStopGuestScreen = () => {
     if (myRole !== "host") return;
-    const guestScrPeerId = peers.find(p => pState[p.id]?.screen === true)?.id;
-    if (guestScrPeerId) {
-      emit("admin-stop-guest-screen", { roomCode, targetSocketId: guestScrPeerId });
+    const guestScrPeer = peers.find(p => pState[p.id]?.screen === true);
+    if (guestScrPeer) {
+      emit("admin-stop-guest-screen", { roomCode, targetSocketId: guestScrPeer.id });
+      // Update pState locally for admin too
+      setPState(prev => ({ ...prev, [guestScrPeer.id]: { ...prev[guestScrPeer.id], screen: false } }));
     }
     setGuestScreenActive(false);
     setSpotlightId(null);
-    showToast("Écran du participant arrêté","#ea4335","🖥️");
+    showToast("Caméra admin restaurée ✅", "#1a73e8", "📷");
   };
 
   const sendReaction = emoji => {
@@ -1220,7 +1285,7 @@ export default function MeetRoom() {
                 return (
                   <div key={m.id} style={{ alignSelf:isMe?"flex-end":"flex-start",maxWidth:"88%",animation:"fadeIn .2s ease" }}>
                     {!isMe && <div style={{ fontSize:10,color:"#9aa0a6",marginBottom:3,display:"flex",alignItems:"center",gap:4 }}>{m.role==="host"&&<span style={{ background:"#1a73e8",color:"#fff",padding:"1px 5px",borderRadius:4,fontSize:9 }}>ADMIN</span>}{m.user}</div>}
-                    <div style={{ padding:"8px 12px",borderRadius:12,fontSize:13,lineHeight:1.6,wordBreak:"break-word",color:"#ffffff",background:isMe?"linear-gradient(135deg,#7c3aed,#5b21b6)":"rgba(255,255,255,.18)" }}>{m.text}</div>
+                    <div style={{ padding:"8px 12px",borderRadius:12,fontSize:13,lineHeight:1.6,wordBreak:"break-word",color:"#ffffff",background:isMe?"linear-gradient(135deg,#7c3aed,#5b21b6)":"#3c4043" }}>{m.text}</div>
                     <div style={{ fontSize:10,color:"#5f6368",marginTop:2,textAlign:isMe?"right":"left" }}>{m.time}</div>
                   </div>
                 );
