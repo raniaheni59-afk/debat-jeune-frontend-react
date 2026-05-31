@@ -149,7 +149,7 @@ const handleSubmit = async (e) => {
               {type === "photo" && "📷 Photo"}
               {type === "video" && "🎥 Vidéo"}
               {type === "pdf" && "📄 PDF"}
-
+              {type === "debat" && "⚖️ Question P/C"}
             </button>
           ))}
         </div>
