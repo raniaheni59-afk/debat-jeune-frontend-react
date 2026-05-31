@@ -73,6 +73,7 @@ export default function JeuneContact() {
   const [loadingMsgs, setLoadingMsgs] = useState(false);
   const [sending,     setSending]     = useState(false);
   const [deletingId,  setDeletingId]  = useState(null);
+  const [unread,      setUnread]      = useState({}); // { [convId]: count }
 
   const bottomRef = useRef(null);
   const sockRef   = useRef(null);
@@ -112,14 +113,18 @@ export default function JeuneContact() {
         .sort((a,b)=>new Date(b.last_time||0)-new Date(a.last_time||0))
       );
 
-      // Ajouter dans la conversation ouverte
+      // Ajouter dans la conversation ouverte ou incrémenter badge
       if (cur && cur!=="group" && Number(m.conversation_id)===Number(cur.id)) {
         setMsgs(p => {
           const arr = safe(p);
-          // Pas de doublon
           if (arr.some(x=>!x._temp && Number(x.id)===Number(m.id))) return arr;
           return [...arr, m];
         });
+        // Marquer lu immédiatement
+        API.put(`/messenger/messages/read/${m.conversation_id}`).catch(()=>{});
+      } else {
+        // Conv non ouverte → badge
+        setUnread(prev => ({...prev, [m.conversation_id]: (prev[m.conversation_id]||0)+1}));
       }
     });
 
@@ -157,10 +162,18 @@ export default function JeuneContact() {
   }, []);
   useEffect(() => { fetchConvs(); }, [fetchConvs]);
 
-  // ── Fetch admins + group ─────────────────────────────────────────
+  // ── Fetch admins + group + unread counts ───────────────────────────
   useEffect(() => {
     API.get("/messenger/admins").then(r=>setAdmins(safe(r.data))).catch(()=>{});
     API.get("/messenger/group/messages").then(r=>setGrpMsgs(safe(r.data))).catch(()=>{});
+    // Charger les badges au démarrage
+    API.get("/messenger/conversations/unread-counts").then(r=>{
+      if (Array.isArray(r.data)) {
+        const map = {};
+        r.data.forEach(row=>{ map[row.conversation_id]=Number(row.unread_count||0); });
+        setUnread(map);
+      }
+    }).catch(()=>{});
   }, []);
 
   // ── Search admins ────────────────────────────────────────────────
@@ -203,7 +216,7 @@ export default function JeuneContact() {
     setMsgs([]);
     setLoadingMsgs(true);
     API.get(`/messenger/messages/${sel.id}`)
-      .then(r=>{ setMsgs(safe(r.data)); sockRef.current?.emit("joinConversation",{conversationId:sel.id}); API.put(`/messenger/messages/read/${sel.id}`).catch(()=>{}); })
+      .then(r=>{ setMsgs(safe(r.data)); sockRef.current?.emit("joinConversation",{conversationId:sel.id}); API.put(`/messenger/messages/read/${sel.id}`).catch(()=>{}); setUnread(prev=>{ const n={...prev}; delete n[sel.id]; return n; }); })
       .catch(e=>console.error(e))
       .finally(()=>setLoadingMsgs(false));
   }, [sel?.id]);
@@ -333,26 +346,41 @@ export default function JeuneContact() {
 
           {safe(listItems).map(item=>{
             if(!item) return null;
-            const isAdmin  = item.role==="admin";
-            const isActive = !isGroup&&sel&&sel!=="group"&&Number(sel.id)===Number(item.id);
+            const isAdmin    = item.role==="admin";
+            const isActive   = !isGroup&&sel&&sel!=="group"&&Number(sel.id)===Number(item.id);
             const isDeleting = deletingId && Number(deletingId)===Number(item.id);
+            const unreadCount= isSearch ? 0 : (unread[item.id]||0);
+            const handleClick = () => {
+              if (isSearch) { openConv(item); return; }
+              setSel(item);
+              // Effacer le badge
+              if (item.id) setUnread(prev=>{ const n={...prev}; delete n[item.id]; return n; });
+            };
             return (
               <div key={item.id||item.id_user} className={`chat-item ${isActive?"active":""}`}
                 style={{position:"relative"}}
-                onClick={()=>isSearch?openConv(item):setSel(item)}>
+                onClick={handleClick}>
                 {isAdmin?<AdminAv size={42}/>:<Av user={item} size={42}/>}
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-                    <span style={{fontWeight:600,fontSize:13.5,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontWeight:unreadCount>0?700:600,fontSize:13.5,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>
                       {isAdmin?"Swafy":`${item.prenom_user||""} ${item.nom_user||""}`}
                     </span>
-                    {item.last_time&&<span style={{fontSize:10,color:"#b0a9d4",flexShrink:0,marginLeft:6}}>{fmtTime(item.last_time)}</span>}
+                    <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0,marginLeft:4}}>
+                      {item.last_time&&<span style={{fontSize:10,color:"#b0a9d4"}}>{fmtTime(item.last_time)}</span>}
+                      {unreadCount>0&&(
+                        <span style={{background:"#ef4444",color:"#fff",fontSize:10,fontWeight:800,
+                          padding:"2px 6px",borderRadius:10,minWidth:18,textAlign:"center",lineHeight:"16px"}}>
+                          {unreadCount>99?"99+":unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <p style={{fontSize:12,color:"#9e97c0",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  <p style={{fontSize:12,color:unreadCount>0?"#6d56c1":"#9e97c0",fontWeight:unreadCount>0?600:400,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {isSearch?"Équipe Swafy":(item.last_message||"Nouvelle conversation")}
                   </p>
                 </div>
-                {/* ✅ Bouton supprimer — visible seulement sur les convs existantes (pas search) */}
+                {/* Bouton supprimer au hover */}
                 {!isSearch && item.id && (
                   <button
                     onClick={(e)=>deleteConv(e, item.id)}
