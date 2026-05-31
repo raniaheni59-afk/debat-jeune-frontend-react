@@ -102,17 +102,44 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
   );
 }
 
-function Btn({ icon, label, onClick, active=true, danger=false, badge=0, pulse=false, disabled=false }) {
+// ── Modern SVG icon library ────────────────────────────
+const Icons = {
+  micOn:     (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>),
+  micOff:    (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M15 9.34V5a3 3 0 0 0-5.68-1.33"/><path d="M9 9v3a3 3 0 0 0 5.12 2.12"/><line x1="12" y1="19" x2="12" y2="22"/></svg>),
+  camOn:     (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>),
+  camOff:    (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 2 20 20"/><path d="M10.66 6H14a2 2 0 0 1 2 2v2.34l1 1L22 8v8"/><path d="M16 16a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2l10 10z"/></svg>),
+  screen:    (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><polyline points="9 8 12 5 15 8"/><line x1="12" y1="5" x2="12" y2="13"/></svg>),
+  screenOff: (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 2 20 20"/><path d="M6.5 6.5H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16"/><path d="M22 6v10a2 2 0 0 1-2 2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>),
+  hand:      (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>),
+  emoji:     (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 13s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>),
+  chat:      (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>),
+  people:    (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>),
+  ai:        (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>),
+  stop:      (<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>),
+  leave:     (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>),
+  cc:        (<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M7 12h1a2 2 0 1 1 0-2H7a2 2 0 0 0 0 4z"/><path d="M14 12h1a2 2 0 1 1 0-2h-1a2 2 0 0 0 0 4z"/></svg>),
+};
+
+function Btn({ icon, iconKey, label, onClick, active=true, danger=false, badge=0, pulse=false, disabled=false }) {
+  const svgIcon = iconKey ? Icons[iconKey] : null;
+  const isDim = !danger && !active;
   return (
     <button className="cbtn" onClick={onClick} title={label} disabled={disabled} style={{
-      border:"none",borderRadius:13,padding:"10px 15px",color: danger ? "#fff" : !active ? "#fff" : "#202124",
-      display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:62,
-      background:danger?"#ea4335":!active?"#ea4335":"#f1f3f4",
-      animation:pulse?"blink 1.4s infinite":"none",position:"relative",opacity:disabled?.5:1 }}>
-      <span style={{ fontSize:20 }}>{icon}</span>
-      <span style={{ fontSize:10,fontWeight:600,opacity:.9,whiteSpace:"nowrap" }}>{label}</span>
-      {badge>0 && <span style={{ position:"absolute",top:-5,right:-5,background:"#ea4335",color:"#fff",
-        borderRadius:"50%",width:18,height:18,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:800 }}>{badge>99?"99+":badge}</span>}
+      border: "none", borderRadius: 14, padding: "9px 13px",
+      color: danger || isDim ? "#fff" : "#202124",
+      display: "flex", flexDirection: "column", alignItems: "center", gap: 4, minWidth: 60,
+      background: danger ? "linear-gradient(135deg,#ea4335,#c62828)" : isDim ? "linear-gradient(135deg,#ea4335,#c62828)" : "#f1f3f4",
+      animation: pulse ? "blink 1.4s infinite" : "none", position: "relative", opacity: disabled ? .5 : 1,
+      boxShadow: danger || isDim ? "0 2px 10px rgba(234,67,53,.35)" : "0 1px 3px rgba(0,0,0,.1)",
+      transition: "all .15s",
+    }}>
+      <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 22, height: 22 }}>
+        {svgIcon || <span style={{ fontSize: 18 }}>{icon}</span>}
+      </span>
+      <span style={{ fontSize: 9.5, fontWeight: 700, opacity: .85, whiteSpace: "nowrap", letterSpacing: .3 }}>{label}</span>
+      {badge > 0 && <span style={{ position: "absolute", top: -5, right: -5, background: "#ea4335", color: "#fff",
+        borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 10, fontWeight: 800, boxShadow: "0 2px 6px rgba(234,67,53,.5)" }}>{badge > 99 ? "99+" : badge}</span>}
     </button>
   );
 }
@@ -1066,21 +1093,29 @@ export default function MeetRoom() {
       )}
 
       {/* HEADER */}
-      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",background:"#ffffff",flexShrink:0,borderBottom:"1px solid #e0e0e0",boxShadow:"0 1px 4px rgba(0,0,0,.08)" }}>
+      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",background:"#ffffff",flexShrink:0,borderBottom:"1px solid #e8eaed",boxShadow:"0 1px 6px rgba(0,0,0,.08)" }}>
         <div style={{ display:"flex",alignItems:"center",gap:12 }}>
-          <div style={{ width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#1a73e8,#0d47a1)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16,color:"#fff" }}>S</div>
+          <div style={{ width:36,height:36,borderRadius:11,background:"linear-gradient(135deg,#1a73e8,#0d47a1)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16,color:"#fff",boxShadow:"0 2px 8px rgba(26,115,232,.4)" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+          </div>
           <div>
             <div style={{ color:"#202124",fontWeight:700,fontSize:14 }}>Swafy Meet {liveInfo&&`— ${liveInfo.title_live}`}</div>
             <div style={{ color:"#5f6368",fontSize:11,display:"flex",gap:6,alignItems:"center" }}>
-              <span style={{ width:7,height:7,borderRadius:"50%",background:"#ea4335",display:"inline-block",animation:"blink 2s infinite" }} />
+              <span style={{ width:7,height:7,borderRadius:"50%",background:"#ea4335",display:"inline-block",animation:"blink 2s infinite",flexShrink:0 }} />
               {roomCode} · {myRole==="host"?"👑 Admin":"👤 Participant"} · ⏱ {fmt(duration)}
             </div>
           </div>
         </div>
         <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-          <span style={{ background:"#f1f3f4",color:"#5f6368",padding:"4px 10px",borderRadius:20,fontSize:12 }}>{ptcps.length} 👥</span>
+          <span style={{ background:"#f1f3f4",color:"#5f6368",padding:"5px 12px",borderRadius:20,fontSize:12,display:"flex",alignItems:"center",gap:5,fontWeight:600 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            {ptcps.length}
+          </span>
           {myRole==="host" && (
-            <button className="cbtn" onClick={()=>setLinkOpen(o=>!o)} style={{ background:"#e8f0fe",border:"1px solid #c5d2f0",color:"#1a73e8",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:600 }}>🔗 Partager ce live</button>
+            <button className="cbtn" onClick={()=>setLinkOpen(o=>!o)} style={{ background:"#e8f0fe",border:"1px solid #c5d2f0",color:"#1a73e8",padding:"7px 16px",borderRadius:10,fontSize:12,fontWeight:700,display:"flex",alignItems:"center",gap:6 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              Partager ce live
+            </button>
           )}
         </div>
       </div>
@@ -1320,12 +1355,12 @@ export default function MeetRoom() {
                   </div>
                   {myRole==="host" && p.socketId!==sockRef.current?.id && (
                     <div style={{ display:"flex",gap:3 }}>
-                      <button title="Autoriser micro"   onClick={()=>adminAllowMic(p.socketId)}    style={{ background:"rgba(52,168,83,.15)",border:"1px solid rgba(52,168,83,.3)",borderRadius:6,color:"#34a853",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🎤</button>
-                      <button title="Couper micro"      onClick={()=>adminMute(p.socketId,"audio")} style={{ background:"rgba(251,188,4,.1)",border:"1px solid rgba(251,188,4,.3)",borderRadius:6,color:"#fbbc04",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🔇</button>
-                      <button title="Partage écran"     onClick={()=>adminAllowScreen(p.socketId)} style={{ background:"rgba(138,180,248,.1)",border:"1px solid rgba(138,180,248,.3)",borderRadius:6,color:"#8ab4f8",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🖥️</button>
-                      <button title="Épingler"          onClick={()=>{ setSpotlightId(p.socketId); emit("spotlight-set",{roomCode,socketId:p.socketId}); }} style={{ background:"rgba(251,188,4,.1)",border:"1px solid rgba(251,188,4,.3)",borderRadius:6,color:"#fbbc04",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>📌</button>
-                      <button title="Retirer"           onClick={()=>adminKick(p.socketId)}         style={{ background:"rgba(234,67,53,.1)",border:"1px solid rgba(234,67,53,.3)",borderRadius:6,color:"#ea4335",padding:"4px 7px",cursor:"pointer",fontSize:11 }}>🚪</button>
-                      <button title="Bloquer"           onClick={()=>adminBlock(p.socketId)}        style={{ background:"rgba(234,67,53,.2)",border:"1px solid rgba(234,67,53,.5)",borderRadius:6,color:"#ea4335",padding:"4px 7px",cursor:"pointer",fontSize:11,fontWeight:700 }}>🚫</button>
+                      <button title="Autoriser micro"   onClick={()=>adminAllowMic(p.socketId)}    style={{ background:"rgba(52,168,83,.12)",border:"1px solid rgba(52,168,83,.25)",borderRadius:7,color:"#34a853",padding:"5px 7px",cursor:"pointer",display:"flex",alignItems:"center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg></button>
+                      <button title="Couper micro"      onClick={()=>adminMute(p.socketId,"audio")} style={{ background:"rgba(251,188,4,.1)",border:"1px solid rgba(251,188,4,.25)",borderRadius:7,color:"#fbbc04",padding:"5px 7px",cursor:"pointer",display:"flex",alignItems:"center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="2" y1="2" x2="22" y2="22"/><path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2"/><path d="M5 10v2a7 7 0 0 0 12 5"/></svg></button>
+                      <button title="Partage écran"     onClick={()=>adminAllowScreen(p.socketId)} style={{ background:"rgba(138,180,248,.1)",border:"1px solid rgba(138,180,248,.25)",borderRadius:7,color:"#8ab4f8",padding:"5px 7px",cursor:"pointer",display:"flex",alignItems:"center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></button>
+                      <button title="Épingler"          onClick={()=>{ setSpotlightId(p.socketId); emit("spotlight-set",{roomCode,socketId:p.socketId}); }} style={{ background:"rgba(251,188,4,.1)",border:"1px solid rgba(251,188,4,.25)",borderRadius:7,color:"#fbbc04",padding:"5px 7px",cursor:"pointer",display:"flex",alignItems:"center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></svg></button>
+                      <button title="Retirer"           onClick={()=>adminKick(p.socketId)}         style={{ background:"rgba(234,67,53,.08)",border:"1px solid rgba(234,67,53,.2)",borderRadius:7,color:"#ea4335",padding:"5px 7px",cursor:"pointer",display:"flex",alignItems:"center" }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+                      <button title="Bloquer"           onClick={()=>adminBlock(p.socketId)}        style={{ background:"rgba(234,67,53,.15)",border:"1px solid rgba(234,67,53,.35)",borderRadius:7,color:"#ea4335",padding:"5px 7px",cursor:"pointer",display:"flex",alignItems:"center",fontWeight:700 }}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg></button>
                     </div>
                   )}
                 </div>
@@ -1376,27 +1411,27 @@ export default function MeetRoom() {
       {emojiOpen && <div style={{ position:"fixed",bottom:92,left:"50%",transform:"translateX(-50%)",background:"#2d2f31",border:"1px solid rgba(255,255,255,.1)",borderRadius:16,padding:"10px 14px",display:"flex",gap:6,flexWrap:"wrap",zIndex:70,boxShadow:"0 8px 32px rgba(0,0,0,.6)",animation:"popIn .2s ease",maxWidth:280,justifyContent:"center" }}>{["👍","❤️","😂","🎉","🔥","👏","🙌","💯","😮","🤔","👎","🌟"].map(e=><button key={e} onClick={()=>sendReaction(e)} style={{ background:"none",border:"none",fontSize:26,cursor:"pointer",borderRadius:8,padding:"4px 6px" }}>{e}</button>)}</div>}
 
       {/* CONTROLS */}
-      <div style={{ background:"#ffffff",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,flexWrap:"wrap",borderTop:"1px solid #e0e0e0",boxShadow:"0 -1px 4px rgba(0,0,0,.06)" }}>
+      <div style={{ background:"#ffffff",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,flexWrap:"wrap",borderTop:"1px solid #e0e0e0",boxShadow:"0 -2px 12px rgba(0,0,0,.08)" }}>
         <div style={{ display:"flex",gap:5 }}>
-          <Btn icon={micOn?"🎤":"🔇"} label={micOn?"Micro":"Muet"} onClick={toggleMic} active={micOn} />
-          {myRole==="host" && <Btn icon={camOn?"📷":"🚫"} label={camOn?"Caméra":"Off"} onClick={toggleCam} active={camOn} />}
+          <Btn iconKey={micOn?"micOn":"micOff"} label={micOn?"Micro":"Muet"} onClick={toggleMic} active={micOn} />
+          {myRole==="host" && <Btn iconKey={camOn?"camOn":"camOff"} label={camOn?"Caméra":"Caméra"} onClick={toggleCam} active={camOn} />}
         </div>
         <div style={{ display:"flex",gap:5 }}>
-          {(myRole==="host" || myRole==="guest") && <Btn icon="🖥️" label={screenOn?"Arrêter":"Partager"} onClick={toggleScreen} active={!screenOn} />}
-          {myRole==="guest" && <Btn icon="✋" label={hand?"Baisser":"Main"} onClick={toggleHand} active={!hand} pulse={hand} />}
-          <Btn icon="😄" label="Réactions" onClick={()=>setEmojiOpen(o=>!o)} active />
-          <Btn icon="💬" label="Chat" onClick={()=>{setChatOpen(o=>!o);setUnread(0);setPartOpen(false);setAiOpen(false);}} active badge={unread} />
-          {myRole==="host" && <Btn icon="👥" label="Membres" onClick={()=>{setPartOpen(o=>!o);setChatOpen(false);setAiOpen(false);}} active />}
+          {(myRole==="host" || myRole==="guest") && <Btn iconKey={screenOn?"screenOff":"screen"} label={screenOn?"Arrêter":"Écran"} onClick={toggleScreen} active={!screenOn} />}
+          {myRole==="guest" && <Btn iconKey="hand" label={hand?"Baisser":"Main"} onClick={toggleHand} active={!hand} pulse={hand} />}
+          <Btn iconKey="emoji" label="Réactions" onClick={()=>setEmojiOpen(o=>!o)} active />
+          <Btn iconKey="chat" label="Chat" onClick={()=>{setChatOpen(o=>!o);setUnread(0);setPartOpen(false);setAiOpen(false);}} active badge={unread} />
+          {myRole==="host" && <Btn iconKey="people" label="Membres" onClick={()=>{setPartOpen(o=>!o);setChatOpen(false);setAiOpen(false);}} active />}
         </div>
         <div style={{ display:"flex",gap:5 }}>
-          <button className="cbtn" onClick={()=>setSubsOn(o=>!o)} style={{ border:"none",borderRadius:13,padding:"10px 15px",color:subsOn?"#fff":"#202124",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:62,background:subsOn?"#1a73e8":"#f1f3f4" }}>
-            <span style={{ fontSize:13,fontWeight:900,fontFamily:"monospace" }}>CC</span>
-            <span style={{ fontSize:10,fontWeight:600 }}>Sous-titres</span>
+          <button className="cbtn" onClick={()=>setSubsOn(o=>!o)} style={{ border:"none",borderRadius:14,padding:"9px 13px",color:subsOn?"#fff":"#202124",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:4,minWidth:60,background:subsOn?"#1a73e8":"#f1f3f4",boxShadow:subsOn?"0 2px 10px rgba(26,115,232,.35)":"0 1px 3px rgba(0,0,0,.1)" }}>
+            <span style={{ display:"flex",alignItems:"center",justifyContent:"center",width:22,height:22 }}>{Icons.cc}</span>
+            <span style={{ fontSize:9.5,fontWeight:700,opacity:.85,letterSpacing:.3 }}>Sous-titres</span>
           </button>
-          {myRole==="host" && <Btn icon="✨" label="Résumé IA" onClick={()=>{setAiOpen(o=>!o);setChatOpen(false);setPartOpen(false);}} active />}
+          {myRole==="host" && <Btn iconKey="ai" label="Résumé IA" onClick={()=>{setAiOpen(o=>!o);setChatOpen(false);setPartOpen(false);}} active />}
           {myRole==="host"
-            ? <Btn icon="⏹️" label="Terminer" onClick={()=>setEndModal(true)} danger />
-            : <Btn icon="🚪" label="Quitter"  onClick={()=>{cleanup();navigate("/jeune");}} danger />
+            ? <Btn iconKey="stop"  label="Terminer" onClick={()=>setEndModal(true)} danger />
+            : <Btn iconKey="leave" label="Quitter"  onClick={()=>{cleanup();navigate("/jeune");}} danger />
           }
         </div>
       </div>
