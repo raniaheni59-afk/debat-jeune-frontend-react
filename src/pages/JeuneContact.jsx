@@ -273,7 +273,8 @@ export default function JeuneContact() {
   const isGroup        = sel==="group";
   const isSearch       = !!query.trim();
   const listItems      = isSearch?results:convs;
-  const adminNotInConv = safe(admins).filter(a=>!safe(convs).find(c=>Number(c.id_user)===Number(a.id_user)));
+  // ✅ Un seul admin max dans "Contacter" (le backend retourne déjà 1 seul admin pour les jeunes)
+  const adminNotInConv = safe(admins).filter(a=>!safe(convs).find(c=>Number(c.id_user)===Number(a.id_user))).slice(0,1);
   const activeMsgs     = safe(isGroup?grpMsgs:msgs);
   const canSend        = !!(text.trim()||filePrev)&&!sending;
 
