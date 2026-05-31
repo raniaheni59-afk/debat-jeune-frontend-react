@@ -142,7 +142,16 @@ export default function JeuneContact() {
   const fetchConvs = useCallback(async () => {
     try {
       const r = await API.get("/messenger/conversations");
-      setConvs(safe(r.data));
+      const all = safe(r.data);
+      // ✅ Dédupliquer: garder une seule conv par admin (la plus récente en premier)
+      const seen = new Set();
+      const deduped = all.filter(c => {
+        const key = Number(c.id_user);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      setConvs(deduped);
     } catch(e) { console.error(e); }
   }, []);
   useEffect(() => { fetchConvs(); }, [fetchConvs]);
