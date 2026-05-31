@@ -334,51 +334,13 @@ const MODAL_MAP = {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   LIVE WIDGET — sidebar, shows active live from API
+   LIVE WIDGET — sidebar, ONLY visible when a live is active
 ═══════════════════════════════════════════════════════════ */
-const LiveEvWidget = ({ goToLive, activeLiveLink }) => {
-  const [live, setLive] = React.useState(null);
+const LiveEvWidget = ({ goToLive, activeLiveLink, liveInfo }) => {
   const navigate = useNavigate();
 
-  React.useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    // Fetch active live
-    fetch("https://debat-jeune.onrender.com/api/lives", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(list => {
-        const active = Array.isArray(list) ? list.find(l => l.is_active) : null;
-        setLive(active || null);
-      })
-      .catch(() => {});
-
-    const onStarted = e => {
-      const d = e.detail;
-      if (d.viewerLink) {
-        setLive({
-          room_code: d.roomCode,
-          stream_link: d.viewerLink,
-          title_live: d.title || "Live en cours",
-        });
-      }
-    };
-    window.addEventListener("live-started", onStarted);
-    window.addEventListener("live-ended", () => setLive(null));
-    return () => {
-      window.removeEventListener("live-started", onStarted);
-      window.removeEventListener("live-ended", () => setLive(null));
-    };
-  }, []);
-
-  // Sync avec activeLiveLink passé depuis JeuneLayout
-  React.useEffect(() => {
-    if (activeLiveLink && !live) {
-      setLive({ stream_link: activeLiveLink, title_live: "Live en cours" });
-    }
-  }, [activeLiveLink]);
-
   const joinLive = () => {
-    const linkToUse = live?.stream_link || activeLiveLink || localStorage.getItem("currentLiveViewerLink");
+    const linkToUse = liveInfo?.stream_link || activeLiveLink || localStorage.getItem("currentLiveViewerLink");
     if (linkToUse) {
       try {
         const url      = new URL(linkToUse);
@@ -391,27 +353,35 @@ const LiveEvWidget = ({ goToLive, activeLiveLink }) => {
     goToLive();
   };
 
-  if (!live) return (
-    <div className="jl-ev-widget">
-      <p className="jl-ev-tag">Sessions Live</p>
-      <p className="jl-ev-name">Aucun live en cours</p>
-      <p className="jl-ev-time"><Icon name="clock" size={12}/>Disponible prochainement</p>
-      <button className="jl-ev-join" onClick={goToLive}>
-        <Icon name="radio" size={13}/>Voir les lives
-      </button>
-    </div>
-  );
+  if (!activeLiveLink && !liveInfo) return null;
 
   return (
-    <div className="jl-ev-widget" style={{ borderColor: "#ea4335", borderWidth: 2 }}>
-      <p className="jl-ev-tag" style={{ color: "#ea4335", display:"flex", alignItems:"center", gap:4 }}>
-        <span style={{ width:8, height:8, borderRadius:"50%", background:"#ea4335", display:"inline-block", animation:"jlPulse 1s infinite" }}/>
-        LIVE EN COURS
+    <div style={{
+      background: "linear-gradient(135deg,#1a0533,#2d0a55)",
+      borderRadius: 16, padding: "14px 16px", marginBottom: 12,
+      border: "1.5px solid rgba(234,67,53,.4)",
+      boxShadow: "0 4px 20px rgba(234,67,53,.15)",
+      animation: "jlFadeIn .4s ease",
+    }}>
+      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
+        <span style={{ width:9, height:9, borderRadius:"50%", background:"#f87171", display:"inline-block", animation:"jlPulse 1s infinite", flexShrink:0 }}/>
+        <span style={{ color:"#f87171", fontWeight:800, fontSize:10, letterSpacing:1.2, textTransform:"uppercase" }}>Live en cours</span>
+      </div>
+      <p style={{ color:"#fff", fontWeight:700, fontSize:14, margin:"0 0 4px", lineHeight:1.3 }}>
+        {liveInfo?.title_live || "Session live"}
       </p>
-      <p className="jl-ev-name">{live.title_live || "Live en cours"}</p>
-      {live.time && <p className="jl-ev-time"><Icon name="clock" size={12}/>{live.time}</p>}
-      <button className="jl-ev-join" onClick={joinLive} style={{ background:"linear-gradient(135deg,#ea4335,#b31412)" }}>
-        <Icon name="play" size={13}/>Rejoindre maintenant
+      {liveInfo?.thematique && (
+        <p style={{ color:"rgba(255,255,255,.5)", fontSize:11, margin:"0 0 12px" }}>{liveInfo.thematique}</p>
+      )}
+      <button onClick={joinLive} style={{
+        width:"100%", background:"linear-gradient(135deg,#ea4335,#b31412)",
+        border:"none", borderRadius:10, padding:"9px", color:"#fff",
+        fontWeight:700, fontSize:13, cursor:"pointer",
+        display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+        boxShadow:"0 3px 12px rgba(234,67,53,.4)",
+      }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        Rejoindre maintenant
       </button>
     </div>
   );
@@ -700,6 +670,7 @@ const JeuneLayout = () => {
   /* ── LIVE STATE (pour notification + chatbot) ── */
   const [activeLiveLink, setActiveLiveLink] = useState(null); // viewerLink du live actif
   const [liveNotifToast, setLiveNotifToast] = useState(null); // toast notification live
+  const [activeLiveInfo, setActiveLiveInfo]   = useState(null); // full live object
 
   /* ── SOCKET ── ✅ FIX: useRef pour éviter le loop connect/disconnect */
   const socketRef = useRef(null);
@@ -735,31 +706,30 @@ const JeuneLayout = () => {
 
     // ✅ Notification live en temps réel
     socketRef.current.on("live-started", (data) => {
-      const { viewerLink, title, roomCode } = data;
+      const { viewerLink, title, roomCode, thematique, description, liveId } = data;
       if (viewerLink) {
         localStorage.setItem("currentLiveViewerLink", viewerLink);
         setActiveLiveLink(viewerLink);
+        setActiveLiveInfo({ title_live: title || "Live en cours", stream_link: viewerLink, room_code: roomCode, thematique, description, id_live: liveId });
       }
-      // Afficher toast notification
-      setLiveNotifToast({ title: title || "Live en cours", viewerLink, roomCode });
-      setUnreadNotifs((n) => n + 1);
-      // Ajouter dans la liste des notifications
+      // Ajouter dans la liste des notifications (pas de toast séparé)
       setNotifications((prev) => [{
         id_notification: Date.now(),
         type_notification: "live_started",
-        message: `🔴 Live démarré — "${title || "Live en cours"}" — Cliquez pour rejoindre`,
+        message: `Un live a démarré — "${title || "Live en cours"}" — Cliquez pour rejoindre`,
         is_read: false,
         created_at: new Date().toISOString(),
         _liveLink: viewerLink,
         _roomCode: roomCode,
       }, ...prev]);
-      // Auto-hide toast après 15s
-      setTimeout(() => setLiveNotifToast(null), 15000);
+      setUnreadNotifs((n) => n + 1);
     });
 
     socketRef.current.on("live-ended", () => {
       setActiveLiveLink(null);
+      setActiveLiveInfo(null);
       setLiveNotifToast(null);
+      localStorage.removeItem("currentLiveViewerLink");
     });
 
     return () => {
@@ -778,7 +748,13 @@ const JeuneLayout = () => {
       const active = list.find(l => l.is_active === 1 || l.is_active === true);
       if (active?.stream_link) {
         setActiveLiveLink(active.stream_link);
+        setActiveLiveInfo(active);
         localStorage.setItem("currentLiveViewerLink", active.stream_link);
+      } else {
+        // No active live — clear stored link
+        setActiveLiveLink(null);
+        setActiveLiveInfo(null);
+        localStorage.removeItem("currentLiveViewerLink");
       }
     }).catch(() => {});
   }, []);
@@ -1171,12 +1147,56 @@ const JeuneLayout = () => {
       case PAGES.LIVE:
         return (
           <div className="jl-page" style={{ padding: 0 }}>
-            <LiveSection activeLiveLink={activeLiveLink} onLiveLinkReceived={(link) => {
-              if (link) {
-                setActiveLiveLink(link);
-                localStorage.setItem("currentLiveViewerLink", link);
-              }
-            }} />
+            {activeLiveLink ? (
+              <LiveSection
+                activeLiveLink={activeLiveLink}
+                activeLiveInfo={activeLiveInfo}
+                onLiveLinkReceived={(link, info) => {
+                  if (link) {
+                    setActiveLiveLink(link);
+                    if (info) setActiveLiveInfo(info);
+                    localStorage.setItem("currentLiveViewerLink", link);
+                  }
+                }}
+              />
+            ) : (
+              <div style={{
+                display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+                minHeight:"60vh", padding:"40px 24px", textAlign:"center",
+              }}>
+                <div style={{
+                  width:100, height:100, borderRadius:"50%",
+                  background:"linear-gradient(135deg,rgba(90,63,160,.1),rgba(124,92,191,.08))",
+                  border:"2px dashed rgba(90,63,160,.2)",
+                  display:"flex", alignItems:"center", justifyContent:"center", marginBottom:24,
+                }}>
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#9b7de0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                  </svg>
+                </div>
+                <h2 style={{ fontSize:20, fontWeight:800, color:"#261a52", margin:"0 0 8px", fontFamily:"'Poppins',sans-serif" }}>
+                  Aucun live en cours
+                </h2>
+                <p style={{ fontSize:14, color:"#9080b8", maxWidth:320, lineHeight:1.7, margin:"0 0 24px" }}>
+                  Les sessions live apparaîtront ici dès qu'un administrateur démarrera une diffusion.
+                  Vous serez notifié automatiquement.
+                </p>
+                <div style={{
+                  background:"linear-gradient(135deg,rgba(90,63,160,.06),rgba(124,92,191,.04))",
+                  border:"1px solid rgba(90,63,160,.12)", borderRadius:14,
+                  padding:"14px 20px", display:"flex", alignItems:"center", gap:10, maxWidth:300,
+                }}>
+                  <div style={{ width:36, height:36, borderRadius:10, background:"linear-gradient(135deg,#5a3fa0,#7c5cbf)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                  </div>
+                  <p style={{ fontSize:12, color:"#5a3fa0", fontWeight:600, lineHeight:1.5, margin:0 }}>
+                    Activez les notifications pour être alerté dès le démarrage d'un live
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         );
 
@@ -1427,41 +1447,9 @@ const JeuneLayout = () => {
         
 
             {/* Live widget */}
-            <LiveEvWidget goToLive={() => goTo(PAGES.LIVE)} activeLiveLink={activeLiveLink} />
+            <LiveEvWidget goToLive={() => goTo(PAGES.LIVE)} activeLiveLink={activeLiveLink} liveInfo={activeLiveInfo} />
 
-            {/* Live notification toast */}
-            {liveNotifToast && (
-              <div style={{
-                background: "linear-gradient(135deg,#7c3aed,#3b82f6)",
-                borderRadius: 14, padding: "14px 16px", marginBottom: 12,
-                border: "1px solid rgba(255,255,255,.15)",
-                animation: "jlFadeIn .4s ease",
-                cursor: "pointer",
-              }} onClick={() => {
-                if (liveNotifToast.viewerLink) {
-                  try {
-                    const url = new URL(liveNotifToast.viewerLink);
-                    const parts = url.pathname.split("/").filter(Boolean);
-                    const rc = parts[parts.length - 1];
-                    const vt = url.searchParams.get("vt");
-                    if (rc && vt) { navigate(`/meet/${rc}?vt=${vt}`); return; }
-                  } catch {}
-                }
-              }}>
-                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
-                  <span style={{ width:9, height:9, borderRadius:"50%", background:"#f87171", display:"inline-block", animation:"jlPulse 1s infinite" }}/>
-                  <span style={{ color:"#fff", fontWeight:800, fontSize:12, letterSpacing:1, textTransform:"uppercase" }}>🔴 LIVE EN COURS</span>
-                  <button onClick={(e) => { e.stopPropagation(); setLiveNotifToast(null); }}
-                    style={{ marginLeft:"auto", background:"rgba(255,255,255,.2)", border:"none", color:"#fff", borderRadius:6, width:22, height:22, cursor:"pointer", fontSize:12, display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
-                </div>
-                <p style={{ color:"rgba(255,255,255,.9)", fontSize:13, fontWeight:600, margin:"0 0 10px" }}>
-                  {liveNotifToast.title}
-                </p>
-                <button style={{ width:"100%", background:"rgba(255,255,255,.2)", border:"1px solid rgba(255,255,255,.3)", borderRadius:10, padding:"8px", color:"#fff", fontWeight:700, fontSize:13, cursor:"pointer" }}>
-                  ▶ Rejoindre le Live
-                </button>
-              </div>
-            )}
+
 
             {/* Chatbot — always visible, context changes with live */}
             <div className="jl-cb">
@@ -1469,7 +1457,7 @@ const JeuneLayout = () => {
                 <div className="jl-cb-icon"><Icon name="robot" size={14}/></div>
                 <div>
                   <p className="jl-cb-title">Assistant Swafy</p>
-                  <p className="jl-cb-sub">{activeLiveLink ? "Actif pendant le live" : "Toujours disponible"}</p>
+                  <p className="jl-cb-sub">{activeLiveLink ? `Contexte: ${activeLiveInfo?.title_live || "Live en cours"}` : "Toujours disponible"}</p>
                 </div>
                 {activeLiveLink ? (
                   <span style={{ background:"#ef4444", color:"#fff", fontSize:9, fontWeight:800, padding:"2px 7px", borderRadius:10, animation:"jlPulse 1.2s infinite" }}>🔴 LIVE</span>
