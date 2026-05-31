@@ -667,7 +667,11 @@ const JeuneLayout = () => {
   const navigate = useNavigate();
 
   /* UI */
-  const [activePage,    setActivePage]    = useState(PAGES.HOME);
+  const [activePage,    setActivePage]    = useState(() => {
+    // ✅ Restaurer la page active après refresh
+    const saved = localStorage.getItem("jeune_activePage");
+    return (saved && Object.values(PAGES).includes(saved)) ? saved : PAGES.HOME;
+  });
   const [sidebarOpen,   setSidebarOpen]   = useState(true);
   const [mobileOpen,    setMobileOpen]    = useState(false);
   const [modalKey,      setModalKey]      = useState(null);
@@ -826,6 +830,8 @@ const JeuneLayout = () => {
   const goTo = (page) => {
     setActivePage(page);
     setMobileOpen(false);
+    // ✅ Sauvegarder la page active pour la restaurer après refresh
+    localStorage.setItem("jeune_activePage", page);
   };
 
   const markNotifRead = async (notif) => {
