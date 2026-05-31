@@ -80,8 +80,8 @@
 
 /* 1 image — pleine largeur, hauteur auto */
 .pc-media-1 { grid-template-columns:1fr; }
-.pc-media-1 .pc-media-item { height:400px; background:#f0f2f5; }
-.pc-media-1 .pc-media-item.pc-media-solo img { object-fit:contain; }
+.pc-media-1 .pc-media-item { height:auto; min-height:200px; max-height:600px; background:#000; }
+.pc-media-1 .pc-media-item.pc-media-solo img { object-fit:contain; max-height:600px; width:100%; height:auto; display:block; }
 
 /* 2 images */
 .pc-media-2 { grid-template-columns:1fr 1fr; }
@@ -104,7 +104,7 @@
   width:100%; height:100%; object-fit:cover; display:block;
   transition:transform .3s ease;
 }
-.pc-media-1 .pc-media-solo img { object-fit:contain; background:#f0f2f5; }
+.pc-media-1 .pc-media-solo img { object-fit:contain; background:#000; }
 .pc-media-item:hover img { transform:scale(1.03); }
 
 .pc-img-fallback {

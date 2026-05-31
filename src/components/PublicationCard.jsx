@@ -17,10 +17,18 @@ const BACKEND = (() => {
 const getMediaUrl = (p) => {
   if (!p) return null;
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  const clean = p.split("\\").join("/").replace(/^\/+/, "");
+  // normalize backslashes (Windows paths)
+  let clean = p.split("\\").join("/");
+  // remove leading slashes
+  clean = clean.replace(/^\/+/, "");
+  // if path contains the absolute server path (e.g. "C:/project/uploads/file.jpg"), extract from uploads/ onward
+  const uploadsIdx = clean.lastIndexOf("uploads/");
+  if (uploadsIdx !== -1) {
+    clean = clean.slice(uploadsIdx);
+  }
   // strip duplicate uploads/ prefix (e.g. "uploads/uploads/file.jpg")
-  const nodup = clean.replace(/^(uploads\/)+/, "");
-  return BACKEND + "/uploads/" + nodup;
+  clean = clean.replace(/^(uploads\/)+/, "");
+  return BACKEND + "/uploads/" + clean;
 };
 
 const avatar = (name) =>
@@ -808,6 +816,7 @@ export default function PublicationCard({ publication, onUpdate, defaultShowComm
               const hasErr=imgErrors[i];
               return (
                 <div key={i} className={`pc-media-item${imgMedias.length===1?" pc-media-solo":""}`}
+                  style={imgMedias.length===1?{height:"auto"}:{}}
                   onClick={()=>!hasErr&&setLightbox(i)}>
                   {!hasErr
                     ? <img src={src} alt="" loading="lazy"
