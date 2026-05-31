@@ -105,9 +105,9 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
 function Btn({ icon, label, onClick, active=true, danger=false, badge=0, pulse=false, disabled=false }) {
   return (
     <button className="cbtn" onClick={onClick} title={label} disabled={disabled} style={{
-      border:"none",borderRadius:13,padding:"10px 15px",color:"#fff",
+      border:"none",borderRadius:13,padding:"10px 15px",color: danger ? "#fff" : !active ? "#fff" : "#202124",
       display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:62,
-      background:danger?"#ea4335":!active?"#ea4335":"rgba(255,255,255,.1)",
+      background:danger?"#ea4335":!active?"#ea4335":"#f1f3f4",
       animation:pulse?"blink 1.4s infinite":"none",position:"relative",opacity:disabled?.5:1 }}>
       <span style={{ fontSize:20 }}>{icon}</span>
       <span style={{ fontSize:10,fontWeight:600,opacity:.9,whiteSpace:"nowrap" }}>{label}</span>
@@ -237,6 +237,8 @@ export default function MeetRoom() {
   const [guestScreenAllowed, setGuestScreenAllowed] = useState(false);
   const [pinnedId,    setPinnedId]  = useState(null); // socket id pinned as main view
   const [spotlightId, setSpotlightId] = useState(null); // who is spotlighted (screen share)
+  const [screenRequest, setScreenRequest] = useState(null); // { socketId, userName } — pending admin confirmation
+  const [guestScreenActive, setGuestScreenActive] = useState(false); // guest screen is currently shown as main
 
   // ── Refs ──
   const sockRef   = useRef(null);
@@ -571,6 +573,37 @@ export default function MeetRoom() {
         }
       });
 
+      // ✅ Guest demande partage d'écran → admin voit modal de confirmation
+      sock.on("screen-share-requested", ({ socketId, userName }) => {
+        if (myRole === "host") {
+          setScreenRequest({ socketId, userName });
+        }
+      });
+
+      // ✅ Guest screen share ended → admin camera revient
+      sock.on("guest-screen-ended", ({ socketId }) => {
+        setGuestScreenActive(false);
+        setSpotlightId(null);
+        setPState(prev => ({ ...prev, [socketId]: { ...prev[socketId], screen: false } }));
+      });
+
+      // ✅ Admin force-stops guest screen share
+      sock.on("admin-stop-guest-screen", ({ targetSocketId }) => {
+        if (targetSocketId === sock.id) {
+          screenStr.current?.getTracks().forEach(t => t.stop());
+          screenStr.current = null;
+          setScreenOn(false);
+          setGuestScreenActive(false);
+          setGuestScreenAllowed(false);
+          const camTrack = localStr.current?.getVideoTracks()[0];
+          Object.values(pcMap.current).forEach(pc => {
+            const sender = pc.getSenders().find(s => s.track?.kind === "video");
+            if (sender && camTrack) sender.replaceTrack(camTrack).catch(() => {});
+          });
+          showToast("Admin a arrêté votre partage d'écran", "#ea4335", "🖥️");
+        }
+      });
+
       // ✅ Spotlight: admin épingle un participant en grand
       sock.on("spotlight-set", ({ socketId }) => {
         setSpotlightId(socketId || null);
@@ -669,14 +702,21 @@ export default function MeetRoom() {
 
   // ✅ FIX Partage d'écran: remplacer track vidéo dans tous les peer connections
   const toggleScreen = async () => {
-    if (myRole!=="host" && !guestScreenAllowed) {
-      showToast("L'admin doit vous autoriser à partager l'écran","#fbbc04");
+    if (myRole !== "host" && !guestScreenAllowed) {
+      // Guest demande l'autorisation à l'admin
+      emit("request-screen-share", { roomCode, userName: myName });
+      showToast("Demande envoyée à l'admin ⏳", "#fbbc04", "🖥️");
       return;
     }
     if (screenOn) {
       screenStr.current?.getTracks().forEach(t=>t.stop());
       screenStr.current = null;
       setScreenOn(false);
+      if (myRole === "guest") {
+        setGuestScreenActive(false);
+        emit("guest-screen-ended", { roomCode });
+        setGuestScreenAllowed(false); // reset permission after stopping
+      }
       emit("screen-share-stopped", { roomCode });
 
       // Remettre la caméra dans tous les peers
@@ -700,16 +740,19 @@ export default function MeetRoom() {
         const replacePromises = Object.values(pcMap.current).map(pc => {
           const sender = pc.getSenders().find(s => s.track?.kind==="video");
           if (sender) return sender.replaceTrack(scrTrack).catch(()=>{});
-          // Pas de sender vidéo → ajouter directement
           try { pc.addTrack(scrTrack, ss); } catch {}
           return Promise.resolve();
         });
         await Promise.all(replacePromises);
 
         scrTrack.onended = async () => {
-          // Arrêt automatique quand l'user ferme le partage
           screenStr.current = null;
           setScreenOn(false);
+          if (myRole === "guest") {
+            setGuestScreenActive(false);
+            emit("guest-screen-ended", { roomCode });
+            setGuestScreenAllowed(false);
+          }
           emit("screen-share-stopped", { roomCode });
           const camTrack = localStr.current?.getVideoTracks()[0];
           Object.values(pcMap.current).forEach(pc => {
@@ -722,6 +765,7 @@ export default function MeetRoom() {
           }
         };
         setScreenOn(true);
+        if (myRole === "guest") setGuestScreenActive(true);
         emit("screen-share-started", { roomCode, sharerRole: myRole });
         showToast("Écran partagé — visible par tous ✅","#34a853","🖥️");
       } catch { showToast("Partage d'écran annulé","#5f6368"); }
@@ -761,11 +805,24 @@ export default function MeetRoom() {
     }
   };
 
-  // ✅ Admin grants screen share to a guest
+  // ✅ Admin confirms screen share request from guest
   const adminAllowScreen = sid => {
     if (myRole !== "host") return;
     emit("allow-screen", { roomCode, targetSocketId: sid });
+    setScreenRequest(null);
     showToast("Partage d'écran autorisé 🖥️","#34a853");
+  };
+
+  // ✅ Admin stops guest screen share and returns to his camera
+  const adminStopGuestScreen = () => {
+    if (myRole !== "host") return;
+    const guestScrPeerId = peers.find(p => pState[p.id]?.screen === true)?.id;
+    if (guestScrPeerId) {
+      emit("admin-stop-guest-screen", { roomCode, targetSocketId: guestScrPeerId });
+    }
+    setGuestScreenActive(false);
+    setSpotlightId(null);
+    showToast("Écran du participant arrêté","#ea4335","🖥️");
   };
 
   const sendReaction = emoji => {
@@ -878,7 +935,7 @@ export default function MeetRoom() {
 
   // ══ MAIN UI ══════════════════════════════════════════
   return (
-    <div style={{ height:"100vh",display:"flex",flexDirection:"column",background:"#202124",fontFamily:"'Google Sans',system-ui,sans-serif",color:"#fff",overflow:"hidden" }}>
+    <div style={{ height:"100vh",display:"flex",flexDirection:"column",background:"#f8f9fa",fontFamily:"'Google Sans',system-ui,sans-serif",color:"#202124",overflow:"hidden" }}>
       <style>{CSS}</style>
 
       {/* TOAST */}
@@ -892,6 +949,11 @@ export default function MeetRoom() {
       {kickTarget  && <Modal emoji="🚪" title="Retirer ce participant ?" desc="Il sera exclu (peut revenir avec le lien)." onCancel={()=>setKickTarget(null)} onConfirm={confirmKick} confirmLabel="Retirer" />}
       {blockTarget && <Modal emoji="🚫" title="Bloquer définitivement ?" desc="Son compte sera supprimé. Il ne pourra plus rejoindre." onCancel={()=>setBlockTarget(null)} onConfirm={confirmBlock} confirmLabel="🚫 Bloquer" />}
 
+      {/* SCREEN SHARE REQUEST MODAL (admin only) */}
+      {screenRequest && myRole === "host" && (
+        <Modal emoji="🖥️" title="Demande de partage d'écran" desc={`${screenRequest.userName} souhaite partager son écran. Voulez-vous autoriser ?`} onCancel={()=>setScreenRequest(null)} onConfirm={()=>adminAllowScreen(screenRequest.socketId)} confirmLabel="✅ Autoriser" confirmColor="#34a853" />
+      )}
+
       {endModal && (
         <Modal emoji="🎙️" title="Terminer le live ?" desc="Le live sera archivé automatiquement." onCancel={()=>setEndModal(false)} onConfirm={null} confirmLabel="">
           <div style={{ display:"flex",flexDirection:"column",gap:10,marginTop:16 }}>
@@ -903,33 +965,33 @@ export default function MeetRoom() {
       )}
 
       {/* HEADER */}
-      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",background:"#2d2f31",flexShrink:0,borderBottom:"1px solid rgba(255,255,255,.06)" }}>
+      <div style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 20px",background:"#ffffff",flexShrink:0,borderBottom:"1px solid #e0e0e0",boxShadow:"0 1px 4px rgba(0,0,0,.08)" }}>
         <div style={{ display:"flex",alignItems:"center",gap:12 }}>
-          <div style={{ width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#1a73e8,#0d47a1)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16 }}>S</div>
+          <div style={{ width:34,height:34,borderRadius:10,background:"linear-gradient(135deg,#1a73e8,#0d47a1)",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:900,fontSize:16,color:"#fff" }}>S</div>
           <div>
-            <div style={{ color:"#e8eaed",fontWeight:700,fontSize:14 }}>Swafy Meet {liveInfo&&`— ${liveInfo.title_live}`}</div>
-            <div style={{ color:"#9aa0a6",fontSize:11,display:"flex",gap:6,alignItems:"center" }}>
+            <div style={{ color:"#202124",fontWeight:700,fontSize:14 }}>Swafy Meet {liveInfo&&`— ${liveInfo.title_live}`}</div>
+            <div style={{ color:"#5f6368",fontSize:11,display:"flex",gap:6,alignItems:"center" }}>
               <span style={{ width:7,height:7,borderRadius:"50%",background:"#ea4335",display:"inline-block",animation:"blink 2s infinite" }} />
               {roomCode} · {myRole==="host"?"👑 Admin":"👤 Participant"} · ⏱ {fmt(duration)}
             </div>
           </div>
         </div>
         <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-          <span style={{ background:"rgba(255,255,255,.07)",color:"#9aa0a6",padding:"4px 10px",borderRadius:20,fontSize:12 }}>{ptcps.length} 👥</span>
+          <span style={{ background:"#f1f3f4",color:"#5f6368",padding:"4px 10px",borderRadius:20,fontSize:12 }}>{ptcps.length} 👥</span>
           {myRole==="host" && (
-            <button className="cbtn" onClick={()=>setLinkOpen(o=>!o)} style={{ background:"rgba(255,255,255,.06)",border:"1px solid rgba(255,255,255,.1)",color:"#e8eaed",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:500 }}>🔗 Partager ce live</button>
+            <button className="cbtn" onClick={()=>setLinkOpen(o=>!o)} style={{ background:"#e8f0fe",border:"1px solid #c5d2f0",color:"#1a73e8",padding:"6px 14px",borderRadius:8,fontSize:12,fontWeight:600 }}>🔗 Partager ce live</button>
           )}
         </div>
       </div>
 
       {/* LINK BAR */}
       {linkOpen && myRole==="host" && (
-        <div style={{ background:"#2d2f31",borderBottom:"1px solid rgba(255,255,255,.06)",padding:"10px 18px",flexShrink:0,animation:"fadeIn .2s ease" }}>
-          <p style={{ color:"#9aa0a6",fontSize:11,marginBottom:6 }}>🔗 Lien public pour les jeunes (copier et partager) :</p>
+        <div style={{ background:"#ffffff",borderBottom:"1px solid #e0e0e0",padding:"10px 18px",flexShrink:0,animation:"fadeIn .2s ease" }}>
+          <p style={{ color:"#5f6368",fontSize:11,marginBottom:6 }}>🔗 Lien public pour les jeunes (copier et partager) :</p>
           <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-            <span style={{ flex:1,color:"#8ab4f8",fontSize:12,wordBreak:"break-all",background:"rgba(138,180,248,.08)",padding:"7px 12px",borderRadius:8,fontFamily:"monospace" }}>{localStorage.getItem("currentLiveViewerLink")||"Aucun lien — créez d'abord un live"}</span>
+            <span style={{ flex:1,color:"#1a73e8",fontSize:12,wordBreak:"break-all",background:"#e8f0fe",padding:"7px 12px",borderRadius:8,fontFamily:"monospace" }}>{localStorage.getItem("currentLiveViewerLink")||"Aucun lien — créez d'abord un live"}</span>
             {localStorage.getItem("currentLiveViewerLink") && <button onClick={copyLink} style={{ background:"#1a73e8",border:"none",borderRadius:8,padding:"7px 16px",color:"#fff",cursor:"pointer",fontSize:12,fontWeight:700,whiteSpace:"nowrap",flexShrink:0 }}>{copied?"✅ Copié !":"📋 Copier"}</button>}
-            <button onClick={()=>setLinkOpen(false)} style={{ background:"rgba(255,255,255,.06)",border:"none",borderRadius:8,padding:"7px 11px",color:"#9aa0a6",cursor:"pointer",flexShrink:0 }}>✕</button>
+            <button onClick={()=>setLinkOpen(false)} style={{ background:"#f1f3f4",border:"none",borderRadius:8,padding:"7px 11px",color:"#5f6368",cursor:"pointer",flexShrink:0 }}>✕</button>
           </div>
         </div>
       )}
@@ -1003,16 +1065,40 @@ export default function MeetRoom() {
 
               /* HOST layout: big admin tile on left, guest strip on right */
               if (myRole === "host") {
+                // If a guest is sharing screen → show it as main, admin tile goes to strip
+                const guestScrPeer = visiblePeers.find(p => pState[p.id]?.screen === true);
+                const mainTilePeer = guestScrPeer || null;
+                const stripList    = guestScrPeer ? visiblePeers.filter(p => p.id !== guestScrPeer.id) : visiblePeers;
+
                 return (
                   <div style={{ flex:1,display:"flex",gap:8,overflow:"hidden",minHeight:0 }}>
-                    {/* Big admin tile */}
+                    {/* Big main tile: guest screen OR admin camera */}
                     <div style={{ flex:1,position:"relative",minWidth:0 }}>
-                      <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} fillHeight />
+                      {mainTilePeer ? (
+                        <>
+                          <Tile stream={mainTilePeer.stream}
+                            name={nameMap.current[mainTilePeer.id]||"Participant"}
+                            role="guest" camOff={false} hand={false} screenShare micOn muted={false} fillHeight />
+                          {/* Admin can stop guest screen */}
+                          <button onClick={adminStopGuestScreen}
+                            style={{ position:"absolute",top:12,right:12,background:"rgba(234,67,53,.9)",border:"none",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontSize:12,fontWeight:700,zIndex:10,display:"flex",alignItems:"center",gap:6,boxShadow:"0 2px 8px rgba(0,0,0,.3)" }}>
+                            🖥️ Arrêter partage
+                          </button>
+                        </>
+                      ) : (
+                        <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} fillHeight />
+                      )}
                     </div>
-                    {/* Guest strip — only if there are guests */}
-                    {peerCount > 0 && (
+                    {/* Strip: admin self-tile + guests (or admin if guest is main) */}
+                    {(peerCount > 0 || mainTilePeer) && (
                       <div style={{ width:180,display:"flex",flexDirection:"column",gap:6,overflowY:"auto",flexShrink:0 }}>
-                        {visiblePeers.map(p => (
+                        {/* Admin self in strip when guest is main */}
+                        {mainTilePeer && (
+                          <div style={{ position:"relative",flexShrink:0 }}>
+                            <Tile localRef={localVid} isLocal muted name={myName} role="host" camOff={!camOn} micOn={micOn} screenShare={screenOn} />
+                          </div>
+                        )}
+                        {stripList.map(p => (
                           <div key={p.id} style={{ position:"relative",flexShrink:0,cursor:"pointer" }}
                             onClick={()=>{ setSpotlightId(p.id); emit("spotlight-set",{roomCode,socketId:p.id}); }}>
                             <Tile stream={p.stream}
@@ -1036,7 +1122,14 @@ export default function MeetRoom() {
 
               /* GUEST layout: show only the admin/remote streams — no guest self-tile */
               return (
-                <div style={{ flex:1,display:"flex",overflow:"hidden",minHeight:0 }}>
+                <div style={{ flex:1,display:"flex",overflow:"hidden",minHeight:0,position:"relative" }}>
+                  {/* If guest is sharing screen → show stop button overlay */}
+                  {screenOn && (
+                    <button onClick={toggleScreen}
+                      style={{ position:"absolute",top:12,right:12,background:"rgba(234,67,53,.9)",border:"none",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontSize:12,fontWeight:700,zIndex:20,display:"flex",alignItems:"center",gap:6,boxShadow:"0 2px 8px rgba(0,0,0,.3)" }}>
+                      🖥️ Arrêter mon partage
+                    </button>
+                  )}
                   {peerCount === 0 ? (
                     <div style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,
                       background:"rgba(0,0,0,.03)",borderRadius:14,border:"1px dashed rgba(0,0,0,.1)" }}>
@@ -1182,7 +1275,7 @@ export default function MeetRoom() {
       {emojiOpen && <div style={{ position:"fixed",bottom:92,left:"50%",transform:"translateX(-50%)",background:"#2d2f31",border:"1px solid rgba(255,255,255,.1)",borderRadius:16,padding:"10px 14px",display:"flex",gap:6,flexWrap:"wrap",zIndex:70,boxShadow:"0 8px 32px rgba(0,0,0,.6)",animation:"popIn .2s ease",maxWidth:280,justifyContent:"center" }}>{["👍","❤️","😂","🎉","🔥","👏","🙌","💯","😮","🤔","👎","🌟"].map(e=><button key={e} onClick={()=>sendReaction(e)} style={{ background:"none",border:"none",fontSize:26,cursor:"pointer",borderRadius:8,padding:"4px 6px" }}>{e}</button>)}</div>}
 
       {/* CONTROLS */}
-      <div style={{ background:"#2d2f31",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,flexWrap:"wrap",borderTop:"1px solid rgba(255,255,255,.05)" }}>
+      <div style={{ background:"#ffffff",padding:"10px 16px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,flexShrink:0,flexWrap:"wrap",borderTop:"1px solid #e0e0e0",boxShadow:"0 -1px 4px rgba(0,0,0,.06)" }}>
         <div style={{ display:"flex",gap:5 }}>
           <Btn icon={micOn?"🎤":"🔇"} label={micOn?"Micro":"Muet"} onClick={toggleMic} active={micOn} />
           {myRole==="host"
@@ -1191,14 +1284,14 @@ export default function MeetRoom() {
           }
         </div>
         <div style={{ display:"flex",gap:5 }}>
-          {(myRole==="host" || guestScreenAllowed) && <Btn icon="🖥️" label={screenOn?"Arrêter":"Partager"} onClick={toggleScreen} active={!screenOn} />}
+          {(myRole==="host" || myRole==="guest") && <Btn icon="🖥️" label={screenOn?"Arrêter":"Partager"} onClick={toggleScreen} active={!screenOn} />}
           {myRole==="guest" && <Btn icon="✋" label={hand?"Baisser":"Main"} onClick={toggleHand} active={!hand} pulse={hand} />}
           <Btn icon="😄" label="Réactions" onClick={()=>setEmojiOpen(o=>!o)} active />
           <Btn icon="💬" label="Chat" onClick={()=>{setChatOpen(o=>!o);setUnread(0);setPartOpen(false);setAiOpen(false);}} active badge={unread} />
           {myRole==="host" && <Btn icon="👥" label="Membres" onClick={()=>{setPartOpen(o=>!o);setChatOpen(false);setAiOpen(false);}} active />}
         </div>
         <div style={{ display:"flex",gap:5 }}>
-          <button className="cbtn" onClick={()=>setSubsOn(o=>!o)} style={{ border:"none",borderRadius:13,padding:"10px 15px",color:"#fff",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:62,background:subsOn?"#1a73e8":"rgba(255,255,255,.1)" }}>
+          <button className="cbtn" onClick={()=>setSubsOn(o=>!o)} style={{ border:"none",borderRadius:13,padding:"10px 15px",color:subsOn?"#fff":"#202124",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:3,minWidth:62,background:subsOn?"#1a73e8":"#f1f3f4" }}>
             <span style={{ fontSize:13,fontWeight:900,fontFamily:"monospace" }}>CC</span>
             <span style={{ fontSize:10,fontWeight:600 }}>Sous-titres</span>
           </button>
