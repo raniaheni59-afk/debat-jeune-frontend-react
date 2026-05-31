@@ -348,18 +348,18 @@ export default function AdminContact({ onUnreadChange }) {
                 onClick={()=>isSrch?openConv(item):openSel(item)}>
                 <Av p={item.prenom_user} n={item.nom_user} id={item.id_user} size={42}/>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline"}}>
-                    <span style={{fontWeight: unreadCount>0?700:600, fontSize:13.5,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <span style={{fontWeight:unreadCount>0?700:600,fontSize:13.5,color:"#1a1a2e",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>
                       {String(item.prenom_user??"")} {String(item.nom_user??"")}
                     </span>
-                    {item.last_time&&<span style={{fontSize:10,color:"#b0a9d4",flexShrink:0,marginLeft:6}}>{ago(item.last_time)}</span>}
+                    <div style={{display:"flex",alignItems:"center",gap:5,flexShrink:0,marginLeft:4}}>
+                      {item.last_time&&<span style={{fontSize:10,color:"#b0a9d4"}}>{ago(item.last_time)}</span>}
+                      <UnreadBadge count={unreadCount}/>
+                    </div>
                   </div>
-                  <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <p style={{fontSize:12,color: unreadCount>0?"#5a3fa0":"#9e97c0",margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontWeight:unreadCount>0?600:400,flex:1}}>
-                      {isSrch?(item.role==="admin"?"👑 Admin":"👤 Jeune"):(item.last_message||"Nouvelle conversation")}
-                    </p>
-                    <UnreadBadge count={unreadCount}/>
-                  </div>
+                  <p style={{fontSize:12,color:unreadCount>0?"#5a3fa0":"#9e97c0",fontWeight:unreadCount>0?600:400,margin:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                    {isSrch?(item.role==="admin"?"Admin":"Jeune"):(item.last_message||"Nouvelle conversation")}
+                  </p>
                 </div>
               </div>
             );
@@ -475,4 +475,3 @@ export default function AdminContact({ onUnreadChange }) {
     </div>
   );
 }
-
