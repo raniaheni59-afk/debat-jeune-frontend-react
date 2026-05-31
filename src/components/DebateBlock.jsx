@@ -1,177 +1,173 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import API from "../services/api";
 import "./DebateBlock.css";
 
-/* ── helpers ─────────────────────────────────────── */
-const COLORS = ["#6b4fbb","#8b6fd4","#a29bfe","#6c5ce7","#9b59b6","#b388ff"];
-const avatarColor = (name = "") => COLORS[(name?.charCodeAt(0) || 0) % COLORS.length];
-
-const fmtDate = (d) => {
-  if (!d) return "";
-  const s = (Date.now() - new Date(d)) / 1000;
-  if (s < 60)    return "À l'instant";
-  if (s < 3600)  return `${Math.floor(s / 60)} min`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return new Date(d).toLocaleDateString("fr-FR");
-};
-
+/* ── helpers ───────────────────────────────────────────── */
 const getCurrentUser = () => {
   try { const u = localStorage.getItem("user"); return u ? JSON.parse(u) : null; }
   catch { return null; }
 };
 
-/* ── CommentCard — manages its own replies state ── */
-const CommentCard = ({ comment: initialComment, side, debateId, onRefresh, currentUser }) => {
-  /* Keep a local copy of the comment so replies update immediately */
-  const [comment, setComment] = useState(initialComment);
-  const [showReply, setShowReply] = useState(false);
-  const [replyText, setReplyText] = useState("");
-  const [sending,   setSending]   = useState(false);
+const avatar = (name) =>
+  `https://ui-avatars.com/api/?name=${encodeURIComponent(name || "U")}&background=6b5ae0&color=fff&size=80&bold=true`;
+
+const timeAgo = (d) => {
+  if (!d) return "";
+  const s = (Date.now() - new Date(d)) / 1000;
+  if (s < 60)     return "À l'instant";
+  if (s < 3600)   return `${Math.floor(s / 60)} min`;
+  if (s < 86400)  return `${Math.floor(s / 3600)}h`;
+  if (s < 604800) return `${Math.floor(s / 86400)}j`;
+  return new Date(d).toLocaleDateString("fr-FR");
+};
+
+/* ── DebateComment — un argument + ses replies ─────────── */
+function DebateComment({ comment, pubId, side, onRefresh }) {
+  const [replyOpen,    setReplyOpen]    = useState(false);
+  const [replyText,    setReplyText]    = useState("");
+  const [replySending, setReplySending] = useState(false);
+  const [showReplies,  setShowReplies]  = useState(false);
   const inputRef = useRef(null);
+  const me = getCurrentUser();
 
-  /* Sync if parent refreshes with new data */
-  useEffect(() => { setComment(initialComment); }, [initialComment]);
-
-  /* Focus input when reply form opens */
-  useEffect(() => {
-    if (showReply) setTimeout(() => inputRef.current?.focus(), 50);
-  }, [showReply]);
-
-  const isOwner = currentUser && (
-    currentUser.id_user === comment.id_user ||
-    currentUser.id      === comment.id_user ||
-    currentUser.id_user === comment.user_id  ||
-    currentUser.id      === comment.user_id  ||
-    currentUser.role    === "admin"
+  const isOwner = me && (
+    String(me.id_user || me.id) === String(comment.id_user || comment.user_id)
+    || me.role === "admin"
   );
 
-  const handleDelete = async () => {
-    if (!window.confirm("Supprimer cet argument ?")) return;
-    try {
-      await API.delete(`/publications/${debateId}/comments/${comment.id_commentaire}`);
-      onRefresh();
-    } catch (e) { console.error("delete:", e?.response?.data || e.message); }
-  };
-
-  const handleSendReply = async () => {
+  const sendReply = async () => {
     const t = replyText.trim();
-    if (!t || sending) return;
-    setSending(true);
-
-    /* 1 — Optimistic: add reply immediately to local state */
-    const user = currentUser || {};
-    const optimistic = {
-      id_commentaire     : `tmp-${Date.now()}`,
-      contenu_commentaire: t,
-      contenu            : t,
-      prenom_user        : user.prenom_user || user.prenom || user.name || "Moi",
-      nom_user           : user.nom_user || user.nom || "",
-      created_at         : new Date().toISOString(),
-      debat_side         : side,
-      parent_id          : comment.id_commentaire,
-    };
-
-    setComment(prev => ({
-      ...prev,
-      replies: [...(prev.replies || []), optimistic],
-    }));
-    setReplyText("");
-    setShowReply(false);
-
-    /* 2 — Send to API */
+    if (!t || replySending) return;
+    setReplySending(true);
     try {
-      await API.post(`/publications/${debateId}/comments`, {
+      await API.post(`/publications/${pubId}/comments`, {
         contenu_commentaire: t,
-        contenu            : t,
-        debat_side         : side,
-        parent_id          : comment.id_commentaire,
+        contenu: t,
+        parent_id: comment.id_commentaire,
+        debat_side: side,
       });
-      /* 3 — Refresh to get real IDs */
+      setReplyText("");
+      setReplyOpen(false);
+      setShowReplies(true);
       onRefresh();
     } catch (e) {
       console.error("reply error:", e?.response?.data || e.message);
-      /* rollback optimistic reply */
-      setComment(prev => ({
-        ...prev,
-        replies: (prev.replies || []).filter(r => r.id_commentaire !== optimistic.id_commentaire),
-      }));
-      setReplyText(t);
-      setShowReply(true);
     } finally {
-      setSending(false);
+      setReplySending(false);
     }
   };
 
-  return (
-    <div className={`db-comment-card ${side}-card`}>
-      {isOwner && (
-        <button className="db-delete-btn" onClick={handleDelete} title="Supprimer" type="button">✕</button>
-      )}
+  const deleteComment = async () => {
+    if (!window.confirm("Supprimer cet argument ?")) return;
+    try {
+      await API.delete(`/publications/${pubId}/comments/${comment.id_commentaire}`);
+      onRefresh();
+    } catch (e) {
+      console.error("delete error:", e?.response?.data || e.message);
+    }
+  };
 
-      <div className="db-cmt-header">
-        <div className="db-avatar" style={{ background: avatarColor(comment.prenom_user || comment.nom_user) }}>
-          {(comment.prenom_user?.[0] || comment.nom_user?.[0] || "U").toUpperCase()}
+  const replies = comment.replies || [];
+
+  return (
+    <div className={`db-arg db-arg-${side}`}>
+      {/* Avatar + header */}
+      <div className="db-arg-header">
+        <img
+          className="db-arg-ava"
+          src={comment.photo_user || avatar(comment.prenom_user || "U")}
+          alt=""
+          onError={e => { e.target.src = avatar(comment.prenom_user || "U"); }}
+        />
+        <div className="db-arg-meta">
+          <span className="db-arg-name">{comment.prenom_user} {comment.nom_user}</span>
+          <span className="db-arg-time">{timeAgo(comment.created_at)}</span>
         </div>
-        <div className="db-user-info">
-          <strong>{comment.prenom_user} {comment.nom_user}</strong>
-          <span className="db-time">{fmtDate(comment.created_at)}</span>
-        </div>
+        {isOwner && (
+          <button className="db-arg-del" onClick={deleteComment} title="Supprimer">✕</button>
+        )}
       </div>
 
-      <p className="db-cmt-content">{comment.contenu_commentaire || comment.contenu}</p>
+      {/* Contenu */}
+      <p className="db-arg-text">{comment.contenu_commentaire || comment.contenu}</p>
 
-      {/* ── Reply trigger ── */}
-      <button
-        className="db-reply-trigger"
-        type="button"
-        onClick={() => setShowReply(v => !v)}
-      >
-        💬 Répondre
-      </button>
+      {/* Actions */}
+      <div className="db-arg-actions">
+        <button
+          className="db-arg-reply-btn"
+          onClick={() => {
+            setReplyOpen(o => !o);
+            if (!replyOpen) setTimeout(() => inputRef.current?.focus(), 100);
+          }}
+        >
+          💬 Répondre
+        </button>
+        {replies.length > 0 && (
+          <button
+            className="db-arg-toggle-btn"
+            onClick={() => setShowReplies(o => !o)}
+          >
+            {showReplies ? "▲ Masquer" : `▼ ${replies.length} réponse${replies.length > 1 ? "s" : ""}`}
+          </button>
+        )}
+      </div>
 
-      {/* ── Reply form ── */}
-      {showReply && (
-        <div className="db-reply-form">
-          <input
-            ref={inputRef}
-            type="text"
-            value={replyText}
-            onChange={e => setReplyText(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleSendReply(); } }}
-            placeholder={`Répondre à ${comment.prenom_user || ""}…`}
+      {/* Zone de réponse — inline comme commentaire normal */}
+      {replyOpen && (
+        <div className="db-reply-wrap">
+          <img
+            className="db-reply-ava"
+            src={me?.photo_user || avatar(me?.prenom_user || "Moi")}
+            alt=""
+            onError={e => { e.target.src = avatar(me?.prenom_user || "Moi"); }}
           />
-          <div className="db-reply-btns">
-            <button
-              className="db-reply-cancel"
-              type="button"
-              onClick={() => { setShowReply(false); setReplyText(""); }}
-            >
-              Annuler
-            </button>
-            <button
-              className="db-reply-send"
-              type="button"
-              onClick={handleSendReply}
-              disabled={!replyText.trim() || sending}
-            >
-              {sending ? "…" : "Envoyer"}
-            </button>
+          <div className="db-reply-box">
+            <input
+              ref={inputRef}
+              className="db-reply-inp"
+              placeholder={`Répondre à ${comment.prenom_user}…`}
+              value={replyText}
+              onChange={e => setReplyText(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); }
+                if (e.key === "Escape") setReplyOpen(false);
+              }}
+            />
+            <div className="db-reply-btns">
+              <button
+                className="db-reply-cancel"
+                onClick={() => { setReplyOpen(false); setReplyText(""); }}
+              >Annuler</button>
+              <button
+                className="db-reply-send"
+                onClick={sendReply}
+                disabled={!replyText.trim() || replySending}
+              >
+                {replySending ? "…" : "Envoyer"}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── Nested replies ── */}
-      {comment.replies?.length > 0 && (
-        <div className="db-replies-list">
-          {comment.replies.map(r => (
-            <div key={r.id_commentaire} className="db-reply-item">
-              <div className="db-reply-avatar" style={{ background: avatarColor(r.prenom_user || r.nom_user) }}>
-                {(r.prenom_user?.[0] || r.nom_user?.[0] || "U").toUpperCase()}
-              </div>
-              <div className="db-reply-body">
-                <strong>{r.prenom_user} {r.nom_user}</strong>
-                <span className="db-reply-time"> · {fmtDate(r.created_at)}</span>
-                <p>{r.contenu_commentaire || r.contenu}</p>
+      {/* Replies imbriquées */}
+      {showReplies && replies.length > 0 && (
+        <div className="db-replies">
+          {replies.map(r => (
+            <div key={r.id_commentaire} className="db-nested">
+              <div className="db-nest-line" />
+              <div className="db-nested-content">
+                <img
+                  className="db-arg-ava small"
+                  src={r.photo_user || avatar(r.prenom_user || "U")}
+                  alt=""
+                  onError={e => { e.target.src = avatar(r.prenom_user || "U"); }}
+                />
+                <div className="db-nested-bubble">
+                  <span className="db-arg-name">{r.prenom_user} {r.nom_user}</span>
+                  <p className="db-arg-text">{r.contenu_commentaire || r.contenu}</p>
+                  <span className="db-arg-time">{timeAgo(r.created_at)}</span>
+                </div>
               </div>
             </div>
           ))}
@@ -179,143 +175,200 @@ const CommentCard = ({ comment: initialComment, side, debateId, onRefresh, curre
       )}
     </div>
   );
-};
+}
 
-/* ── Main DebateBlock ── */
-const DebateBlock = ({ publication }) => {
-  const debateId    = publication?.id_publication;
-  const currentUser = getCurrentUser();
+/* ── DebateSide — colonne POUR ou CONTRE ───────────────── */
+function DebateSide({ side, label, icon, pubId, comments, onRefresh, accentClass }) {
+  const [text,    setText]    = useState("");
+  const [sending, setSending] = useState(false);
+  const me = getCurrentUser();
 
-  const [comments,      setComments]      = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [pourText,      setPourText]      = useState("");
-  const [contreText,    setContreText]    = useState("");
-  const [pourSending,   setPourSending]   = useState(false);
-  const [contreSending, setContreSending] = useState(false);
-
-  const fetchData = async () => {
+  const submit = async () => {
+    const t = text.trim();
+    if (!t || sending) return;
+    setSending(true);
     try {
-      const res  = await API.get(`/publications/${debateId}/comments`);
-      const flat = Array.isArray(res.data) ? res.data : [];
-      const top  = flat.filter(c => !c.parent_id);
-      setComments(
-        top.map(c => ({
-          ...c,
-          replies: flat
-            .filter(r => String(r.parent_id) === String(c.id_commentaire))
-            .map(r => ({ ...r, debat_side: r.debat_side || c.debat_side })),
-        }))
-      );
-    } catch (err) {
-      console.error("Erreur débat:", err);
+      await API.post(`/publications/${pubId}/comments`, {
+        contenu_commentaire: t,
+        contenu: t,
+        debat_side: side,
+      });
+      setText("");
+      onRefresh();
+    } catch (e) {
+      console.error("debate comment error:", e?.response?.data || e.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className={`db-side ${accentClass}`}>
+      <div className="db-side-header">
+        <span className="db-side-icon">{icon}</span>
+        <span className="db-side-label">{label}</span>
+        <span className="db-side-count">{comments.length} arg.</span>
+      </div>
+
+      {/* Input */}
+      <div className="db-input-wrap">
+        <textarea
+          className="db-input"
+          placeholder={`Ajouter un argument ${label}…`}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          rows={2}
+          onKeyDown={e => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); }
+          }}
+        />
+        <button
+          className={`db-submit ${accentClass}`}
+          onClick={submit}
+          disabled={!text.trim() || sending}
+        >
+          {sending ? "…" : "Publier"}
+        </button>
+      </div>
+
+      {/* Arguments */}
+      <div className="db-args-list">
+        {comments.length === 0 ? (
+          <p className="db-empty">Soyez le premier à argumenter {label} !</p>
+        ) : (
+          comments.map(c => (
+            <DebateComment
+              key={c.id_commentaire}
+              comment={c}
+              pubId={pubId}
+              side={side}
+              onRefresh={onRefresh}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── DebateBlock — composant principal ─────────────────── */
+export default function DebateBlock({ publication }) {
+  const pub   = publication;
+  const pubId = pub.id_publication;
+
+  const [pourCount,    setPourCount]    = useState(pub.pour_count   || 0);
+  const [contreCount,  setContreCount]  = useState(pub.contre_count || 0);
+  const [userVote,     setUserVote]     = useState(pub.userVote     || null);
+  const [pourCmts,     setPourCmts]     = useState([]);
+  const [contreCmts,   setContreCmts]  = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const me = getCurrentUser();
+
+  const loadComments = useCallback(async () => {
+    try {
+      const res = await API.get(`/publications/${pubId}/comments`);
+      const all = Array.isArray(res.data) ? res.data : [];
+      setPourCmts(all.filter(c => c.debat_side === "pour"));
+      setContreCmts(all.filter(c => c.debat_side === "contre"));
+    } catch (e) {
+      console.error("load debate comments:", e?.response?.data || e.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [pubId]);
 
-  useEffect(() => { if (debateId) fetchData(); }, [debateId]);
+  useEffect(() => { loadComments(); }, [loadComments]);
 
-  const handleSend = async (side) => {
-    const text = side === "pour" ? pourText : contreText;
-    if (!text.trim()) return;
-    side === "pour" ? setPourSending(true) : setContreSending(true);
+  const vote = async (pos) => {
+    const same = userVote === pos;
+    const prevVote = userVote;
+    const prevPour = pourCount;
+    const prevContre = contreCount;
+
+    // optimistic
+    setUserVote(same ? null : pos);
+    if (pos === "pour") {
+      setPourCount(n => same ? n - 1 : n + 1);
+      if (!same && prevVote === "contre") setContreCount(n => n - 1);
+    } else {
+      setContreCount(n => same ? n - 1 : n + 1);
+      if (!same && prevVote === "pour") setPourCount(n => n - 1);
+    }
+
     try {
-      await API.post(`/publications/${debateId}/comments`, {
-        contenu_commentaire: text.trim(),
-        contenu            : text.trim(),
-        debat_side         : side,
-        parent_id          : null,
-      });
-      side === "pour" ? setPourText("") : setContreText("");
-      await fetchData();
-    } catch (e) {
-      console.error("send:", e?.response?.data || e.message);
-    } finally {
-      side === "pour" ? setPourSending(false) : setContreSending(false);
+      await API.post(`/publications/${pubId}/vote`, { position: same ? null : pos });
+    } catch {
+      setUserVote(prevVote);
+      setPourCount(prevPour);
+      setContreCount(prevContre);
     }
   };
 
-  const pourComments   = comments.filter(c => c.debat_side === "pour");
-  const contreComments = comments.filter(c => c.debat_side === "contre");
-
-  if (loading) return (
-    <div className="db-loading">
-      <div className="db-spinner" />
-      <span>Chargement du débat…</span>
-    </div>
-  );
-
-  const renderSide = (side, list, text, setText, sending) => (
-    <div className={`db-side db-${side}`}>
-      <div className={`db-side-header db-${side}-header`}>
-        <span>{side === "pour" ? "✅ POUR" : "❌ CONTRE"}</span>
-        <span className="db-side-count">{list.length} arg.</span>
-      </div>
-
-      <div className="db-add-area">
-        <textarea
-          placeholder={`Ajouter un argument ${side === "pour" ? "POUR" : "CONTRE"}…`}
-          value={text}
-          onChange={e => setText(e.target.value)}
-        />
-        <div className="db-add-footer">
-          <button
-            className={`db-publish-btn db-${side}-btn`}
-            type="button"
-            onClick={() => handleSend(side)}
-            disabled={!text.trim() || sending}
-          >
-            {sending ? "…" : "Publier"}
-          </button>
-        </div>
-      </div>
-
-      <div className="db-comments-list">
-        {list.length === 0
-          ? <div className="db-empty">
-              Soyez le premier à argumenter {side === "pour" ? "POUR" : "CONTRE"} !
-            </div>
-          : list.map(c => (
-              <CommentCard
-                key={c.id_commentaire}
-                comment={c}
-                side={side}
-                debateId={debateId}
-                onRefresh={fetchData}
-                currentUser={currentUser}
-              />
-            ))
-        }
-      </div>
-    </div>
-  );
+  const total = pourCount + contreCount;
+  const pourPct   = total ? Math.round((pourCount   / total) * 100) : 50;
+  const contrePct = total ? Math.round((contreCount / total) * 100) : 50;
 
   return (
-    <div className="db-wrapper">
-      <div className="db-header">
+    <div className="db-block">
+      {/* Question */}
+      <div className="db-question-wrap">
         <span className="db-badge">⚖️ QUESTION P/C</span>
-        <h2 className="db-question">{publication?.question_debat || "Débat"}</h2>
+        <h3 className="db-question">{pub.question_debat || pub.titre_publication}</h3>
+        {(pub.contenu_publication || pub.contenu) && (
+          <p className="db-desc">{pub.contenu_publication || pub.contenu}</p>
+        )}
       </div>
 
-      {comments.length > 0 && (
-        <div className="db-score-bar">
-          <span className="db-score-pour">POUR {pourComments.length}</span>
-          <div className="db-score-track">
-            <div
-              className="db-score-fill"
-              style={{ width: `${Math.round((pourComments.length / comments.length) * 100)}%` }}
-            />
-          </div>
-          <span className="db-score-contre">CONTRE {contreComments.length}</span>
+      {/* Barre de votes */}
+      <div className="db-vote-bar-wrap">
+        <span className="db-vote-label pour">POUR {pourPct}%</span>
+        <div className="db-vote-bar">
+          <div className="db-vote-fill pour" style={{ width: `${pourPct}%` }} />
+        </div>
+        <span className="db-vote-label contre">CONTRE {contrePct}%</span>
+      </div>
+
+      {/* Boutons vote */}
+      <div className="db-vote-btns">
+        <button
+          className={`db-vote-btn pour${userVote === "pour" ? " active" : ""}`}
+          onClick={() => vote("pour")}
+        >
+          ✅ POUR · {pourCount}
+        </button>
+        <button
+          className={`db-vote-btn contre${userVote === "contre" ? " active" : ""}`}
+          onClick={() => vote("contre")}
+        >
+          ❌ CONTRE · {contreCount}
+        </button>
+      </div>
+
+      {/* Les deux colonnes */}
+      {loading ? (
+        <div className="db-loading">Chargement des arguments…</div>
+      ) : (
+        <div className="db-columns">
+          <DebateSide
+            side="pour"
+            label="POUR"
+            icon="✅"
+            pubId={pubId}
+            comments={pourCmts}
+            onRefresh={loadComments}
+            accentClass="pour"
+          />
+          <DebateSide
+            side="contre"
+            label="CONTRE"
+            icon="❌"
+            pubId={pubId}
+            comments={contreCmts}
+            onRefresh={loadComments}
+            accentClass="contre"
+          />
         </div>
       )}
-
-      <div className="db-columns">
-        {renderSide("pour",   pourComments,   pourText,   setPourText,   pourSending)}
-        {renderSide("contre", contreComments, contreText, setContreText, contreSending)}
-      </div>
     </div>
   );
-};
-
-export default DebateBlock;
+}
