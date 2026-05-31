@@ -16,19 +16,16 @@ const BACKEND = (() => {
 
 const getMediaUrl = (p) => {
   if (!p) return null;
+  // Cloudinary URL — retourner directement
   if (p.startsWith("http://") || p.startsWith("https://")) return p;
-  // normalize backslashes (Windows paths)
-  let clean = p.split("\\").join("/");
-  // remove leading slashes
-  clean = clean.replace(/^\/+/, "");
-  // if path contains the absolute server path (e.g. "C:/project/uploads/file.jpg"), extract from uploads/ onward
+  // Chemin local (legacy) — construire l'URL backend
+  const clean = p.split("\\").join("/").replace(/^\/+/, "");
+  // Extraire depuis "uploads/" si chemin absolu Windows/Linux
   const uploadsIdx = clean.lastIndexOf("uploads/");
-  if (uploadsIdx !== -1) {
-    clean = clean.slice(uploadsIdx);
-  }
-  // strip duplicate uploads/ prefix (e.g. "uploads/uploads/file.jpg")
-  clean = clean.replace(/^(uploads\/)+/, "");
-  return BACKEND + "/uploads/" + clean;
+  const normalized = uploadsIdx !== -1 ? clean.slice(uploadsIdx) : clean;
+  // Supprimer les doublons uploads/uploads/
+  const nodup = normalized.replace(/^(uploads\/)+/, "");
+  return BACKEND + "/uploads/" + nodup;
 };
 
 const avatar = (name) =>

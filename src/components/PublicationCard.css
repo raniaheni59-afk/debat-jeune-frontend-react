@@ -80,7 +80,7 @@
 
 /* 1 image — pleine largeur, hauteur auto */
 .pc-media-1 { grid-template-columns:1fr; }
-.pc-media-1 .pc-media-item { height:auto; min-height:200px; max-height:600px; background:#000; }
+.pc-media-1 .pc-media-item { height:auto; min-height:200px; background:#000; }
 .pc-media-1 .pc-media-item.pc-media-solo img { object-fit:contain; max-height:600px; width:100%; height:auto; display:block; }
 
 /* 2 images */
