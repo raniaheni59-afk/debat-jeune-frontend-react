@@ -63,21 +63,16 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
     const el = vRef?.current;
     if (!el) return;
     if (stream) {
-      // ✅ FIX: toujours réassigner srcObject si stream change
-      if (el.srcObject !== stream) {
-        el.srcObject = stream;
-      }
+      el.srcObject = stream;
       el.play().catch(() => {});
     } else if (!isLocal) {
       el.srcObject = null;
     }
-  }, [stream, isLocal, camOff]); // ✅ recalcule aussi quand camOff change
+  }, [stream, isLocal]);
 
   const init  = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const isH   = role === "host";
-  // ✅ FIX: si stream a des video tracks actifs → montrer la vidéo même si camOff non encore reçu
-  const hasVideoTrack = !isLocal && stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks().some(t => t.enabled && t.readyState !== "ended");
-  const showV = isLocal ? !camOff : (hasVideoTrack && !camOff);
+  const showV = isLocal ? !camOff : (!camOff && !!stream);
 
   return (
     <div style={{ position:"relative", background:"#111", borderRadius:14, overflow:"hidden",
@@ -360,13 +355,10 @@ export default function MeetRoom() {
     pc.ontrack = e => {
       const stream = e.streams[0];
       if (!stream) return;
-      // ✅ FIX: lire roleMap au moment où le track arrive (pas à la création du peer)
-      const peerRole = roleMap.current[sid] || "guest";
-      const peerName = nameMap.current[sid] || (peerRole === "host" ? "Admin" : "Invité");
       setPeers(prev => {
         const ex = prev.find(p=>p.id===sid);
-        if (ex) return prev.map(p=>p.id===sid?{...p,stream,role:peerRole,name:peerName}:p);
-        return [...prev, { id:sid, stream, name:peerName, role:peerRole }];
+        if (ex) return prev.map(p=>p.id===sid?{...p,stream}:p);
+        return [...prev, { id:sid, stream, name:nameMap.current[sid]||"Invité", role:roleMap.current[sid]||"guest" }];
       });
     };
 
@@ -464,13 +456,6 @@ export default function MeetRoom() {
         }, ack => {
           if (ack && !ack.ok) { setErrMsg(ack.message||"Accès refusé."); setStatus("error"); }
         });
-        // ✅ FIX: émettre l'état initial des médias pour que les peers sachent camera=on/off
-        if (myRole === "host") {
-          setTimeout(() => {
-            sock.emit("toggle-media", { roomCode, type:"video", enabled: true });
-            sock.emit("toggle-media", { roomCode, type:"audio", enabled: true });
-          }, 1000);
-        }
       });
 
       sock.on("connect_error", err => console.error("Socket error:", err.message));
@@ -1031,11 +1016,7 @@ export default function MeetRoom() {
   };
 
   // ── Google Meet style layout ──
-  // ✅ FIX: utiliser roleMap.current EN PRIORITÉ — ptcps peut arriver après le stream
-  const hostPeer = peers.find(p => {
-    const role = roleMap.current[p.id] || ptcps.find(x => x.socketId === p.id)?.role;
-    return role === "host";
-  }) || (peers.length === 1 ? peers[0] : null); // fallback: si seul peer = admin
+  const hostPeer     = peers.find(p => (ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id])==="host");
   // Guest sees admin + any guest sharing screen; Admin sees everyone
   const guestScrPeer = peers.find(p => pState[p.id]?.screen === true);
   const visiblePeers = myRole === "host" ? peers : [hostPeer, guestScrPeer].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i);
