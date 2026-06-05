@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { FaVideo, FaKeyboard } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
-import "./Swafy_Meet.css";
+
 
 export default function Swafy_Meet() {
   const [dateText, setDateText] = useState("");
