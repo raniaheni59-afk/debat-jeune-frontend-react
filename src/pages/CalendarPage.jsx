@@ -604,6 +604,7 @@ export default function CalendarPage() {
                   <label className="cal-form-label">Catégorie</label>
                   <select className="cal-form-ctrl" value={noteForm.category}
                     onChange={e => setNoteForm(p => ({ ...p, category: e.target.value }))}>
+                    <option value="Live">Live</option>
                     <option value="Enquete">Enquête</option>
                     <option value="Evenement">Événement</option>
                     <option value="Personnel">Personnel</option>

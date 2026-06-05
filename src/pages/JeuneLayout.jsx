@@ -401,12 +401,14 @@ const CAL_CAT_COLORS_J = {
 };
 
 function JeuneCalendarView() {
-  const [current,  setCurrent]  = React.useState(new Date());
-  const [selected, setSelected] = React.useState(new Date());
-  const [notes,    setNotes]    = React.useState({});
-  const [lives,    setLives]    = React.useState({});
-  const [toast,    setToast]    = React.useState(null);
-  const [detailEv, setDetailEv] = React.useState(null);
+  const [current,      setCurrent]      = React.useState(new Date());
+  const [selected,     setSelected]     = React.useState(new Date());
+  const [notes,        setNotes]        = React.useState({});
+  const [lives,        setLives]        = React.useState({});
+  const [adminEvents,  setAdminEvents]  = React.useState({});
+  const [toast,        setToast]        = React.useState(null);
+  const [detailEv,     setDetailEv]     = React.useState(null);
+  const navigate = useNavigate();
 
   // Load admin notes from localStorage (read-only)
   React.useEffect(() => {
@@ -429,9 +431,43 @@ function JeuneCalendarView() {
           if (!live.date) return;
           const key = live.date.slice(0,10);
           if (!map[key]) map[key] = [];
-          map[key].push({ title: live.title_live || "Live", time: live.time || "", category:"Live", isActive: live.is_active });
+          map[key].push({
+            title:      live.title_live || "Live",
+            time:       live.time || "",
+            category:   "Live",
+            isActive:   live.is_active,
+            streamLink: live.stream_link || "",
+            description: live.description || "",
+          });
         });
         setLives(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch admin events from API
+  React.useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    fetch("https://debat-jeune.onrender.com/api/events", { headers:{ Authorization:`Bearer ${token}` } })
+      .then(r => r.json())
+      .then(list => {
+        if (!Array.isArray(list)) return;
+        const map = {};
+        list.forEach(ev => {
+          // Accept date field as `date` or `event_date`
+          const raw = ev.date || ev.event_date || ev.start_date;
+          if (!raw) return;
+          const key = raw.slice(0,10);
+          if (!map[key]) map[key] = [];
+          map[key].push({
+            title:       ev.title || ev.name || "Événement",
+            time:        ev.time || ev.start_time || "",
+            category:    ev.category || "Evenement",
+            description: ev.description || "",
+          });
+        });
+        setAdminEvents(map);
       })
       .catch(() => {});
   }, []);
@@ -448,9 +484,10 @@ function JeuneCalendarView() {
 
   const eventsOfDay = (day) => {
     const key = keyOf(day);
-    const noteEvs = (notes[key] || []).map((n,i) => ({ ...n, id:`note-${key}-${i}`, isNote:true }));
-    const liveEvs = (lives[key] || []);
-    return [...liveEvs, ...noteEvs];
+    const noteEvs  = (notes[key]       || []).map((n,i) => ({ ...n, id:`note-${key}-${i}`, isNote:true }));
+    const liveEvs  = (lives[key]       || []);
+    const adminEvs = (adminEvents[key] || []);
+    return [...liveEvs, ...adminEvs, ...noteEvs];
   };
 
   // Build month grid
@@ -606,14 +643,39 @@ function JeuneCalendarView() {
                 <p style={{ fontSize:16, fontWeight:700, color:"#1A2340", fontFamily:"Poppins,sans-serif", marginBottom:4 }}>{detailEv.title}</p>
                 {detailEv.time && <p style={{ fontSize:12, color:"#94A3B8", marginBottom:4 }}>🕐 {detailEv.time}</p>}
                 {detailEv.text && <p style={{ fontSize:12, color:"#4A5568", lineHeight:1.5 }}>{detailEv.text}</p>}
+                {detailEv.description && <p style={{ fontSize:12, color:"#4A5568", lineHeight:1.5 }}>{detailEv.description}</p>}
                 {detailEv.isActive && <span style={{ background:"#EF4444", color:"#fff", fontSize:10, padding:"2px 8px", borderRadius:6, fontWeight:800 }}>EN DIRECT</span>}
+                {detailEv.category && (
+                  <span style={{ display:"inline-block", marginTop:6, fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:10,
+                    background:(CAL_CAT_COLORS_J[detailEv.category]||CAL_CAT_COLORS_J.Personnel).light,
+                    color:(CAL_CAT_COLORS_J[detailEv.category]||CAL_CAT_COLORS_J.Personnel).text }}>
+                    {detailEv.category === "Enquete" ? "Enquête" : detailEv.category === "Evenement" ? "Événement" : detailEv.category}
+                  </span>
+                )}
               </div>
             </div>
-            <div style={{ background:"#FEF3C7", borderRadius:10, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#78350F", display:"flex", gap:8, alignItems:"flex-start" }}>
-              <span>ℹ️</span>
-              <span>Cet événement est géré par l'équipe Swafy. Pour toute question, contactez-nous via la messagerie.</span>
-            </div>
-            <div style={{ display:"flex", justifyContent:"flex-end" }}>
+            {detailEv.category !== "Live" && (
+              <div style={{ background:"#FEF3C7", borderRadius:10, padding:"10px 14px", marginBottom:14, fontSize:12, color:"#78350F", display:"flex", gap:8, alignItems:"flex-start" }}>
+                <span>ℹ️</span>
+                <span>Cet événement est géré par l'équipe Swafy. Pour toute question, contactez-nous via la messagerie.</span>
+              </div>
+            )}
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:8 }}>
+              {detailEv.category === "Live" && detailEv.streamLink && (() => {
+                try {
+                  const url   = new URL(detailEv.streamLink);
+                  const parts = url.pathname.split("/").filter(Boolean);
+                  const room  = parts[parts.length - 1];
+                  const vt    = url.searchParams.get("vt");
+                  if (room && vt) return (
+                    <button onClick={() => navigate(`/meet/${room}?vt=${vt}`)}
+                      style={{ padding:"8px 20px", border:"none", borderRadius:8, background:"#EF4444", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6 }}>
+                      ▶ Rejoindre le live
+                    </button>
+                  );
+                } catch {}
+                return null;
+              })()}
               <button onClick={() => setDetailEv(null)}
                 style={{ padding:"8px 20px", border:"none", borderRadius:8, background:"#0ABFAA", color:"#fff", fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"Poppins,sans-serif" }}>
                 Fermer
