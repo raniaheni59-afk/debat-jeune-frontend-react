@@ -745,10 +745,9 @@ export default function AdminDashboard() {
       {/* ══ SWAFY MEET ══ */}
       {activePage === "swafyMeet" && (
         <div style={{ marginLeft:240, minHeight:"100vh", background:"#fff" }}>
-          {/* ✅ FIX: bouton "Démarrer un live" → ouvre AdminLiveStream directement sans passer par NewLive */}
+          {/* ✅ "Nouvelle réunion" → ouvre AdminLiveStream directement (camera + session) */}
           <Swafy_Meet
-            onNouvelleReunion={() => setActivePage("newlive")}
-            onDemarrerLive={() => setActivePage("live")}
+            onNouvelleReunion={() => setActivePage("live")}
           />
         </div>
       )}
