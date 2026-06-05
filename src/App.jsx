@@ -19,7 +19,6 @@ import JeuneContact   from "./pages/JeuneContact";
 import Settings       from "./pages/Settings";
 
 // ── Pages swafy (nouvelles) ─────────────────────────
-import Swafy_Meet     from "./pages/Swafy_Meet";
 import MeetRoom       from "./pages/MeetRoom";
 import LiveViewer     from "./pages/LiveViewer";
 import NewLive        from "./pages/NewLive";
@@ -120,7 +119,7 @@ export default function App() {
         <Route path="/contact"    element={<ProtectedRoute><JeuneContact /></ProtectedRoute>} />
 
         {/* ══ MEET / LIVE (jeune + admin) ════════════ */}
-        <Route path="/meet"           element={<ProtectedRoute><Swafy_Meet /></ProtectedRoute>} />
+        <Route path="/meet"           element={<ProtectedRoute><MeetRoom /></ProtectedRoute>} />
         <Route path="/meet/:roomCode" element={<MeetRoom />} />
         <Route path="/calendar"       element={<ProtectedRoute><CalendarPage /></ProtectedRoute>} />
 
