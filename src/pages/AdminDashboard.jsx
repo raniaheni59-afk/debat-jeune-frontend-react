@@ -21,7 +21,6 @@ import ParametrePage from "./ParametrePage";
 import ParametreContact from "./ParametreContact";
 import NewLive from "./NewLive";
 import AdminLiveStream from "./AdminLiveStream";
-import Swafy_Meet from "./Swafy_Meet";
 
 ChartJS.register(
   CategoryScale, LinearScale, PointElement, LineElement,
@@ -746,10 +745,7 @@ export default function AdminDashboard() {
       {activePage === "swafyMeet" && (
         <div style={{ marginLeft:240, minHeight:"100vh", background:"#fff" }}>
           {/* ✅ FIX: bouton "Démarrer un live" → ouvre AdminLiveStream directement sans passer par NewLive */}
-          <Swafy_Meet
-            onNouvelleReunion={() => setActivePage("newlive")}
-            onDemarrerLive={() => setActivePage("live")}
-          />
+          
         </div>
       )}
 
