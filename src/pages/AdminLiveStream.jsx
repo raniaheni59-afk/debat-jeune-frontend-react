@@ -504,3 +504,4 @@ const st = {
   chatInput: { flex: 1, padding: "10px 16px", background: "#f1f3f4", border: "none", borderRadius: 25, outline: "none" },
   sendBtn: { width: 38, height: 38, borderRadius: "50%", background: "#4285f4", color: "white", border: "none", cursor: "pointer" },
 }; 
+ 
