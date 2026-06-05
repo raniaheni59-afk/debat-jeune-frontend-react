@@ -182,22 +182,16 @@ export default function CalendarPage() {
   const [view,        setView]      = useState("month");
   const [current,     setCurrent]   = useState(new Date());
   const [selected,    setSelected]  = useState(new Date());
-  const [events,      setEvents]    = useState({});
-  const [notes,       setNotes]     = useState(() => {
-    try { return JSON.parse(localStorage.getItem("swafy_calendar_notes") || "{}"); }
-    catch { return {}; }
-  });
+  const [events,      setEvents]    = useState({});  // lives
+  const [calEvents,   setCalEvents] = useState({});  // admin calendar events (DB)
   const [filterCat,   setFilterCat] = useState("Tous");
   const [showModal,   setShowModal] = useState(false);
   const [modalDate,   setModalDate] = useState(null);
-  const [noteForm,    setNoteForm]  = useState({ title: "", text: "", category: "Personnel", time: "" });
+  const [noteForm,    setNoteForm]  = useState({ title: "", text: "", category: "Evenement", time: "" });
   const [detailEvent, setDetailEvent] = useState(null);
   const [miniCalOpen, setMiniCalOpen] = useState(true);
 
-  useEffect(() => {
-    localStorage.setItem("swafy_calendar_notes", JSON.stringify(notes));
-  }, [notes]);
-
+  // Fetch lives
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -224,18 +218,47 @@ export default function CalendarPage() {
       .catch(() => {});
   }, [location.key]);
 
+  // Fetch admin calendar events from DB
+  const fetchCalEvents = useCallback(() => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    API.get("/calendar-events")
+      .then(res => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        const map  = {};
+        list.forEach(ev => {
+          const raw = ev.date || ev.event_date;
+          if (!raw) return;
+          const key = format(new Date(raw), "yyyy-MM-dd");
+          if (!map[key]) map[key] = [];
+          map[key].push({
+            id:          ev.id,
+            title:       ev.title,
+            time:        ev.time || "",
+            category:    ev.category || "Evenement",
+            description: ev.description || "",
+            text:        ev.description || "",
+            streamLink:  ev.stream_link || "",
+            isNote:      true,
+          });
+        });
+        setCalEvents(map);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { fetchCalEvents(); }, [location.key, fetchCalEvents]);
+
   const keyOf = d => format(d, "yyyy-MM-dd");
 
   const eventsOfDay = useCallback((day) => {
     const key = keyOf(day);
     const liveEvs = events[key] || [];
-    const noteEvs = (notes[key] || []).map((n, i) => ({
-      ...n, id: `note-${key}-${i}`, category: n.category || "Personnel", isNote: true,
-    }));
-    const all = [...liveEvs, ...noteEvs];
+    const calEvs  = calEvents[key] || [];
+    const all = [...liveEvs, ...calEvs];
     if (filterCat === "Tous") return all;
     return all.filter(e => e.category === filterCat);
-  }, [events, notes, filterCat]);
+  }, [events, calEvents, filterCat]);
 
   const hasEvent = d => eventsOfDay(d).length > 0;
 
@@ -262,21 +285,40 @@ export default function CalendarPage() {
 
   const openAddNote = (day) => {
     setModalDate(day);
-    setNoteForm({ title: "", text: "", category: "Personnel", time: "" });
+    setNoteForm({ title: "", text: "", category: "Evenement", time: "" });
     setShowModal(true);
   };
 
-  const saveNote = () => {
+  const saveNote = async () => {
     if (!noteForm.title.trim() || !modalDate) return;
-    const key = keyOf(modalDate);
-    setNotes(prev => ({ ...prev, [key]: [...(prev[key] || []), { ...noteForm }] }));
-    setShowModal(false);
+    const token = localStorage.getItem("token");
+    try {
+      await API.post("/calendar-events", {
+        title:       noteForm.title,
+        date:        keyOf(modalDate),
+        time:        noteForm.time || null,
+        category:    noteForm.category,
+        description: noteForm.text || "",
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      setShowModal(false);
+      fetchCalEvents();
+    } catch (err) {
+      console.error("saveNote error:", err);
+    }
   };
 
-  const deleteNote = (day, idx) => {
-    const key = keyOf(day);
-    setNotes(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== idx) }));
-    setDetailEvent(null);
+  const deleteNote = async (day, evId) => {
+    if (!evId) { setDetailEvent(null); return; }
+    const token = localStorage.getItem("token");
+    try {
+      await API.delete(`/calendar-events/${evId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDetailEvent(null);
+      fetchCalEvents();
+    } catch (err) {
+      console.error("deleteNote error:", err);
+    }
   };
 
   const viewTitle = () => {
@@ -604,7 +646,6 @@ export default function CalendarPage() {
                   <label className="cal-form-label">Catégorie</label>
                   <select className="cal-form-ctrl" value={noteForm.category}
                     onChange={e => setNoteForm(p => ({ ...p, category: e.target.value }))}>
-                    <option value="Live">Live</option>
                     <option value="Enquete">Enquête</option>
                     <option value="Evenement">Événement</option>
                     <option value="Personnel">Personnel</option>
@@ -644,9 +685,7 @@ export default function CalendarPage() {
             <div className="cal-detail-actions">
               {detailEvent._type === "note" && (
                 <button className="cal-detail-del" onClick={() => {
-                  const key = keyOf(selected);
-                  const idx = (notes[key] || []).findIndex(n => n.title === detailEvent.title && n.text === detailEvent.text);
-                  if (idx !== -1) deleteNote(selected, idx);
+                  deleteNote(selected, detailEvent.id);
                 }}>Supprimer</button>
               )}
               {detailEvent._type === "live" && detailEvent.streamLink && (

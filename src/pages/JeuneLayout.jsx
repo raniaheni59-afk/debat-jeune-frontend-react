@@ -401,22 +401,13 @@ const CAL_CAT_COLORS_J = {
 };
 
 function JeuneCalendarView() {
-  const [current,      setCurrent]      = React.useState(new Date());
-  const [selected,     setSelected]     = React.useState(new Date());
-  const [notes,        setNotes]        = React.useState({});
-  const [lives,        setLives]        = React.useState({});
-  const [adminEvents,  setAdminEvents]  = React.useState({});
-  const [toast,        setToast]        = React.useState(null);
-  const [detailEv,     setDetailEv]     = React.useState(null);
+  const [current,     setCurrent]     = React.useState(new Date());
+  const [selected,    setSelected]    = React.useState(new Date());
+  const [lives,       setLives]       = React.useState({});
+  const [calEvents,   setCalEvents]   = React.useState({});
+  const [toast,       setToast]       = React.useState(null);
+  const [detailEv,    setDetailEv]    = React.useState(null);
   const navigate = useNavigate();
-
-  // Load admin notes from localStorage (read-only)
-  React.useEffect(() => {
-    try {
-      const raw = JSON.parse(localStorage.getItem("swafy_calendar_notes") || "{}");
-      setNotes(raw);
-    } catch {}
-  }, []);
 
   // Fetch lives from API
   React.useEffect(() => {
@@ -445,29 +436,30 @@ function JeuneCalendarView() {
       .catch(() => {});
   }, []);
 
-  // Fetch admin events from API
+  // Fetch admin calendar events from DB
   React.useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
-    fetch("https://debat-jeune.onrender.com/api/events", { headers:{ Authorization:`Bearer ${token}` } })
+    fetch("https://debat-jeune.onrender.com/api/calendar-events", { headers:{ Authorization:`Bearer ${token}` } })
       .then(r => r.json())
       .then(list => {
         if (!Array.isArray(list)) return;
         const map = {};
         list.forEach(ev => {
-          // Accept date field as `date` or `event_date`
-          const raw = ev.date || ev.event_date || ev.start_date;
+          const raw = ev.date || ev.event_date;
           if (!raw) return;
           const key = raw.slice(0,10);
           if (!map[key]) map[key] = [];
           map[key].push({
-            title:       ev.title || ev.name || "Événement",
-            time:        ev.time || ev.start_time || "",
+            id:          ev.id,
+            title:       ev.title,
+            time:        ev.time || "",
             category:    ev.category || "Evenement",
             description: ev.description || "",
+            streamLink:  ev.stream_link || "",
           });
         });
-        setAdminEvents(map);
+        setCalEvents(map);
       })
       .catch(() => {});
   }, []);
@@ -484,10 +476,9 @@ function JeuneCalendarView() {
 
   const eventsOfDay = (day) => {
     const key = keyOf(day);
-    const noteEvs  = (notes[key]       || []).map((n,i) => ({ ...n, id:`note-${key}-${i}`, isNote:true }));
-    const liveEvs  = (lives[key]       || []);
-    const adminEvs = (adminEvents[key] || []);
-    return [...liveEvs, ...adminEvs, ...noteEvs];
+    const liveEvs = (lives[key]     || []);
+    const calEvs  = (calEvents[key] || []);
+    return [...liveEvs, ...calEvs];
   };
 
   // Build month grid
@@ -642,8 +633,9 @@ function JeuneCalendarView() {
               <div style={{ flex:1 }}>
                 <p style={{ fontSize:16, fontWeight:700, color:"#1A2340", fontFamily:"Poppins,sans-serif", marginBottom:4 }}>{detailEv.title}</p>
                 {detailEv.time && <p style={{ fontSize:12, color:"#94A3B8", marginBottom:4 }}>🕐 {detailEv.time}</p>}
-                {detailEv.text && <p style={{ fontSize:12, color:"#4A5568", lineHeight:1.5 }}>{detailEv.text}</p>}
-                {detailEv.description && <p style={{ fontSize:12, color:"#4A5568", lineHeight:1.5 }}>{detailEv.description}</p>}
+                {(detailEv.text || detailEv.description) && (
+                  <p style={{ fontSize:12, color:"#4A5568", lineHeight:1.5 }}>{detailEv.description || detailEv.text}</p>
+                )}
                 {detailEv.isActive && <span style={{ background:"#EF4444", color:"#fff", fontSize:10, padding:"2px 8px", borderRadius:6, fontWeight:800 }}>EN DIRECT</span>}
                 {detailEv.category && (
                   <span style={{ display:"inline-block", marginTop:6, fontSize:10, fontWeight:700, padding:"2px 8px", borderRadius:10,
