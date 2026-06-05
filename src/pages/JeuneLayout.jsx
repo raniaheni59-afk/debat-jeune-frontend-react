@@ -784,6 +784,12 @@ const JeuneLayout = () => {
       setActiveLiveInfo(null);
       setLiveNotifToast(null);
       localStorage.removeItem("currentLiveViewerLink");
+      // ✅ FIX: supprimer les notifs live_started quand le live se termine
+      setNotifications(prev => {
+        const liveUnreadCount = prev.filter(n => n.type_notification === "live_started" && !n.is_read).length;
+        setUnreadNotifs(c => Math.max(0, c - liveUnreadCount));
+        return prev.filter(n => n.type_notification !== "live_started");
+      });
     });
 
     return () => {
@@ -827,8 +833,19 @@ const JeuneLayout = () => {
     try {
       const res  = await API.get("/notifications");
       const list = Array.isArray(res.data) ? res.data : [];
-      setNotifications(list);
-      setUnreadNotifs(list.filter((n) => !n.is_read).length);
+      // ✅ FIX: filtrer les notifs live_started venant de l'API —
+      // elles sont gérées uniquement via socket pour apparaître/disparaître dynamiquement
+      const filtered = list.filter(n => n.type_notification !== "live_started");
+      setNotifications(prev => {
+        // Garder les notifs live socket en mémoire (avec _liveLink) et remplacer le reste
+        const socketLiveNotifs = prev.filter(n => n.type_notification === "live_started" && n._liveLink);
+        return [...socketLiveNotifs, ...filtered];
+      });
+      setUnreadNotifs(prev => {
+        // Recalculer: non-lues API + non-lues socket live
+        const apiUnread = filtered.filter(n => !n.is_read).length;
+        return apiUnread; // socket live count sera ajusté par le socket event
+      });
     } catch {}
   }, []);
 

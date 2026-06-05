@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import "./Swafy_Meet.css";
 
-export default function Swafy_Meet() {
+export default function Swafy_Meet({ onDemarrerLive }) {
   const [dateText, setDateText] = useState("");
   const [joinValue, setJoinValue] = useState("");
   const [loading, setLoading] = useState(false);
@@ -80,6 +80,24 @@ export default function Swafy_Meet() {
         </p>
 
         <div className="swafy-meet-actions">
+          {/* DÉMARRER LIVE ✅ bouton admin uniquement si onDemarrerLive fourni */}
+          {onDemarrerLive && (
+            <button
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "14px 24px", borderRadius: 12,
+                background: "linear-gradient(135deg,#ea4335,#b31412)",
+                color: "#fff", border: "none", fontSize: 14, fontWeight: 700,
+                cursor: "pointer", boxShadow: "0 4px 18px rgba(234,67,53,.35)",
+                fontFamily: "inherit",
+              }}
+              onClick={onDemarrerLive}
+            >
+              <span style={{ fontSize: 13 }}>🔴</span>
+              <span>Démarrer un live</span>
+            </button>
+          )}
+
           {/* CREATE ✅ يحول للصفحة NewLive */}
           <button
             className="swafy-meet-btn-primary"

@@ -85,10 +85,17 @@ export default function AdminLiveStream() {
   // ════════════════════════════════════════
  const createSecureSession = async () => {
   try {
-    const res = await API.post(
-      "/lives/session/create",
-      { liveId: recentLive.id }
-    );
+    // ✅ FIX: يشتغل بـ recentLive إذا موجود، وإلا ينشئ live جديد مباشرة
+    const payload = recentLive?.id
+      ? { liveId: recentLive.id }
+      : {
+          title: recentLive?.title_live || recentLive?.titre || "Live Swafy",
+          description: recentLive?.description || "",
+          thematique: recentLive?.thematique || "",
+          status: "En cours",
+        };
+
+    const res = await API.post("/lives/session/create", payload);
 
     console.log("✅ SESSION CREATED:", res.data);
 
@@ -101,12 +108,8 @@ export default function AdminLiveStream() {
 };
 
 useEffect(() => {
-  if (!recentLive || !recentLive.id) {
-    alert("❌ لازم تختار Live من Calendar قبل ما تبدأ Session");
-    navigate("/calendar");
-    return;
-  }
-  createSecureSession(false);
+  // ✅ FIX: on crée toujours une session — recentLive est optionnel
+  createSecureSession();
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, []);
 
