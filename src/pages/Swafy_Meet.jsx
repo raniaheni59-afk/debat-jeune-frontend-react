@@ -90,20 +90,9 @@ export default function Swafy_Meet() {
             <span>{loading ? "Création..." : "Nouvelle réunion"}</span>
           </button>
 
-          {/* JOIN */}
-          <div className="swafy-meet-join-box">
-            <FaKeyboard className="swafy-meet-icon swafy-meet-input-icon" />
-            <input
-              type="text"
-              placeholder="Coller un lien de réunion"
-              value={joinValue}
-              onChange={(e) => setJoinValue(e.target.value)}
-            />
-          </div>
+         
 
-          <button className="swafy-meet-btn-link" onClick={handleJoinMeeting}>
-            Participer
-          </button>
+          
         </div>
 
         <hr className="swafy-meet-separator" />

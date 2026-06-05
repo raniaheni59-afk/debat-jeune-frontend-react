@@ -163,14 +163,13 @@ function Modal({ emoji, title, desc, onCancel, confirmLabel, onConfirm, confirmC
 }
 
 
-// ══ GUEST SELF TILE ══════════════════════════════════
+// ══ GUEST SELF TILE — Picture-in-Picture ══════════════
 function GuestSelfTile({ name, camOn, micOn, hand, camStream }) {
   const vRef = useRef(null);
 
   useEffect(() => {
-    if (!vRef.current || !camStream) return;
-    const track = camStream.getVideoTracks()[0];
-    if (camOn && track?.enabled) {
+    if (!vRef.current) return;
+    if (camOn && camStream?.getVideoTracks()[0]?.enabled) {
       vRef.current.srcObject = camStream;
       vRef.current.play().catch(() => {});
     } else {
@@ -181,29 +180,33 @@ function GuestSelfTile({ name, camOn, micOn, hand, camStream }) {
   const init = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
 
   return (
-    <div style={{ position:"relative",background:"#111",borderRadius:14,overflow:"hidden",
-      aspectRatio:"16/9",minHeight:90,boxShadow:"0 2px 12px rgba(0,0,0,.4)" }}>
+    <div style={{
+      position:"absolute", bottom:12, right:12, zIndex:20,
+      width:160, borderRadius:12, overflow:"hidden",
+      background:"#111", boxShadow:"0 4px 20px rgba(0,0,0,.6)",
+      border:"2px solid rgba(52,168,83,.7)"
+    }}>
       <video ref={vRef} autoPlay playsInline muted
-        style={{ width:"100%",height:"100%",objectFit:"cover",display:camOn?"block":"none" }} />
+        style={{ width:"100%", display:camOn?"block":"none", objectFit:"cover", aspectRatio:"16/9" }} />
       {!camOn && (
-        <div style={{ position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",
-          flexDirection:"column",gap:8,background:"radial-gradient(circle at 35% 30%,#1a1a2e,#0d0d1a)" }}>
-          <div style={{ width:52,height:52,borderRadius:"50%",display:"flex",alignItems:"center",
-            justifyContent:"center",fontSize:18,fontWeight:800,color:"#fff",
+        <div style={{ aspectRatio:"16/9", display:"flex", alignItems:"center", justifyContent:"center",
+          flexDirection:"column", gap:6, background:"radial-gradient(circle at 35% 30%,#1a1a2e,#0d0d1a)" }}>
+          <div style={{ width:40,height:40,borderRadius:"50%",display:"flex",alignItems:"center",
+            justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff",
             background:"linear-gradient(135deg,#34a853,#1a6e38)",boxShadow:"0 4px 16px rgba(0,0,0,.5)" }}>
             {init}
           </div>
-          <span style={{ color:"#9aa0a6",fontSize:10,background:"rgba(0,0,0,.5)",
-            padding:"3px 10px",borderRadius:20 }}>{micOn?"🎤":"🔇"}</span>
+          <span style={{ color:"#9aa0a6",fontSize:9,background:"rgba(0,0,0,.5)",padding:"2px 8px",borderRadius:20 }}>
+            {micOn?"🎤 Micro actif":"🔇 Muet"}
+          </span>
         </div>
       )}
-      <div style={{ position:"absolute",bottom:6,left:6,display:"flex",gap:4,alignItems:"center" }}>
-        <span style={{ background:"rgba(0,0,0,.75)",color:"#fff",fontSize:10,padding:"2px 7px",borderRadius:6 }}>
-          {name} (Vous)
+      <div style={{ position:"absolute",bottom:4,left:6,display:"flex",gap:3,alignItems:"center" }}>
+        <span style={{ background:"rgba(0,0,0,.75)",color:"#fff",fontSize:9,padding:"2px 6px",borderRadius:5 }}>
+          Vous {!micOn?"🔇":""}
         </span>
-        {!micOn && <span style={{ background:"rgba(234,67,53,.85)",color:"#fff",fontSize:9,padding:"2px 5px",borderRadius:5 }}>🔇</span>}
       </div>
-      {hand && <div style={{ position:"absolute",top:6,left:6,fontSize:18,animation:"wave .7s infinite" }}>✋</div>}
+      {hand && <div style={{ position:"absolute",top:4,left:6,fontSize:14,animation:"wave .7s infinite" }}>✋</div>}
     </div>
   );
 }
@@ -1016,7 +1019,10 @@ export default function MeetRoom() {
   };
 
   // ── Google Meet style layout ──
-  const hostPeer     = peers.find(p => (ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id])==="host");
+  // ✅ FIX: fallback sur peers[0] si ptcps pas encore rempli (race condition)
+  const hostPeer = peers.find(p =>
+    (ptcps.find(x => x.socketId === p.id)?.role || roleMap.current[p.id]) === "host"
+  ) || (myRole === "guest" && peers.length > 0 ? peers[0] : undefined);
   // Guest sees admin + any guest sharing screen; Admin sees everyone
   const guestScrPeer = peers.find(p => pState[p.id]?.screen === true);
   const visiblePeers = myRole === "host" ? peers : [hostPeer, guestScrPeer].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i);
@@ -1256,10 +1262,10 @@ export default function MeetRoom() {
                 );
               }
 
-              /* GUEST layout: show only the admin/remote streams — no guest self-tile */
+              /* GUEST layout: admin stream plein écran + PiP self-view */
               return (
                 <div style={{ flex:1,display:"flex",overflow:"hidden",minHeight:0,position:"relative" }}>
-                  {/* If guest is sharing screen → show stop button overlay */}
+                  {/* Bouton arrêter partage écran */}
                   {screenOn && (
                     <button onClick={toggleScreen}
                       style={{ position:"absolute",top:12,right:12,background:"rgba(234,67,53,.9)",border:"none",borderRadius:10,color:"#fff",padding:"7px 14px",cursor:"pointer",fontSize:12,fontWeight:700,zIndex:20,display:"flex",alignItems:"center",gap:6,boxShadow:"0 2px 8px rgba(0,0,0,.3)" }}>
@@ -1267,36 +1273,77 @@ export default function MeetRoom() {
                     </button>
                   )}
                   {peerCount === 0 ? (
+                    /* En attente du stream admin */
                     <div style={{ flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:14,
                       background:"rgba(0,0,0,.03)",borderRadius:14,border:"1px dashed rgba(0,0,0,.1)" }}>
                       <div style={{ width:44,height:44,border:"3px solid rgba(0,0,0,.1)",borderTopColor:"#1a73e8",
                         borderRadius:"50%",animation:"spin .8s linear infinite" }} />
-                      <p style={{ color:"#555",fontSize:14 }}>En attente du flux vidéo de l\'admin…</p>
+                      <p style={{ color:"#555",fontSize:14,textAlign:"center",lineHeight:1.6 }}>
+                        En attente du flux vidéo de l&apos;admin…<br/>
+                        <span style={{ fontSize:12,color:"#999" }}>Le flux apparaîtra automatiquement</span>
+                      </p>
                     </div>
                   ) : peerCount === 1 ? (
+                    /* ✅ Un seul peer (l'admin) → plein écran */
                     <div style={{ flex:1,position:"relative",minWidth:0 }}>
-                      <Tile stream={visiblePeers[0].stream}
+                      <Tile
+                        stream={visiblePeers[0].stream}
                         name={nameMap.current[visiblePeers[0].id]||visiblePeers[0].name||"Admin"}
                         role={ptcps.find(x=>x.socketId===visiblePeers[0].id)?.role||roleMap.current[visiblePeers[0].id]||"host"}
                         camOff={pState[visiblePeers[0].id]?.video===false}
                         hand={pState[visiblePeers[0].id]?.hand}
                         screenShare={pState[visiblePeers[0].id]?.screen}
                         micOn={pState[visiblePeers[0].id]?.audio!==false}
-                        muted={false} fillHeight />
+                        muted={false}
+                        fillHeight
+                      />
+                      {/* ✅ PiP: guest se voit en bas à droite */}
+                      <GuestSelfTile
+                        name={myName}
+                        camOn={camOn}
+                        micOn={micOn}
+                        hand={hand}
+                        camStream={localStr.current}
+                      />
                     </div>
                   ) : (
-                    <div style={{ flex:1,display:"grid",gap:8,alignContent:"center",overflow:"hidden",
-                      gridTemplateColumns:`repeat(${peerCount<=4?2:3},1fr)`,gridAutoRows:"1fr" }}>
-                      {visiblePeers.map(p => (
-                        <div key={p.id} style={{ position:"relative" }}>
-                          <Tile stream={p.stream}
-                            name={nameMap.current[p.id]||p.name||"Invité"}
+                    /* ✅ Plusieurs peers: admin grand + autres en strip */
+                    <div style={{ flex:1,display:"flex",gap:6,overflow:"hidden",minHeight:0 }}>
+                      <div style={{ flex:1,position:"relative",minWidth:0 }}>
+                        <Tile
+                          stream={visiblePeers[0].stream}
+                          name={nameMap.current[visiblePeers[0].id]||visiblePeers[0].name||"Admin"}
+                          role={ptcps.find(x=>x.socketId===visiblePeers[0].id)?.role||roleMap.current[visiblePeers[0].id]||"host"}
+                          camOff={pState[visiblePeers[0].id]?.video===false}
+                          hand={pState[visiblePeers[0].id]?.hand}
+                          screenShare={pState[visiblePeers[0].id]?.screen}
+                          micOn={pState[visiblePeers[0].id]?.audio!==false}
+                          muted={false}
+                          fillHeight
+                        />
+                        {/* ✅ PiP self-view */}
+                        <GuestSelfTile
+                          name={myName}
+                          camOn={camOn}
+                          micOn={micOn}
+                          hand={hand}
+                          camStream={localStr.current}
+                        />
+                      </div>
+                      {/* Écran partagé par un autre guest */}
+                      {visiblePeers.slice(1).map(p => (
+                        <div key={p.id} style={{ width:200,flexShrink:0 }}>
+                          <Tile
+                            stream={p.stream}
+                            name={nameMap.current[p.id]||p.name||"Participant"}
                             role={ptcps.find(x=>x.socketId===p.id)?.role||roleMap.current[p.id]||"guest"}
                             camOff={pState[p.id]?.video===false}
                             hand={pState[p.id]?.hand}
                             screenShare={pState[p.id]?.screen}
                             micOn={pState[p.id]?.audio!==false}
-                            muted={false} />
+                            muted={false}
+                            fillHeight
+                          />
                         </div>
                       ))}
                     </div>
@@ -1415,6 +1462,7 @@ export default function MeetRoom() {
         <div style={{ display:"flex",gap:5 }}>
           <Btn iconKey={micOn?"micOn":"micOff"} label={micOn?"Micro":"Muet"} onClick={toggleMic} active={micOn} />
           {myRole==="host" && <Btn iconKey={camOn?"camOn":"camOff"} label={camOn?"Caméra":"Caméra"} onClick={toggleCam} active={camOn} />}
+          {myRole==="guest" && <Btn iconKey={camOn?"camOn":"camOff"} label={camOn?"Caméra":"Caméra"} onClick={toggleGuestCam} active={camOn} />}
         </div>
         <div style={{ display:"flex",gap:5 }}>
           {(myRole==="host" || myRole==="guest") && <Btn iconKey={screenOn?"screenOff":"screen"} label={screenOn?"Arrêter":"Écran"} onClick={toggleScreen} active={!screenOn} />}
