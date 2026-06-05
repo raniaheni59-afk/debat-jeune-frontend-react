@@ -40,7 +40,7 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:#fff;color:var(--txt)
 .o2{width:480px;height:480px;background:radial-gradient(circle,rgba(74,159,181,.12) 0%,transparent 70%);bottom:-60px;left:-120px;animation:drift 17s ease-in-out infinite alternate-reverse}
 
 /* BARRE PARTENAIRES */
-.pbar{background:#fff;border-bottom:1px solid var(--bdr);padding:7px 24px;z-index:101;position:relative}
+.pbar{background:#fff;border-bottom:1px solid var(--bdr);padding:7px 24px;z-index:99;position:relative}
 .pbar-in{max-width:1180px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
 .pbar-lbl{font-size:.68rem;color:var(--mut);font-style:italic}
 .pbar-logos{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
