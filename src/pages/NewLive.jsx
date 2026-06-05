@@ -346,4 +346,4 @@ const W = {
   emailCount:    { display: "flex", alignItems: "center", gap: 5, color: "rgba(167,139,250,.7)", fontSize: 11, fontWeight: 600 },
   emailTag:      { background: "rgba(124,58,237,.2)", color: "#c4b5fd", fontSize: 11, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(124,58,237,.3)" },
   invitePreview: { background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)", borderRadius: 12, padding: "14px 16px", textAlign: "left", marginTop: 4 },
-};
+}; 
