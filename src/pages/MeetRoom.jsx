@@ -298,6 +298,92 @@ function GuestSelfTile({ name, camOn, micOn, hand, camStream }) {
 // ══════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ══════════════════════════════════════════════════════
+
+// ── Ended Screen Component ────────────────────────────────────
+function EndedScreen({ countdown, setCountdown, navigate }) {
+  const [count, setCount] = useState(5);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setCount(c => {
+        if (c <= 1) { clearInterval(t); navigate("/jeune"); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [navigate]);
+
+  return (
+    <div style={{
+      minHeight: "100vh", background: "linear-gradient(135deg,#1a1a2e,#16213e,#0f3460)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontFamily: "'Google Sans',system-ui,sans-serif",
+    }}>
+      <style>{`
+        @keyframes pulse2{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.08);opacity:.7}}
+        @keyframes fadeUp2{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes countdown-ring{from{stroke-dashoffset:0}to{stroke-dashoffset:283}}
+      `}</style>
+      <div style={{ textAlign: "center", animation: "fadeUp2 .6s ease", padding: 32 }}>
+        {/* Icon */}
+        <div style={{
+          width: 100, height: 100, borderRadius: "50%",
+          background: "linear-gradient(135deg,#ea4335,#c5221f)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          margin: "0 auto 28px",
+          boxShadow: "0 20px 60px rgba(234,67,53,.4)",
+          animation: "pulse2 2s ease infinite",
+        }}>
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m22 8-6 4 6 4V8z"/><rect x="2" y="6" width="14" height="12" rx="2"/>
+            <line x1="2" y1="2" x2="22" y2="22" stroke="white" strokeWidth="2.5"/>
+          </svg>
+        </div>
+
+        <h1 style={{ color: "#fff", fontSize: 28, fontWeight: 800, marginBottom: 12 }}>
+          Le live est terminé
+        </h1>
+        <p style={{ color: "rgba(255,255,255,.6)", fontSize: 15, marginBottom: 40, lineHeight: 1.7 }}>
+          L'administrateur a mis fin à cette session.<br/>
+          Merci d'avoir participé !
+        </p>
+
+        {/* Countdown ring */}
+        <div style={{ position: "relative", width: 100, height: 100, margin: "0 auto 32px" }}>
+          <svg width="100" height="100" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx="50" cy="50" r="45" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="6"/>
+            <circle cx="50" cy="50" r="45" fill="none" stroke="#8ab4f8" strokeWidth="6"
+              strokeDasharray="283"
+              strokeDashoffset={283 - (283 * count / 5)}
+              style={{ transition: "stroke-dashoffset 1s linear" }}
+              strokeLinecap="round"
+            />
+          </svg>
+          <div style={{
+            position: "absolute", inset: 0, display: "flex", alignItems: "center",
+            justifyContent: "center", color: "#fff", fontSize: 32, fontWeight: 800,
+          }}>{count}</div>
+        </div>
+
+        <p style={{ color: "rgba(255,255,255,.5)", fontSize: 13, marginBottom: 24 }}>
+          Redirection dans {count} seconde{count > 1 ? "s" : ""}…
+        </p>
+
+        <button
+          onClick={() => navigate("/jeune")}
+          style={{
+            background: "linear-gradient(135deg,#1a73e8,#0d47a1)",
+            border: "none", borderRadius: 14, padding: "14px 36px",
+            color: "#fff", fontSize: 15, fontWeight: 700, cursor: "pointer",
+            boxShadow: "0 8px 24px rgba(26,115,232,.4)",
+          }}>
+          Retour à l'espace jeune →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function MeetRoom() {
   const { roomCode } = useParams();
   const [sp]         = useSearchParams();
@@ -348,6 +434,7 @@ export default function MeetRoom() {
   const [permDenied,  setPermDenied]= useState(false);
   const [endModal,    setEndModal]  = useState(false);
   const [liveInfo,    setLiveInfo]  = useState(null);
+  const [countdown,   setCountdown] = useState(5); // ✅ countdown après live-ended
   const [guestScreenAllowed, setGuestScreenAllowed] = useState(false);
   const [pinnedId,    setPinnedId]  = useState(null); // socket id pinned as main view
   const [spotlightId, setSpotlightId] = useState(null); // who is spotlighted (screen share)
@@ -876,8 +963,8 @@ export default function MeetRoom() {
 
       sock.on("live-ended", () => {
         if (myRole !== "host") {
-          showToast("Le live est terminé.", "#5f6368");
-          setTimeout(()=>{ cleanup(); navigate("/jeune"); }, 2500);
+          // ✅ FIX: afficher countdown et rediriger tous les guests sans exception
+          setStatus("ended");
         }
       });
 
@@ -1256,6 +1343,11 @@ export default function MeetRoom() {
     : visiblePeers.filter(p => p.id !== mainPeer?.id);
   const useSpotlight = !!mainPeer || (myRole === "host" && screenOn);
 
+  // ══ ENDED SCREEN (guest only) ══
+  if (status === "ended") return (
+    <EndedScreen countdown={countdown} setCountdown={setCountdown} navigate={navigate} />
+  );
+
   // ── Loading / Error ──
   if (status==="loading") return (
     <div style={{ minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#202124",fontFamily:"'Google Sans',system-ui" }}>
@@ -1292,14 +1384,14 @@ export default function MeetRoom() {
       {permDenied && <div style={{ background:"rgba(234,67,53,.18)",borderBottom:"2px solid rgba(234,67,53,.45)",padding:"10px 20px",color:"#ea4335",fontSize:13,textAlign:"center" }}>🔒 <strong>Accès Caméra/Micro refusé</strong> — Cliquez 🔒 dans la barre → Autorisez → Rechargez</div>}
       {mediaError && !permDenied && <div style={{ background:"rgba(234,67,53,.1)",borderBottom:"1px solid rgba(234,67,53,.25)",padding:"7px 20px",color:"#ea4335",fontSize:12,textAlign:"center" }}>⚠️ {mediaError}</div>}
 
-      {/* ✅ FIX: banner click-to-play pour débloquer autoplay (politique navigateur) */}
+      {/* ✅ FIX: banner click-to-play discret */}
       {myRole === "guest" && peers.length > 0 && (
         <div onClick={() => {
           document.querySelectorAll("video").forEach(v => {
             if (v.srcObject) { v.muted = false; v.play().catch(() => {}); }
           });
-        }} style={{ background:"linear-gradient(90deg,#1a73e8,#0d47a1)",padding:"8px 20px",color:"#fff",fontSize:13,textAlign:"center",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,flexShrink:0,userSelect:"none" }}>
-          🔊 <strong>Si vous ne voyez pas ou n'entendez pas l'admin — cliquez ici pour activer le flux</strong>
+        }} style={{ background:"linear-gradient(90deg,#1a73e8,#0d47a1)",padding:"6px 16px",color:"#fff",fontSize:12,textAlign:"center",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6,flexShrink:0,userSelect:"none",opacity:0.92 }}>
+          🔊 <span>Cliquez ici si le flux vidéo n'est pas visible</span>
         </div>
       )}
 

@@ -826,6 +826,85 @@ function JeuneCalendarView() {
 /* ═══════════════════════════════════════════════════════════
    MAIN COMPONENT
 ═══════════════════════════════════════════════════════════ */
+
+// ── LiveCountdownToast — toast moderne quand live démarre ────────
+function LiveCountdownToast({ data, onClose, navigate }) {
+  const [count, setCount] = React.useState(10);
+  const [dismissed, setDismissed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (dismissed) return;
+    const t = setInterval(() => {
+      setCount(c => {
+        if (c <= 1) { clearInterval(t); joinLive(); return 0; }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [dismissed]);
+
+  const joinLive = () => {
+    onClose();
+    if (!data?.link) return;
+    try {
+      const url = new URL(data.link);
+      const parts = url.pathname.split("/").filter(Boolean);
+      const roomCode = parts[parts.length - 1];
+      const vt = url.searchParams.get("vt");
+      if (roomCode && vt) { navigate(`/meet/${roomCode}?vt=${vt}`); return; }
+    } catch {}
+  };
+
+  if (dismissed) return null;
+
+  return (
+    <div style={{
+      position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+      width: 340, borderRadius: 20,
+      background: "linear-gradient(145deg,#0f0025,#1a0040,#2d0a6b)",
+      border: "1px solid rgba(124,58,237,.5)",
+      boxShadow: "0 20px 60px rgba(124,58,237,.4)",
+      padding: "20px", fontFamily: "inherit",
+      animation: "slideInRight .4s cubic-bezier(.16,1,.3,1)",
+    }}>
+      <style>{`
+        @keyframes slideInRight{from{opacity:0;transform:translateX(60px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes liveRing{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+      `}</style>
+      <button onClick={() => { setDismissed(true); onClose(); }} style={{
+        position:"absolute",top:12,right:12,background:"rgba(255,255,255,.08)",
+        border:"none",borderRadius:"50%",width:26,height:26,cursor:"pointer",
+        color:"rgba(255,255,255,.5)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,
+      }}>✕</button>
+      <div style={{ display:"flex",alignItems:"center",gap:8,marginBottom:14 }}>
+        <div style={{ display:"flex",alignItems:"center",gap:6,background:"rgba(239,68,68,.2)",border:"1px solid rgba(239,68,68,.4)",borderRadius:20,padding:"4px 12px" }}>
+          <span style={{ width:7,height:7,borderRadius:"50%",background:"#ef4444",display:"inline-block",animation:"liveRing 1s infinite" }}/>
+          <span style={{ color:"#f87171",fontWeight:800,fontSize:10,letterSpacing:1.5,textTransform:"uppercase" }}>Live démarré</span>
+        </div>
+      </div>
+      <p style={{ color:"#fff",fontWeight:800,fontSize:15,margin:"0 0 4px",lineHeight:1.4 }}>{data?.title || "Session live"}</p>
+      <p style={{ color:"rgba(167,139,250,.8)",fontSize:12,margin:"0 0 18px" }}>L'admin a démarré un live — rejoignez maintenant !</p>
+      <div style={{ height:3,background:"rgba(255,255,255,.1)",borderRadius:99,marginBottom:16,overflow:"hidden" }}>
+        <div style={{ height:"100%",background:"linear-gradient(90deg,#7c3aed,#a78bfa)",borderRadius:99,width:`${(count/10)*100}%`,transition:"width 1s linear" }}/>
+      </div>
+      <div style={{ display:"flex",gap:8 }}>
+        <button onClick={joinLive} style={{
+          flex:1,background:"linear-gradient(135deg,#7c3aed,#5b21b6)",border:"none",borderRadius:12,
+          padding:"11px 16px",color:"#fff",fontWeight:800,fontSize:13,cursor:"pointer",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:6,
+        }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Rejoindre ({count}s)
+        </button>
+        <button onClick={() => { setDismissed(true); onClose(); }} style={{
+          background:"rgba(255,255,255,.08)",border:"1px solid rgba(255,255,255,.12)",
+          borderRadius:12,padding:"11px 14px",color:"rgba(255,255,255,.6)",fontSize:12,cursor:"pointer",
+        }}>Plus tard</button>
+      </div>
+    </div>
+  );
+}
+
 const JeuneLayout = () => {
   const [user] = useState(() => {
     try { return JSON.parse(localStorage.getItem("user")) || null; }
@@ -867,6 +946,7 @@ const JeuneLayout = () => {
   /* ── LIVE STATE (pour notification + chatbot) ── */
   const [activeLiveLink, setActiveLiveLink] = useState(null); // viewerLink du live actif
   const [liveNotifToast, setLiveNotifToast] = useState(null); // toast notification live
+  const [liveCountdown, setLiveCountdown] = useState(null); // { link, title } — countdown toast
   const [activeLiveInfo, setActiveLiveInfo]   = useState(null); // full live object
 
   /* ── SOCKET ── ✅ FIX: useRef pour éviter le loop connect/disconnect */
@@ -908,8 +988,10 @@ const JeuneLayout = () => {
         localStorage.setItem("currentLiveViewerLink", viewerLink);
         setActiveLiveLink(viewerLink);
         setActiveLiveInfo({ title_live: title || "Live en cours", stream_link: viewerLink, room_code: roomCode, thematique, description, id_live: liveId });
+        // ✅ FIX: afficher countdown toast quand live démarre
+        setLiveCountdown({ link: viewerLink, title: title || "Live en cours", roomCode });
       }
-      // Ajouter dans la liste des notifications (pas de toast séparé)
+      // Ajouter dans la liste des notifications
       setNotifications((prev) => [{
         id_notification: Date.now(),
         type_notification: "live_started",
@@ -926,6 +1008,7 @@ const JeuneLayout = () => {
       setActiveLiveLink(null);
       setActiveLiveInfo(null);
       setLiveNotifToast(null);
+      setLiveCountdown(null);
       localStorage.removeItem("currentLiveViewerLink");
     });
 
@@ -1542,6 +1625,15 @@ const JeuneLayout = () => {
   ═══════════════════════════════════════════════════════ */
   return (
     <div className="jl-root">
+      {/* ✅ Live countdown toast */}
+      {liveCountdown && (
+        <LiveCountdownToast
+          data={liveCountdown}
+          onClose={() => setLiveCountdown(null)}
+          navigate={navigate}
+        />
+      )}
+
       {/* orbs */}
       <div className="jl-orb jl-orb1" aria-hidden="true"/>
       <div className="jl-orb jl-orb2" aria-hidden="true"/>

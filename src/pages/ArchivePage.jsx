@@ -1,5 +1,70 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import API from "../services/api";
+
+
+// ── ArchiveCard avec AI Summary ───────────────────────────────
+function ArchiveCard({ item, badge, color, title, description, dateVal, duration, participants, host }) {
+  const [showAI, setShowAI] = React.useState(false);
+  const aiSummary = item.ai_summary || item.aiSummary || null;
+
+  return (
+    <div className="archive-card">
+      <span className={`badge ${color}`}>{badge}</span>
+      <h3>{title}</h3>
+      {description && <p>{description}</p>}
+      {(duration || participants || host) && (
+        <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginTop:"10px" }}>
+          {host        && <span style={{ fontSize:11, background:"#f0ebff", color:"#5a3fa0", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{host}</span>}
+          {duration    && <span style={{ fontSize:11, background:"#f0ebff", color:"#5a3fa0", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{duration}</span>}
+          {participants && <span style={{ fontSize:11, background:"#e0f2fe", color:"#0369a1", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{participants}</span>}
+        </div>
+      )}
+      <span className="date">
+        📅 {dateVal ? new Date(dateVal).toLocaleDateString("fr-FR", { day:"numeric", month:"long", year:"numeric" }) : "—"}
+      </span>
+
+      {/* ✅ AI Summary */}
+      {aiSummary && (
+        <div style={{ marginTop: 12 }}>
+          <button
+            onClick={() => setShowAI(o => !o)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              background: showAI ? "linear-gradient(135deg,#ede9fe,#ddd6fe)" : "linear-gradient(135deg,#f5f3ff,#ede9fe)",
+              border: "1px solid rgba(124,58,237,.25)", borderRadius: 10,
+              padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 700,
+              color: "#5b21b6", transition: "all .2s",
+            }}
+          >
+            <span style={{ fontSize: 14 }}>✨</span>
+            {showAI ? "Masquer le résumé IA" : "Voir le résumé IA"}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
+              style={{ transform: showAI ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+              <path d="m6 9 6 6 6-6"/>
+            </svg>
+          </button>
+
+          {showAI && (
+            <div style={{
+              marginTop: 10, padding: "14px 16px",
+              background: "linear-gradient(135deg,#faf5ff,#f3e8ff)",
+              border: "1px solid rgba(124,58,237,.2)", borderRadius: 14,
+              fontSize: 13, color: "#3b1e6e", lineHeight: 1.7,
+              animation: "fadeUp .3s ease",
+              whiteSpace: "pre-wrap",
+            }}>
+              <div style={{ display:"flex",alignItems:"center",gap:6,marginBottom:8,paddingBottom:8,borderBottom:"1px solid rgba(124,58,237,.15)" }}>
+                <span style={{ fontSize:16 }}>🤖</span>
+                <span style={{ fontWeight:800,fontSize:12,color:"#7c3aed",letterSpacing:.5 }}>RÉSUMÉ IA</span>
+              </div>
+              {aiSummary}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ArchivePage() {
   const [showAllLives, setShowAllLives] = useState(false);
@@ -56,22 +121,14 @@ export default function ArchivePage() {
     const participants = item.participants_count != null ? `👥 ${item.participants_count} participants` : null;
     const host = item.host_name ? `🎙 ${item.host_name}` : null;
 
+    const [showAI, setShowAI] = false; // handled per card below
     return (
-      <div key={item.id || item.id_live || item.id_enquete || idx} className="archive-card">
-        <span className={`badge ${color}`}>{badge}</span>
-        <h3>{title}</h3>
-        {description && <p>{description}</p>}
-        {(duration || participants || host) && (
-          <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginTop:"10px" }}>
-            {host        && <span style={{ fontSize:11, background:"#f0ebff", color:"#5a3fa0", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{host}</span>}
-            {duration    && <span style={{ fontSize:11, background:"#f0ebff", color:"#5a3fa0", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{duration}</span>}
-            {participants && <span style={{ fontSize:11, background:"#e0f2fe", color:"#0369a1", padding:"3px 8px", borderRadius:8, fontWeight:600 }}>{participants}</span>}
-          </div>
-        )}
-        <span className="date">
-          📅 {dateVal ? new Date(dateVal).toLocaleDateString("fr-FR", { day:"numeric", month:"long", year:"numeric" }) : "—"}
-        </span>
-      </div>
+      <ArchiveCard
+        key={item.id || item.id_live || item.id_enquete || idx}
+        item={item} badge={badge} color={color}
+        title={title} description={description} dateVal={dateVal}
+        duration={duration} participants={participants} host={host}
+      />
     );
   });
 
