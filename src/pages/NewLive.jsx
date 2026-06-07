@@ -84,27 +84,52 @@ function CustomDatePicker({ value, onChange, error }) {
   const yearStart = Math.floor(cursor.year / 10) * 10;
   const years = Array.from({ length: 12 }, (_, i) => yearStart + i);
 
+  // ✅ parse dd/mm/yyyy typed manually
+  const handleManualDate = (e) => {
+    const raw = e.target.value;
+    // accept dd/mm/yyyy format
+    const match = raw.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+    if (match) {
+      const [, d, m, y] = match;
+      const iso = `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+      const dt = new Date(iso + "T00:00:00");
+      if (!isNaN(dt)) { onChange(iso); setCursor({ year: dt.getFullYear(), month: dt.getMonth() }); }
+    } else if (raw === "") { onChange(""); }
+  };
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      {/* Input trigger */}
-      <button type="button" onClick={() => setOpen(o => !o)} style={{
-        width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "12px 16px", borderRadius: 12,
+      {/* ✅ Input text + icône calendar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 0,
         background: "rgba(255,255,255,.06)",
         border: `1px solid ${error ? "#ef4444" : open ? "rgba(124,106,191,.8)" : "rgba(255,255,255,.12)"}`,
-        color: selected ? "#fff" : "rgba(255,255,255,.45)",
-        fontSize: 14, cursor: "pointer", textAlign: "left",
+        borderRadius: 12,
         boxShadow: open ? "0 0 0 3px rgba(124,106,191,.2)" : error ? "0 0 0 3px rgba(239,68,68,.15)" : "none",
-        transition: "all .2s", fontFamily: "inherit",
+        transition: "all .2s",
       }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={selected ? "#c4b5fd" : "rgba(255,255,255,.4)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-        </svg>
-        <span style={{ flex: 1 }}>{displayValue}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
-          <path d="m6 9 6 6 6-6"/>
-        </svg>
-      </button>
+        <input
+          type="text"
+          placeholder="jj/mm/aaaa"
+          defaultValue={selected ? `${String(selected.getDate()).padStart(2,"0")}/${String(selected.getMonth()+1).padStart(2,"0")}/${selected.getFullYear()}` : ""}
+          key={value}
+          onBlur={handleManualDate}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleManualDate({ target: e.currentTarget }); } }}
+          style={{
+            flex: 1, background: "transparent", border: "none", outline: "none",
+            color: selected ? "#fff" : "rgba(255,255,255,.45)", fontSize: 14,
+            padding: "12px 16px", fontFamily: "inherit", minWidth: 0,
+          }}
+        />
+        <button type="button" onClick={() => setOpen(o => !o)} style={{
+          background: "transparent", border: "none", cursor: "pointer",
+          padding: "12px 14px", display: "flex", alignItems: "center",
+          color: open ? "#c4b5fd" : "rgba(255,255,255,.4)",
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+        </button>
+      </div>
 
       {/* Dropdown calendar */}
       {open && (
@@ -295,26 +320,50 @@ function CustomTimePicker({ value, onChange, error }) {
   const hours   = Array.from({ length: 24 }, (_, i) => i);
   const minutes = [0, 15, 30, 45];
 
+  const handleManualTime = (e) => {
+    const raw = e.target.value.trim();
+    const match = raw.match(/^(\d{1,2})[:\h](\d{2})$/);
+    if (match) {
+      const hh = String(parseInt(match[1])).padStart(2,"0");
+      const mm = String(parseInt(match[2])).padStart(2,"0");
+      if (parseInt(hh) < 24 && parseInt(mm) < 60) {
+        setH(hh); setM(mm); onChange(`${hh}:${mm}`);
+      }
+    } else if (raw === "") { onChange(""); }
+  };
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button type="button" onClick={() => setOpen(o => !o)} style={{
-        width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "12px 16px", borderRadius: 12,
+      <div style={{ display: "flex", alignItems: "center",
         background: "rgba(255,255,255,.06)",
         border: `1px solid ${error ? "#ef4444" : open ? "rgba(124,106,191,.8)" : "rgba(255,255,255,.12)"}`,
-        color: value ? "#fff" : "rgba(255,255,255,.45)",
-        fontSize: 14, cursor: "pointer", textAlign: "left",
+        borderRadius: 12,
         boxShadow: open ? "0 0 0 3px rgba(124,106,191,.2)" : error ? "0 0 0 3px rgba(239,68,68,.15)" : "none",
-        transition: "all .2s", fontFamily: "inherit",
+        transition: "all .2s",
       }}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={value ? "#c4b5fd" : "rgba(255,255,255,.4)"} strokeWidth="2" strokeLinecap="round">
-          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
-        </svg>
-        <span style={{ flex: 1 }}>{value || "--:--"}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
-          <path d="m6 9 6 6 6-6"/>
-        </svg>
-      </button>
+        <input
+          type="text"
+          placeholder="hh:mm"
+          defaultValue={value || ""}
+          key={value}
+          onBlur={handleManualTime}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleManualTime({ target: e.currentTarget }); } }}
+          style={{
+            flex: 1, background: "transparent", border: "none", outline: "none",
+            color: value ? "#fff" : "rgba(255,255,255,.45)", fontSize: 14,
+            padding: "12px 16px", fontFamily: "inherit", minWidth: 0,
+          }}
+        />
+        <button type="button" onClick={() => setOpen(o => !o)} style={{
+          background: "transparent", border: "none", cursor: "pointer",
+          padding: "12px 14px", display: "flex", alignItems: "center",
+          color: open ? "#c4b5fd" : "rgba(255,255,255,.4)",
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+          </svg>
+        </button>
+      </div>
 
       {open && (
         <div style={{
@@ -429,10 +478,14 @@ export default function NewLive({ onCancel }) {
   const handleCreate = async () => {
     setLoading(true);
     try {
+      const finalThematique = form.thematique === "Autre" && form.thematiqueAutre
+        ? form.thematiqueAutre
+        : form.thematique;
+
       const res = await API.post("/lives/session/create", {
         title: form.title, description: form.description,
         date: form.date, time: form.time,
-        thematique: form.thematique, status: "En cours", category: "other",
+        thematique: finalThematique, status: "En cours", category: "other",
       });
 
       if (!res.data?.success) throw new Error(res.data?.message || "Erreur");
@@ -571,6 +624,15 @@ export default function NewLive({ onCancel }) {
 
           <Field label="🎯 Thématique" error={errors.thematique}>
             <ThematiqueSelect value={form.thematique} onChange={v => set("thematique", v)} error={errors.thematique} />
+            {form.thematique === "Autre" && (
+              <input
+                style={{ ...inp(errors.thematique), marginTop: 8 }}
+                placeholder="Précisez la thématique…"
+                value={form.thematiqueAutre || ""}
+                onChange={e => setForm(p => ({ ...p, thematiqueAutre: e.target.value }))}
+                autoFocus
+              />
+            )}
           </Field>
 
           {/* EMAIL INVITES */}
@@ -686,4 +748,4 @@ const W = {
   emailCount:    { display: "flex", alignItems: "center", gap: 5, color: "rgba(255,255,255,.6)", fontSize: 11, fontWeight: 600 },
   emailTag:      { background: "rgba(255,255,255,.15)", color: "#fff", fontSize: 11, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(255,255,255,.25)" },
   invitePreview: { background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "14px 16px", textAlign: "left", marginTop: 4 },
-}; 
+};

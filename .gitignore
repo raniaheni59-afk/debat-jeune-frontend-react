@@ -30,3 +30,4 @@ public/gallery/
 .vercel
 .env*.local
 .env*
+temp_check.txt 

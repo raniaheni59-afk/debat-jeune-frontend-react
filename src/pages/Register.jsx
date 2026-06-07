@@ -79,26 +79,53 @@ function BirthDatePicker({ value, onChange }) {
     cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
   };
 
+  const handleManualDate = (e) => {
+    const raw = e.target.value.trim();
+    const match = raw.match(/^(\d{1,2})[\/-\.](\d{1,2})[\/-\.](\d{4})$/);
+    if (match) {
+      const [, d, m, y] = match;
+      const iso = `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
+      const dt = new Date(iso + "T00:00:00");
+      if (!isNaN(dt) && dt <= new Date()) {
+        onChange(iso);
+        setCursor({ year: dt.getFullYear(), month: dt.getMonth() });
+      }
+    } else if (raw === "") { onChange(""); }
+  };
+
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <button type="button" onClick={() => setOpen(o => !o)} style={{
-        width: "100%", display: "flex", alignItems: "center", gap: 10,
-        padding: "11px 14px", borderRadius: 11,
+      <div style={{
+        display: "flex", alignItems: "center",
         background: "rgba(255,255,255,.15)",
         border: `1.5px solid ${open ? "rgba(255,255,255,.65)" : "rgba(255,255,255,.22)"}`,
-        color: selected ? "#fff" : "rgba(255,255,255,.45)",
-        fontSize: 14, cursor: "pointer", textAlign: "left",
+        borderRadius: 11,
         boxShadow: open ? "0 0 0 3px rgba(255,255,255,.1)" : "none",
-        transition: "all .2s", fontFamily: "inherit",
+        transition: "all .2s",
       }}>
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={selected ? "#fff" : "rgba(255,255,255,.5)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-        </svg>
-        <span style={{ flex: 1, fontSize: selected ? 14 : 13 }}>{displayValue}</span>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" strokeWidth="2" strokeLinecap="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
-          <path d="m6 9 6 6 6-6"/>
-        </svg>
-      </button>
+        <input
+          type="text"
+          placeholder="jj/mm/aaaa"
+          defaultValue={selected ? `${String(selected.getDate()).padStart(2,"0")}/${String(selected.getMonth()+1).padStart(2,"0")}/${selected.getFullYear()}` : ""}
+          key={value}
+          onBlur={handleManualDate}
+          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleManualDate({ target: e.currentTarget }); } }}
+          style={{
+            flex: 1, background: "transparent", border: "none", outline: "none",
+            color: selected ? "#fff" : "rgba(255,255,255,.45)",
+            fontSize: 14, padding: "11px 14px", fontFamily: "inherit", minWidth: 0,
+          }}
+        />
+        <button type="button" onClick={() => setOpen(o => !o)} style={{
+          background: "transparent", border: "none", cursor: "pointer",
+          padding: "11px 12px", display: "flex", alignItems: "center",
+          color: open ? "#fff" : "rgba(255,255,255,.5)",
+        }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+        </button>
+      </div>
 
       {open && (
         <div style={{
