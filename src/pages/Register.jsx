@@ -79,20 +79,6 @@ function BirthDatePicker({ value, onChange }) {
     cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
   };
 
-  const handleManualDate = (e) => {
-    const raw = e.target.value.trim();
-    const match = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
-    if (match) {
-      const [, d, m, y] = match;
-      const iso = `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
-      const dt = new Date(iso + "T00:00:00");
-      if (!isNaN(dt) && dt <= new Date()) {
-        onChange(iso);
-        setCursor({ year: dt.getFullYear(), month: dt.getMonth() });
-      }
-    } else if (raw === "") { onChange(""); }
-  };
-
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <div style={{
@@ -103,17 +89,24 @@ function BirthDatePicker({ value, onChange }) {
         boxShadow: open ? "0 0 0 3px rgba(255,255,255,.1)" : "none",
         transition: "all .2s",
       }}>
+        {/* ✅ input type=date natif stylé */}
         <input
-          type="text"
-          placeholder="jj/mm/aaaa"
-          defaultValue={selected ? `${String(selected.getDate()).padStart(2,"0")}/${String(selected.getMonth()+1).padStart(2,"0")}/${selected.getFullYear()}` : ""}
-          key={value}
-          onBlur={handleManualDate}
-          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleManualDate({ target: e.currentTarget }); } }}
+          type="date"
+          max={new Date().toISOString().split("T")[0]}
+          value={value || ""}
+          onChange={e => {
+            const val = e.target.value;
+            if (val) {
+              const dt = new Date(val + "T00:00:00");
+              onChange(val);
+              setCursor({ year: dt.getFullYear(), month: dt.getMonth() });
+            } else { onChange(""); }
+          }}
           style={{
             flex: 1, background: "transparent", border: "none", outline: "none",
-            color: selected ? "#fff" : "rgba(255,255,255,.45)",
+            color: value ? "#fff" : "rgba(255,255,255,.45)",
             fontSize: 14, padding: "11px 14px", fontFamily: "inherit", minWidth: 0,
+            colorScheme: "dark",
           }}
         />
         <button type="button" onClick={() => setOpen(o => !o)} style={{
