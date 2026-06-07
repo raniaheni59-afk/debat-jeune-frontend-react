@@ -9,9 +9,16 @@ const ICE = [
   { urls: "stun:stun.l.google.com:19302" },
   { urls: "stun:stun1.l.google.com:19302" },
   { urls: "stun:stun2.l.google.com:19302" },
+  { urls: "stun:stun3.l.google.com:19302" },
+  { urls: "stun:stun4.l.google.com:19302" },
+  { urls: "stun:stun.cloudflare.com:3478" },
   { urls: "turn:openrelay.metered.ca:80",                username: "openrelayproject", credential: "openrelayproject" },
   { urls: "turn:openrelay.metered.ca:443",               username: "openrelayproject", credential: "openrelayproject" },
   { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turns:openrelay.metered.ca:443",              username: "openrelayproject", credential: "openrelayproject" },
+  { urls: "turn:numb.viagenie.ca", username: "webrtc@live.com", credential: "muazkh" },
+  { urls: "turn:192.158.29.39:3478?transport=udp", username: "28224511:1379330808", credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=" },
+  { urls: "turn:192.158.29.39:3478?transport=tcp", username: "28224511:1379330808", credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=" },
 ];
 
 const CSS = `
@@ -58,21 +65,50 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
                 hand=false, isLocal=false, localRef, screenShare=false, micOn=true, fillHeight=false }) {
   const ref  = useRef(null);
   const vRef = isLocal ? localRef : ref;
+  const [hasVideo, setHasVideo] = useState(false);
+  const [clicked,  setClicked]  = useState(false);
 
   useEffect(() => {
     const el = vRef?.current;
     if (!el) return;
+
     if (stream) {
-      el.srcObject = stream;
-      el.play().catch(() => {});
+      if (el.srcObject !== stream) {
+        el.srcObject = stream;
+      }
+      // ✅ FIX: retry play plusieurs fois (browser autoplay policy + cross-network delay)
+      const tryPlay = (attempt = 0) => {
+        el.play().catch(() => {
+          if (attempt < 5) setTimeout(() => tryPlay(attempt + 1), 800);
+        });
+      };
+      tryPlay();
+
+      // ✅ FIX: surveiller les tracks vidéo en temps réel
+      const checkVideo = () => {
+        const vt = stream.getVideoTracks();
+        const has = vt.length > 0 && vt.some(t => t.readyState !== "ended");
+        setHasVideo(has);
+      };
+      checkVideo();
+      stream.addEventListener("addtrack",    checkVideo);
+      stream.addEventListener("removetrack", checkVideo);
+      const iv = setInterval(checkVideo, 600);
+      return () => {
+        clearInterval(iv);
+        stream.removeEventListener("addtrack",    checkVideo);
+        stream.removeEventListener("removetrack", checkVideo);
+      };
     } else if (!isLocal) {
       el.srcObject = null;
+      setHasVideo(false);
     }
   }, [stream, isLocal]);
 
   const init  = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const isH   = role === "host";
-  const showV = isLocal ? !camOff : (!camOff && !!stream);
+  // ✅ FIX: remote → montrer si hasVideo (tracks reçus) et pas camOff explicite
+  const showV = isLocal ? !camOff : (!!stream && hasVideo && !camOff);
 
   return (
     <div style={{ position:"relative", background:"#111", borderRadius:14, overflow:"hidden",
@@ -295,6 +331,17 @@ export default function MeetRoom() {
 
   const { live: subtitle, saved: transcript } = useSubtitles(subsOn);
 
+  // ✅ FIX cross-network: forcer play sur toutes les vidéos quand un peer arrive
+  useEffect(() => {
+    if (peers.length === 0) return;
+    const t = setTimeout(() => {
+      document.querySelectorAll("video").forEach(v => {
+        if (v.srcObject && v.paused) v.play().catch(() => {});
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [peers]);
+
   const showToast = useCallback((msg, color="#1a73e8", icon="") => {
     setToast({ msg, color, icon });
     setTimeout(() => setToast(null), 4000);
@@ -356,10 +403,17 @@ export default function MeetRoom() {
       if (pc.iceConnectionState === "failed") pc.restartIce();
     };
     pc.ontrack = e => {
-      const stream = e.streams[0];
-      if (!stream) return;
-      // ✅ FIX: s'assurer que roleMap est à jour au moment du ontrack
-      // Sinon hostPeer reste undefined et le guest voit l'écran d'attente
+      // ✅ FIX cross-network: e.streams[0] peut être undefined → construire stream manuellement
+      let stream = e.streams?.[0];
+      if (!stream) {
+        // Fallback: récupérer ou créer le stream pour ce peer
+        if (!pcMap.current[sid + "_stream"]) {
+          pcMap.current[sid + "_stream"] = new MediaStream();
+        }
+        stream = pcMap.current[sid + "_stream"];
+        stream.addTrack(e.track);
+      }
+      // ✅ S'assurer que roleMap est à jour
       setPeers(prev => {
         const ex = prev.find(p=>p.id===sid);
         if (ex) return prev.map(p=>p.id===sid?{...p,stream}:p);
@@ -370,6 +424,15 @@ export default function MeetRoom() {
           role: roleMap.current[sid] || "guest",
         }];
       });
+    };
+
+    // ✅ FIX: surveiller l'état de connexion ICE pour debug
+    pc.onconnectionstatechange = () => {
+      console.log(`🔗 Peer ${sid} connectionState:`, pc.connectionState);
+      if (pc.connectionState === "failed") {
+        console.warn("❌ WebRTC failed — tentative restartIce");
+        pc.restartIce();
+      }
     };
 
     // ✅ Ajouter les tracks locaux au peer
@@ -1097,6 +1160,19 @@ export default function MeetRoom() {
       {/* PERM DENIED */}
       {permDenied && <div style={{ background:"rgba(234,67,53,.18)",borderBottom:"2px solid rgba(234,67,53,.45)",padding:"10px 20px",color:"#ea4335",fontSize:13,textAlign:"center" }}>🔒 <strong>Accès Caméra/Micro refusé</strong> — Cliquez 🔒 dans la barre → Autorisez → Rechargez</div>}
       {mediaError && !permDenied && <div style={{ background:"rgba(234,67,53,.1)",borderBottom:"1px solid rgba(234,67,53,.25)",padding:"7px 20px",color:"#ea4335",fontSize:12,textAlign:"center" }}>⚠️ {mediaError}</div>}
+
+      {/* ✅ FIX cross-network: banner pour débloquer autoplay (obligatoire dans Chrome) */}
+      {myRole === "guest" && peers.length > 0 && (
+        <div
+          onClick={() => {
+            document.querySelectorAll("video").forEach(v => {
+              if (v.srcObject) { v.muted = false; v.play().catch(() => {}); }
+            });
+          }}
+          style={{ background:"linear-gradient(90deg,#1a73e8,#0d47a1)",padding:"9px 20px",color:"#fff",fontSize:13,textAlign:"center",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,userSelect:"none" }}>
+          🔊 <strong>Cliquez ici si vous ne voyez/entendez pas l'admin</strong> — Activer le flux vidéo
+        </div>
+      )}
 
       {/* MODALS */}
       {kickTarget  && <Modal emoji="🚪" title="Retirer ce participant ?" desc="Il sera exclu (peut revenir avec le lien)." onCancel={()=>setKickTarget(null)} onConfirm={confirmKick} confirmLabel="Retirer" />}
