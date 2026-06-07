@@ -12,13 +12,17 @@ const ICE = [
   { urls: "stun:stun3.l.google.com:19302" },
   { urls: "stun:stun4.l.google.com:19302" },
   { urls: "stun:stun.cloudflare.com:3478" },
+  { urls: "stun:stun.stunprotocol.org:3478" },
   { urls: "turn:openrelay.metered.ca:80",                username: "openrelayproject", credential: "openrelayproject" },
   { urls: "turn:openrelay.metered.ca:443",               username: "openrelayproject", credential: "openrelayproject" },
   { urls: "turn:openrelay.metered.ca:443?transport=tcp", username: "openrelayproject", credential: "openrelayproject" },
   { urls: "turns:openrelay.metered.ca:443",              username: "openrelayproject", credential: "openrelayproject" },
-  { urls: "turn:numb.viagenie.ca", username: "webrtc@live.com", credential: "muazkh" },
-  { urls: "turn:192.158.29.39:3478?transport=udp", username: "28224511:1379330808", credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=" },
-  { urls: "turn:192.158.29.39:3478?transport=tcp", username: "28224511:1379330808", credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=" },
+  { urls: "turn:relay1.expressturn.com:3478",            username: "efUN6ZQIWNKZPXLSRZ", credential: "cJGdDLaepbFLtAuN" },
+  { urls: "turn:relay2.expressturn.com:3478",            username: "efUN6ZQIWNKZPXLSRZ", credential: "cJGdDLaepbFLtAuN" },
+  { urls: "turn:a.relay.metered.ca:80",                  username: "f4a1826f507a526e4d1eb53b", credential: "qO4MKZWT0pMLLvfx" },
+  { urls: "turn:a.relay.metered.ca:80?transport=tcp",    username: "f4a1826f507a526e4d1eb53b", credential: "qO4MKZWT0pMLLvfx" },
+  { urls: "turn:a.relay.metered.ca:443",                 username: "f4a1826f507a526e4d1eb53b", credential: "qO4MKZWT0pMLLvfx" },
+  { urls: "turns:a.relay.metered.ca:443?transport=tcp",  username: "f4a1826f507a526e4d1eb53b", credential: "qO4MKZWT0pMLLvfx" },
 ];
 
 const CSS = `
@@ -66,38 +70,40 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
   const ref  = useRef(null);
   const vRef = isLocal ? localRef : ref;
   const [hasVideo, setHasVideo] = useState(false);
-  const [clicked,  setClicked]  = useState(false);
 
   useEffect(() => {
     const el = vRef?.current;
     if (!el) return;
 
     if (stream) {
+      // ✅ FIX: toujours re-assigner srcObject si différent
       if (el.srcObject !== stream) {
         el.srcObject = stream;
       }
-      // ✅ FIX: retry play plusieurs fois (browser autoplay policy + cross-network delay)
-      const tryPlay = (attempt = 0) => {
+
+      // ✅ FIX cross-network: retry play jusqu'à 8 fois
+      let attempts = 0;
+      const tryPlay = () => {
         el.play().catch(() => {
-          if (attempt < 5) setTimeout(() => tryPlay(attempt + 1), 800);
+          if (attempts++ < 8) setTimeout(tryPlay, 700);
         });
       };
       tryPlay();
 
-      // ✅ FIX: surveiller les tracks vidéo en temps réel
-      const checkVideo = () => {
+      // ✅ FIX: détecter si des video tracks actives existent (cross-network delay)
+      const check = () => {
         const vt = stream.getVideoTracks();
-        const has = vt.length > 0 && vt.some(t => t.readyState !== "ended");
-        setHasVideo(has);
+        setHasVideo(vt.length > 0 && vt.some(t => t.readyState !== "ended"));
       };
-      checkVideo();
-      stream.addEventListener("addtrack",    checkVideo);
-      stream.addEventListener("removetrack", checkVideo);
-      const iv = setInterval(checkVideo, 600);
+      check();
+      stream.addEventListener("addtrack",    check);
+      stream.addEventListener("removetrack", check);
+      // ✅ poll toutes les 500ms — tracks peuvent arriver tard cross-network
+      const iv = setInterval(check, 500);
       return () => {
         clearInterval(iv);
-        stream.removeEventListener("addtrack",    checkVideo);
-        stream.removeEventListener("removetrack", checkVideo);
+        stream.removeEventListener("addtrack",    check);
+        stream.removeEventListener("removetrack", check);
       };
     } else if (!isLocal) {
       el.srcObject = null;
@@ -105,9 +111,19 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
     }
   }, [stream, isLocal]);
 
+  // ✅ FIX: re-play quand la vidéo est pausée (click utilisateur ou focus change)
+  useEffect(() => {
+    const el = vRef?.current;
+    if (!el || isLocal) return;
+    const onPause = () => { if (stream) el.play().catch(() => {}); };
+    el.addEventListener("pause", onPause);
+    return () => el.removeEventListener("pause", onPause);
+  }, [stream, isLocal]);
+
   const init  = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const isH   = role === "host";
-  // ✅ FIX: remote → montrer si hasVideo (tracks reçus) et pas camOff explicite
+  // ✅ FIX: remote tile — afficher si hasVideo ET pas camOff explicite
+  // isLocal → utiliser camOff directement (stream local géré séparément)
   const showV = isLocal ? !camOff : (!!stream && hasVideo && !camOff);
 
   return (
@@ -338,7 +354,7 @@ export default function MeetRoom() {
       document.querySelectorAll("video").forEach(v => {
         if (v.srcObject && v.paused) v.play().catch(() => {});
       });
-    }, 400);
+    }, 500);
     return () => clearTimeout(t);
   }, [peers]);
 
@@ -403,36 +419,24 @@ export default function MeetRoom() {
       if (pc.iceConnectionState === "failed") pc.restartIce();
     };
     pc.ontrack = e => {
-      // ✅ FIX cross-network: e.streams[0] peut être undefined → construire stream manuellement
+      // ✅ FIX cross-network: e.streams[0] parfois undefined → construire stream manuellement
       let stream = e.streams?.[0];
       if (!stream) {
-        // Fallback: récupérer ou créer le stream pour ce peer
-        if (!pcMap.current[sid + "_stream"]) {
-          pcMap.current[sid + "_stream"] = new MediaStream();
-        }
-        stream = pcMap.current[sid + "_stream"];
-        stream.addTrack(e.track);
+        if (!pcMap.current[`${sid}_ms`]) pcMap.current[`${sid}_ms`] = new MediaStream();
+        stream = pcMap.current[`${sid}_ms`];
+        try { stream.addTrack(e.track); } catch {}
       }
-      // ✅ S'assurer que roleMap est à jour
       setPeers(prev => {
         const ex = prev.find(p=>p.id===sid);
         if (ex) return prev.map(p=>p.id===sid?{...p,stream}:p);
-        return [...prev, {
-          id:   sid,
-          stream,
-          name: nameMap.current[sid] || "Invité",
-          role: roleMap.current[sid] || "guest",
-        }];
+        return [...prev, { id:sid, stream, name:nameMap.current[sid]||"Invité", role:roleMap.current[sid]||"guest" }];
       });
     };
 
-    // ✅ FIX: surveiller l'état de connexion ICE pour debug
+    // ✅ FIX: log + restartIce automatique si connexion échoue
     pc.onconnectionstatechange = () => {
-      console.log(`🔗 Peer ${sid} connectionState:`, pc.connectionState);
-      if (pc.connectionState === "failed") {
-        console.warn("❌ WebRTC failed — tentative restartIce");
-        pc.restartIce();
-      }
+      console.log(`[WebRTC] ${sid} → ${pc.connectionState}`);
+      if (pc.connectionState === "failed") { try { pc.restartIce(); } catch {} }
     };
 
     // ✅ Ajouter les tracks locaux au peer
@@ -1161,16 +1165,14 @@ export default function MeetRoom() {
       {permDenied && <div style={{ background:"rgba(234,67,53,.18)",borderBottom:"2px solid rgba(234,67,53,.45)",padding:"10px 20px",color:"#ea4335",fontSize:13,textAlign:"center" }}>🔒 <strong>Accès Caméra/Micro refusé</strong> — Cliquez 🔒 dans la barre → Autorisez → Rechargez</div>}
       {mediaError && !permDenied && <div style={{ background:"rgba(234,67,53,.1)",borderBottom:"1px solid rgba(234,67,53,.25)",padding:"7px 20px",color:"#ea4335",fontSize:12,textAlign:"center" }}>⚠️ {mediaError}</div>}
 
-      {/* ✅ FIX cross-network: banner pour débloquer autoplay (obligatoire dans Chrome) */}
+      {/* ✅ FIX: banner click-to-play pour débloquer autoplay (politique navigateur) */}
       {myRole === "guest" && peers.length > 0 && (
-        <div
-          onClick={() => {
-            document.querySelectorAll("video").forEach(v => {
-              if (v.srcObject) { v.muted = false; v.play().catch(() => {}); }
-            });
-          }}
-          style={{ background:"linear-gradient(90deg,#1a73e8,#0d47a1)",padding:"9px 20px",color:"#fff",fontSize:13,textAlign:"center",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,userSelect:"none" }}>
-          🔊 <strong>Cliquez ici si vous ne voyez/entendez pas l'admin</strong> — Activer le flux vidéo
+        <div onClick={() => {
+          document.querySelectorAll("video").forEach(v => {
+            if (v.srcObject) { v.muted = false; v.play().catch(() => {}); }
+          });
+        }} style={{ background:"linear-gradient(90deg,#1a73e8,#0d47a1)",padding:"8px 20px",color:"#fff",fontSize:13,textAlign:"center",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8,flexShrink:0,userSelect:"none" }}>
+          🔊 <strong>Si vous ne voyez pas ou n'entendez pas l'admin — cliquez ici pour activer le flux</strong>
         </div>
       )}
 
