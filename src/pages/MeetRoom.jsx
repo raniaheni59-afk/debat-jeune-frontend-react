@@ -76,32 +76,47 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
     if (!el) return;
 
     if (stream) {
-      // ✅ FIX: toujours re-assigner srcObject si différent
       if (el.srcObject !== stream) {
         el.srcObject = stream;
       }
 
-      // ✅ FIX cross-network: retry play jusqu'à 8 fois
+      // Retry play agressif — cross-network + autoplay policy
       let attempts = 0;
       const tryPlay = () => {
         el.play().catch(() => {
-          if (attempts++ < 8) setTimeout(tryPlay, 700);
+          if (attempts++ < 12) setTimeout(tryPlay, 600);
         });
       };
       tryPlay();
 
-      // ✅ FIX: détecter si des video tracks actives existent (cross-network delay)
+      // ✅ FIX écran noir cross-network:
+      // hasVideo = true dès qu'il y a au moins 1 track (même si enabled=false côté émetteur)
+      // On ne met false QUE si vraiment 0 tracks ou tous ended
+      // L'affichage dépend de camOff (signal explicite de l'admin) pas de l'état du track local
       const check = () => {
         const vt = stream.getVideoTracks();
-        setHasVideo(vt.length > 0 && vt.some(t => t.readyState !== "ended"));
+        // ✅ CLEF: si le stream a des tracks (même muted/disabled), on considère hasVideo=true
+        // car l'admin peut avoir la cam "enabled" côté serveur mais le track arrive delayed
+        const hasAny = vt.length > 0;
+        const allEnded = vt.every(t => t.readyState === "ended");
+        setHasVideo(hasAny && !allEnded);
       };
       check();
       stream.addEventListener("addtrack",    check);
       stream.addEventListener("removetrack", check);
-      // ✅ poll toutes les 500ms — tracks peuvent arriver tard cross-network
-      const iv = setInterval(check, 500);
+      // Poll rapide au début (cross-network tracks arrivent tard)
+      const iv1 = setInterval(check, 200);
+      const stopFast = setTimeout(() => {
+        clearInterval(iv1);
+        // Poll lent ensuite
+        const iv2 = setInterval(check, 2000);
+        // Stocker pour cleanup
+        el._slowPoll = iv2;
+      }, 4000);
       return () => {
-        clearInterval(iv);
+        clearInterval(iv1);
+        clearTimeout(stopFast);
+        clearInterval(el._slowPoll);
         stream.removeEventListener("addtrack",    check);
         stream.removeEventListener("removetrack", check);
       };
@@ -111,7 +126,7 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
     }
   }, [stream, isLocal]);
 
-  // ✅ FIX: re-play quand la vidéo est pausée (click utilisateur ou focus change)
+  // Re-play si la vidéo se pause (autoplay policy, tab focus, etc.)
   useEffect(() => {
     const el = vRef?.current;
     if (!el || isLocal) return;
@@ -120,11 +135,23 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
     return () => el.removeEventListener("pause", onPause);
   }, [stream, isLocal]);
 
+  // ✅ FIX: forcer play quand el devient visible (cas où video était cachée pendant chargement)
+  useEffect(() => {
+    if (isLocal) return;
+    const el = vRef?.current;
+    if (!el || !stream) return;
+    const t = setTimeout(() => {
+      if (el.paused && stream.active) el.play().catch(() => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [hasVideo, stream, isLocal]);
+
   const init  = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const isH   = role === "host";
-  // ✅ FIX: remote tile — afficher si hasVideo ET pas camOff explicite
-  // isLocal → utiliser camOff directement (stream local géré séparément)
-  const showV = isLocal ? !camOff : (!!stream && hasVideo && !camOff);
+  // ✅ FIX écran noir: pour remote tiles, afficher la vidéo si stream existe ET (hasVideo OU pas camOff explicite)
+  // camOff=true seulement quand l'admin émet toggle-media video=false
+  // Ne pas masquer la vidéo juste parce que hasVideo tarde à se mettre à jour cross-network
+  const showV = isLocal ? !camOff : (!!stream && !camOff && (hasVideo || stream.getVideoTracks().length > 0));
 
   return (
     <div style={{ position:"relative", background:"#111", borderRadius:14, overflow:"hidden",
@@ -347,16 +374,24 @@ export default function MeetRoom() {
 
   const { live: subtitle, saved: transcript } = useSubtitles(subsOn);
 
-  // ✅ FIX cross-network: forcer play sur toutes les vidéos quand un peer arrive
+  // ✅ FIX écran noir cross-network: forcer play sur toutes les vidéos quand peers arrivent
+  // ET toutes les 3s pendant les premières 30s (TURN relay peut être lent)
   useEffect(() => {
     if (peers.length === 0) return;
-    const t = setTimeout(() => {
+    const forcePlay = () => {
       document.querySelectorAll("video").forEach(v => {
         if (v.srcObject && v.paused) v.play().catch(() => {});
       });
-    }, 500);
-    return () => clearTimeout(t);
-  }, [peers]);
+    };
+    // Immédiat
+    setTimeout(forcePlay, 300);
+    setTimeout(forcePlay, 1000);
+    // Puis toutes les 3s pendant 30s
+    const intervals = [3000, 6000, 9000, 12000, 18000, 24000, 30000].map(d =>
+      setTimeout(forcePlay, d)
+    );
+    return () => intervals.forEach(clearTimeout);
+  }, [peers.length]);
 
   const showToast = useCallback((msg, color="#1a73e8", icon="") => {
     setToast({ msg, color, icon });
@@ -510,17 +545,33 @@ export default function MeetRoom() {
           s.getVideoTracks().forEach(t => { t.enabled = true; });
         }
       } else {
-        // Guest: audio seulement, muet par défaut
+        // Guest: micro + caméra optionnelle dès le départ
+        // micro muet par défaut, cam off par défaut
         try {
+          // Essayer avec cam + micro
           const s = await navigator.mediaDevices.getUserMedia({
-            video: false,
+            video: true,
             audio: { echoCancellation:true, noiseSuppression:true }
           });
           if (!alive) { s.getTracks().forEach(t=>t.stop()); return; }
+          // Micro muet par défaut, cam off par défaut
           s.getAudioTracks().forEach(t => { t.enabled = false; });
+          s.getVideoTracks().forEach(t => { t.enabled = false; });
           localStr.current = s;
           lsRef.current    = s;
-        } catch { setMicOn(false); }
+        } catch {
+          // Fallback: audio seulement
+          try {
+            const s = await navigator.mediaDevices.getUserMedia({
+              video: false,
+              audio: { echoCancellation:true, noiseSuppression:true }
+            });
+            if (!alive) { s.getTracks().forEach(t=>t.stop()); return; }
+            s.getAudioTracks().forEach(t => { t.enabled = false; });
+            localStr.current = s;
+            lsRef.current    = s;
+          } catch { setMicOn(false); }
+        }
       }
 
       setStatus("ok");
@@ -985,36 +1036,47 @@ export default function MeetRoom() {
     }
   };
 
-  // ✅ Guest can toggle own camera (small self-view only)
+  // ✅ Guest can toggle own camera (small self-view PiP)
   const toggleGuestCam = async () => {
     if (myRole === "host") return;
+
+    // Cam déjà active → toggle enabled
     if (localStr.current?.getVideoTracks().length) {
       const track = localStr.current.getVideoTracks()[0];
       const nxt = !track.enabled;
       track.enabled = nxt;
       setCamOn(nxt);
       emit("toggle-media", { roomCode, type:"video", enabled: nxt });
-    } else {
-      // First time: request camera
-      try {
-        const camStream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
-        const camTrack  = camStream.getVideoTracks()[0];
-        if (localStr.current) {
-          // Add video track to existing audio stream
-          localStr.current.addTrack(camTrack);
-          lsRef.current = localStr.current;
-          // Push to all existing peers
-          Object.values(pcMap.current).forEach(pc => {
-            try { pc.addTrack(camTrack, localStr.current); } catch {}
-          });
-        } else {
-          localStr.current = camStream;
-          lsRef.current    = camStream;
+      return;
+    }
+
+    // Première activation → demander accès caméra
+    try {
+      const camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const camTrack  = camStream.getVideoTracks()[0];
+
+      if (localStr.current) {
+        localStr.current.addTrack(camTrack);
+        lsRef.current = localStr.current;
+        // ✅ FIX: envoyer le track aux peers avec renegotiation
+        for (const [peerId, pc] of Object.entries(pcMap.current)) {
+          try {
+            pc.addTrack(camTrack, localStr.current);
+            // Guest peut renegocier pour envoyer sa caméra
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            sockRef.current?.emit("offer", { target: peerId, sdp: offer });
+          } catch {}
         }
-        setCamOn(true);
-        emit("toggle-media", { roomCode, type:"video", enabled:true });
-        showToast("Caméra activée 📷","#34a853");
-      } catch { showToast("Caméra non disponible","#ea4335","📷"); }
+      } else {
+        localStr.current = camStream;
+        lsRef.current    = camStream;
+      }
+      setCamOn(true);
+      emit("toggle-media", { roomCode, type:"video", enabled: true });
+      showToast("Caméra activée 📷", "#34a853");
+    } catch {
+      showToast("Caméra non disponible", "#ea4335", "📷");
     }
   };
 
