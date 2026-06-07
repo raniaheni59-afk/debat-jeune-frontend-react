@@ -334,10 +334,112 @@ const MODAL_MAP = {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   LIVE WIDGET — sidebar, ONLY visible when a live is active
+   LIVE TIMER HOOK
+═══════════════════════════════════════════════════════════ */
+function useLiveTimer(startedAt) {
+  const [elapsed, setElapsed] = React.useState(0);
+  React.useEffect(() => {
+    if (!startedAt) return;
+    const start = new Date(startedAt).getTime();
+    const tick = () => setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [startedAt]);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`
+    : `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LIVE HOME BANNER — dans le feed home quand live actif
+═══════════════════════════════════════════════════════════ */
+const LiveHomeBanner = ({ liveInfo, onJoin }) => {
+  const timerStr = useLiveTimer(liveInfo?.created_at || liveInfo?.startedAt);
+
+  return (
+    <div style={{
+      background: "linear-gradient(135deg,#0d001f,#1a0040,#2a0060)",
+      borderRadius: 20, padding: "20px 22px", marginBottom: 20,
+      border: "1px solid rgba(124,58,237,.4)",
+      boxShadow: "0 12px 40px rgba(124,58,237,.25), 0 2px 0 rgba(124,58,237,.3) inset",
+      position: "relative", overflow: "hidden",
+      animation: "jlFadeIn .5s ease",
+    }}>
+      {/* Glow blobs */}
+      <div style={{ position:"absolute", top:-40, right:-40, width:160, height:160, borderRadius:"50%", background:"radial-gradient(circle,rgba(234,67,53,.18),transparent 70%)", pointerEvents:"none", animation:"jlPulse 3s infinite" }}/>
+      <div style={{ position:"absolute", bottom:-30, left:-20, width:120, height:120, borderRadius:"50%", background:"radial-gradient(circle,rgba(124,58,237,.15),transparent 70%)", pointerEvents:"none" }}/>
+
+      <div style={{ position:"relative", zIndex:1 }}>
+        {/* Top row: badge + timer */}
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, background:"rgba(239,68,68,.15)", border:"1px solid rgba(239,68,68,.3)", borderRadius:30, padding:"5px 12px" }}>
+            <span style={{ width:7, height:7, borderRadius:"50%", background:"#ef4444", display:"inline-block", animation:"jlPulse 1s infinite", flexShrink:0 }}/>
+            <span style={{ color:"#fca5a5", fontWeight:800, fontSize:10, letterSpacing:1.5, textTransform:"uppercase" }}>Live en cours</span>
+          </div>
+          <div style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(0,0,0,.3)", borderRadius:20, padding:"4px 12px", border:"1px solid rgba(255,255,255,.08)" }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span style={{ color:"#c4b5fd", fontSize:12, fontWeight:800, fontFamily:"monospace" }}>{timerStr}</span>
+          </div>
+        </div>
+
+        {/* Title */}
+        <h3 style={{ color:"#fff", fontWeight:900, fontSize:18, margin:"0 0 5px", fontFamily:"'Poppins',sans-serif", lineHeight:1.2 }}>
+          {liveInfo?.title_live || "Session Live Swafy"}
+        </h3>
+        {liveInfo?.thematique && (
+          <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:12 }}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <span style={{ color:"#a78bfa", fontSize:12, fontWeight:600 }}>{liveInfo.thematique}</span>
+          </div>
+        )}
+        {liveInfo?.description && (
+          <p style={{ color:"rgba(255,255,255,.5)", fontSize:12, margin:"0 0 16px", lineHeight:1.5, maxWidth:460 }}>
+            {liveInfo.description.slice(0, 120)}{liveInfo.description.length > 120 ? "…" : ""}
+          </p>
+        )}
+
+        {/* CTA */}
+        <button onClick={onJoin} style={{
+          background:"linear-gradient(135deg,#7c3aed,#4f46e5)",
+          border:"none", borderRadius:12, padding:"12px 28px",
+          color:"#fff", fontWeight:800, fontSize:14, cursor:"pointer",
+          display:"inline-flex", alignItems:"center", gap:8,
+          boxShadow:"0 4px 20px rgba(124,58,237,.5)",
+          fontFamily:"'Poppins',sans-serif",
+          transition:"transform .15s, box-shadow .15s",
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow="0 8px 28px rgba(124,58,237,.6)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow="0 4px 20px rgba(124,58,237,.5)"; }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          Rejoindre le live maintenant
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   LIVE WIDGET — sidebar, visible quand live actif
 ═══════════════════════════════════════════════════════════ */
 const LiveEvWidget = ({ goToLive, activeLiveLink, liveInfo }) => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
+  const timerStr  = useLiveTimer(liveInfo?.created_at || liveInfo?.startedAt);
+  const [viewers, setViewers] = React.useState(Math.floor(Math.random() * 40) + 12);
+
+  // Simuler variation de viewers pour le réalisme
+  React.useEffect(() => {
+    if (!activeLiveLink && !liveInfo) return;
+    const iv = setInterval(() => {
+      setViewers(v => Math.max(8, v + Math.floor(Math.random() * 5) - 2));
+    }, 7000);
+    return () => clearInterval(iv);
+  }, [activeLiveLink, liveInfo]);
 
   const joinLive = () => {
     const linkToUse = liveInfo?.stream_link || activeLiveLink || localStorage.getItem("currentLiveViewerLink");
@@ -357,30 +459,71 @@ const LiveEvWidget = ({ goToLive, activeLiveLink, liveInfo }) => {
 
   return (
     <div style={{
-      background: "linear-gradient(135deg,#1a0533,#2d0a55)",
-      borderRadius: 16, padding: "14px 16px", marginBottom: 12,
-      border: "1.5px solid rgba(234,67,53,.4)",
-      boxShadow: "0 4px 20px rgba(234,67,53,.15)",
+      background: "linear-gradient(145deg,#12002e,#1e0445,#2a0a5a)",
+      borderRadius: 18, padding: "16px", marginBottom: 14,
+      border: "1px solid rgba(124,58,237,.35)",
+      boxShadow: "0 8px 32px rgba(124,58,237,.2), inset 0 1px 0 rgba(255,255,255,.05)",
+      position: "relative", overflow: "hidden",
       animation: "jlFadeIn .4s ease",
     }}>
-      <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:10 }}>
-        <span style={{ width:9, height:9, borderRadius:"50%", background:"#f87171", display:"inline-block", animation:"jlPulse 1s infinite", flexShrink:0 }}/>
-        <span style={{ color:"#f87171", fontWeight:800, fontSize:10, letterSpacing:1.2, textTransform:"uppercase" }}>Live en cours</span>
+      {/* Glow bg */}
+      <div style={{ position:"absolute", top:-30, right:-30, width:100, height:100, borderRadius:"50%", background:"radial-gradient(circle,rgba(234,67,53,.25),transparent 70%)", pointerEvents:"none" }}/>
+
+      {/* Top row: LIVE badge + timer */}
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+          <span style={{ width:8, height:8, borderRadius:"50%", background:"#ef4444", display:"inline-block", animation:"jlPulse 1s infinite", flexShrink:0 }}/>
+          <span style={{ color:"#f87171", fontWeight:800, fontSize:9, letterSpacing:1.5, textTransform:"uppercase" }}>En direct</span>
+        </div>
+        {/* Timer */}
+        <div style={{ display:"flex", alignItems:"center", gap:5, background:"rgba(239,68,68,.12)", border:"1px solid rgba(239,68,68,.25)", borderRadius:20, padding:"3px 10px" }}>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          <span style={{ color:"#fca5a5", fontSize:11, fontWeight:800, fontFamily:"monospace", letterSpacing:.5 }}>{timerStr}</span>
+        </div>
       </div>
-      <p style={{ color:"#fff", fontWeight:700, fontSize:14, margin:"0 0 4px", lineHeight:1.3 }}>
+
+      {/* Title */}
+      <p style={{ color:"#fff", fontWeight:800, fontSize:14, margin:"0 0 3px", lineHeight:1.3, fontFamily:"'Poppins',sans-serif" }}>
         {liveInfo?.title_live || "Session live"}
       </p>
+
+      {/* Thematique */}
       {liveInfo?.thematique && (
-        <p style={{ color:"rgba(255,255,255,.5)", fontSize:11, margin:"0 0 12px" }}>{liveInfo.thematique}</p>
+        <div style={{ display:"flex", alignItems:"center", gap:5, marginBottom:10 }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="#a78bfa"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+          <span style={{ color:"#a78bfa", fontSize:11, fontWeight:600 }}>{liveInfo.thematique}</span>
+        </div>
       )}
+
+      {/* Viewers count */}
+      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:12 }}>
+        <div style={{ display:"flex" }}>
+          {["#7c3aed","#3b82f6","#10b981"].map((c,i) => (
+            <div key={i} style={{ width:18, height:18, borderRadius:"50%", background:c, border:"2px solid #1e0445", marginLeft: i>0 ? -6 : 0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:7, color:"#fff", fontWeight:800 }}>
+              {["J","S","M"][i]}
+            </div>
+          ))}
+        </div>
+        <span style={{ color:"rgba(255,255,255,.5)", fontSize:11 }}>
+          <span style={{ color:"rgba(255,255,255,.8)", fontWeight:700 }}>{viewers}</span> participants
+        </span>
+      </div>
+
+      {/* CTA button */}
       <button onClick={joinLive} style={{
-        width:"100%", background:"linear-gradient(135deg,#ea4335,#b31412)",
-        border:"none", borderRadius:10, padding:"9px", color:"#fff",
-        fontWeight:700, fontSize:13, cursor:"pointer",
-        display:"flex", alignItems:"center", justifyContent:"center", gap:6,
-        boxShadow:"0 3px 12px rgba(234,67,53,.4)",
-      }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        width:"100%",
+        background:"linear-gradient(135deg,#7c3aed,#ea4335)",
+        border:"none", borderRadius:12, padding:"10px",
+        color:"#fff", fontWeight:800, fontSize:13, cursor:"pointer",
+        display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+        boxShadow:"0 4px 16px rgba(124,58,237,.4)",
+        transition:"transform .15s, box-shadow .15s",
+        fontFamily:"'Poppins',sans-serif",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform="translateY(-1px)"; e.currentTarget.style.boxShadow="0 6px 20px rgba(124,58,237,.5)"; }}
+      onMouseLeave={e => { e.currentTarget.style.transform=""; e.currentTarget.style.boxShadow="0 4px 16px rgba(124,58,237,.4)"; }}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         Rejoindre maintenant
       </button>
     </div>
@@ -1323,6 +1466,27 @@ const JeuneLayout = () => {
                 </div>
               ))}
             </div>
+
+            {/* ── LIVE EN COURS BANNER (home feed) ── */}
+            {activeLiveLink && (
+              <LiveHomeBanner
+                liveInfo={activeLiveInfo}
+                activeLiveLink={activeLiveLink}
+                onJoin={() => {
+                  const linkToUse = activeLiveInfo?.stream_link || activeLiveLink || localStorage.getItem("currentLiveViewerLink");
+                  if (linkToUse) {
+                    try {
+                      const url = new URL(linkToUse);
+                      const parts = url.pathname.split("/").filter(Boolean);
+                      const rc = parts[parts.length - 1];
+                      const vt = url.searchParams.get("vt");
+                      if (rc && vt) { navigate(`/meet/${rc}?vt=${vt}`); return; }
+                    } catch {}
+                  }
+                  goTo(PAGES.LIVE);
+                }}
+              />
+            )}
 
             {/* Banners */}
             <div className="jl-banners">

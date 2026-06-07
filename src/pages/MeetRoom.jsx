@@ -148,10 +148,15 @@ function Tile({ stream, muted=false, name="?", role="guest", camOff=false,
 
   const init  = (name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
   const isH   = role === "host";
-  // ✅ FIX écran noir: pour remote tiles, afficher la vidéo si stream existe ET (hasVideo OU pas camOff explicite)
-  // camOff=true seulement quand l'admin émet toggle-media video=false
-  // Ne pas masquer la vidéo juste parce que hasVideo tarde à se mettre à jour cross-network
-  const showV = isLocal ? !camOff : (!!stream && !camOff && (hasVideo || stream.getVideoTracks().length > 0));
+  // ✅ FIX écran noir:
+  // - isLocal: afficher si !camOff
+  // - remote: afficher si stream existe ET camOff n'est pas EXPLICITEMENT true
+  //   (undefined = on ne sait pas encore → on affiche; false = admin a dit "caméra off" → on cache)
+  // Ne jamais cacher juste parce que hasVideo=false (il peut arriver tard sur TURN/cross-network)
+  const camExplicitlyOff = camOff === true; // undefined ou false → pas explicitement off
+  const showV = isLocal
+    ? !camExplicitlyOff
+    : (!!stream && !camExplicitlyOff);
 
   return (
     <div style={{ position:"relative", background:"#111", borderRadius:14, overflow:"hidden",
@@ -614,8 +619,16 @@ export default function MeetRoom() {
               if (sockRef.current?.connected) createOfferForPeer(u.socketId);
             }, 800 + i * 250);
           });
+        } else {
+          // ✅ FIX: Guest rejoint une room où l'admin est déjà là
+          // → demander à l'admin d'envoyer une offer (il peut avoir déjà un stream actif)
+          const hostInRoom = others.find(u => u.role === "host");
+          if (hostInRoom) {
+            setTimeout(() => {
+              sockRef.current?.emit("request-reoffer", { roomCode });
+            }, 1000);
+          }
         }
-        // ✅ Guest: ne fait RIEN ici — attend l'offer de l'admin
       });
 
       // ── Nouveau participant rejoint ────────────────────────
@@ -630,7 +643,12 @@ export default function MeetRoom() {
             if (sockRef.current?.connected) createOfferForPeer(socketId);
           }, 700);
         }
-        // ✅ Guest ne fait RIEN — attend l'offer de l'admin
+        // ✅ Guest: si c'est l'admin qui vient de rejoindre → demander reoffer
+        if (myRole === "guest" && role === "host") {
+          setTimeout(() => {
+            sockRef.current?.emit("request-reoffer", { roomCode });
+          }, 1200);
+        }
       });
 
       // ── Admin rejoint la room ──────────────────────────────
@@ -643,7 +661,11 @@ export default function MeetRoom() {
         // ✅ FIX écran noir: forcer re-calcul de hostPeer en mettant à jour peers state
         // Sans ça, le guest reste sur l'écran d'attente même si le stream arrive
         setPeers(prev => prev.map(p => p.id === socketId ? { ...p, role: "host" } : p));
-        // ✅ NE PAS créer de peer ni envoyer d'offer — l'admin le fera
+        // ✅ FIX: demander à l'admin d'envoyer une offer (il reçoit user-joined de notre côté
+        // mais par sécurité on demande explicitement via request-reoffer)
+        setTimeout(() => {
+          sockRef.current?.emit("request-reoffer", { roomCode });
+        }, 800);
       });
 
       sock.on("offer", async ({ caller, sdp }) => {
@@ -799,7 +821,9 @@ export default function MeetRoom() {
 
       // ✅ Guest requests admin to re-offer (after adding screen track)
       sock.on("request-reoffer", ({ roomCode: rc, fromSocketId }) => {
-        if (myRole === "host" && fromSocketId && pcMap.current[fromSocketId]) {
+        if (myRole === "host" && fromSocketId) {
+          // ✅ FIX: créer l'offer même si le peer n'existe pas encore
+          // (cas où guest vient de rejoindre et pcMap n'est pas encore initialisé)
           setTimeout(() => {
             if (sockRef.current?.connected) createOfferForPeer(fromSocketId);
           }, 500);
@@ -965,6 +989,12 @@ export default function MeetRoom() {
           localVid.current.srcObject = localStr.current;
           localVid.current.play().catch(() => {});
         }
+        // ✅ FIX: re-offer après restore pour que les guests voient la camera de nouveau
+        setTimeout(() => {
+          Object.keys(pcMap.current).forEach(sid => {
+            if (sockRef.current?.connected) createOfferForPeer(sid);
+          });
+        }, 400);
       }
       emit("screen-share-stopped", { roomCode });
 
@@ -984,6 +1014,13 @@ export default function MeetRoom() {
             return Promise.resolve();
           });
           await Promise.all(replacePromises);
+          // ✅ FIX: après replaceTrack, certains peers cross-network ne reçoivent pas le nouveau track
+          // → re-offer à tous pour forcer renegociation
+          setTimeout(() => {
+            Object.keys(pcMap.current).forEach(sid => {
+              if (sockRef.current?.connected) createOfferForPeer(sid);
+            });
+          }, 400);
         } else {
           // Guest has NO video sender → add track + renegotiate with admin
           for (const [peerId, pc] of Object.entries(pcMap.current)) {
@@ -1023,6 +1060,12 @@ export default function MeetRoom() {
               localVid.current.srcObject = localStr.current;
               localVid.current.play().catch(() => {});
             }
+            // ✅ FIX: re-offer pour restaurer camera chez tous les guests
+            setTimeout(() => {
+              Object.keys(pcMap.current).forEach(sid => {
+                if (sockRef.current?.connected) createOfferForPeer(sid);
+              });
+            }, 400);
           }
           emit("screen-share-stopped", { roomCode });
         };
@@ -1046,6 +1089,7 @@ export default function MeetRoom() {
       const nxt = !track.enabled;
       track.enabled = nxt;
       setCamOn(nxt);
+      // ✅ FIX: émettre toggle-media même pour les guests (server fixé pour accepter)
       emit("toggle-media", { roomCode, type:"video", enabled: nxt });
       return;
     }
@@ -1056,13 +1100,20 @@ export default function MeetRoom() {
       const camTrack  = camStream.getVideoTracks()[0];
 
       if (localStr.current) {
-        localStr.current.addTrack(camTrack);
+        // ✅ FIX: ajouter le track au stream existant
+        try { localStr.current.addTrack(camTrack); } catch {}
         lsRef.current = localStr.current;
-        // ✅ FIX: envoyer le track aux peers avec renegotiation
+        // Envoyer le track aux peers avec renegotiation
         for (const [peerId, pc] of Object.entries(pcMap.current)) {
           try {
-            pc.addTrack(camTrack, localStr.current);
-            // Guest peut renegocier pour envoyer sa caméra
+            // ✅ FIX: si déjà un sender vidéo → replaceTrack, sinon addTrack
+            const existingSender = pc.getSenders().find(s => s.track?.kind === "video");
+            if (existingSender) {
+              await existingSender.replaceTrack(camTrack).catch(() => {});
+            } else {
+              pc.addTrack(camTrack, localStr.current);
+            }
+            // Re-négociation pour que l'admin reçoive le nouveau track
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
             sockRef.current?.emit("offer", { target: peerId, sdp: offer });
@@ -1166,14 +1217,28 @@ export default function MeetRoom() {
   };
 
   // ── Google Meet style layout ──
-  // ✅ FIX: hostPeer re-évalué à chaque render, fallback robuste sur peers[0] pour guest
-  // Cas fréquent: ptcps/roleMap pas encore sync au moment du 1er ontrack → peers[0] est l'admin
+  // ✅ FIX: hostPeer détecté par rôle d'abord
+  // Fallback: si peers.length === 1 ET le rôle n'est pas explicitement "guest" → c'est l'admin
+  // (cas fréquent: ptcps/roleMap pas encore sync au 1er ontrack)
   const hostPeer = peers.find(p =>
     (ptcps.find(x => x.socketId === p.id)?.role || roleMap.current[p.id]) === "host"
-  ) ?? (myRole === "guest" && peers.length > 0 ? peers[0] : undefined);
+  ) ?? (myRole === "guest" && peers.length > 0
+    ? peers.find(p => {
+        const r = ptcps.find(x => x.socketId === p.id)?.role || roleMap.current[p.id];
+        return !r || r === "host"; // rôle inconnu OU host → candidat admin
+      }) ?? null
+    : undefined);
   // Guest sees admin + any guest sharing screen; Admin sees everyone
   const guestScrPeer = peers.find(p => pState[p.id]?.screen === true);
-  const visiblePeers = myRole === "host" ? peers : [hostPeer, guestScrPeer].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i);
+  // ✅ FIX: si hostPeer non détecté mais peers existent → montrer le 1er peer avec stream
+  // (roleMap peut ne pas être encore sync au moment du 1er ontrack)
+  const visiblePeers = myRole === "host"
+    ? peers
+    : hostPeer
+      ? [hostPeer, guestScrPeer].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i)
+      : peers.length > 0
+        ? [peers[0], guestScrPeer].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i)
+        : [];
 
   // Spotlight = pinned || screen sharer || host (for guests)
   const getMainPeer = () => {
