@@ -358,10 +358,17 @@ export default function MeetRoom() {
     pc.ontrack = e => {
       const stream = e.streams[0];
       if (!stream) return;
+      // ✅ FIX: s'assurer que roleMap est à jour au moment du ontrack
+      // Sinon hostPeer reste undefined et le guest voit l'écran d'attente
       setPeers(prev => {
         const ex = prev.find(p=>p.id===sid);
         if (ex) return prev.map(p=>p.id===sid?{...p,stream}:p);
-        return [...prev, { id:sid, stream, name:nameMap.current[sid]||"Invité", role:roleMap.current[sid]||"guest" }];
+        return [...prev, {
+          id:   sid,
+          stream,
+          name: nameMap.current[sid] || "Invité",
+          role: roleMap.current[sid] || "guest",
+        }];
       });
     };
 
@@ -379,6 +386,14 @@ export default function MeetRoom() {
 
   // ── ✅ createOfferForPeer: créer et envoyer offre à un peer ──
   const createOfferForPeer = useCallback(async (sid) => {
+    // ✅ FIX écran noir: attendre que le stream local soit prêt (getUserMedia async)
+    // L'admin peut recevoir all-users/user-joined avant que son stream soit capturé
+    let waited = 0;
+    while (!lsRef.current && waited < 4000) {
+      await new Promise(r => setTimeout(r, 100));
+      waited += 100;
+    }
+
     const pc = createPeer(sid);
     pcMap.current[sid] = pc;
     try {
@@ -507,6 +522,9 @@ export default function MeetRoom() {
         nameMap.current[socketId] = n;
         roleMap.current[socketId] = "host";
         showToast(`👑 ${n} (Admin) a rejoint`, "#1a73e8");
+        // ✅ FIX écran noir: forcer re-calcul de hostPeer en mettant à jour peers state
+        // Sans ça, le guest reste sur l'écran d'attente même si le stream arrive
+        setPeers(prev => prev.map(p => p.id === socketId ? { ...p, role: "host" } : p));
         // ✅ NE PAS créer de peer ni envoyer d'offer — l'admin le fera
       });
 
@@ -1019,10 +1037,11 @@ export default function MeetRoom() {
   };
 
   // ── Google Meet style layout ──
-  // ✅ FIX: fallback sur peers[0] si ptcps pas encore rempli (race condition)
+  // ✅ FIX: hostPeer re-évalué à chaque render, fallback robuste sur peers[0] pour guest
+  // Cas fréquent: ptcps/roleMap pas encore sync au moment du 1er ontrack → peers[0] est l'admin
   const hostPeer = peers.find(p =>
     (ptcps.find(x => x.socketId === p.id)?.role || roleMap.current[p.id]) === "host"
-  ) || (myRole === "guest" && peers.length > 0 ? peers[0] : undefined);
+  ) ?? (myRole === "guest" && peers.length > 0 ? peers[0] : undefined);
   // Guest sees admin + any guest sharing screen; Admin sees everyone
   const guestScrPeer = peers.find(p => pState[p.id]?.screen === true);
   const visiblePeers = myRole === "host" ? peers : [hostPeer, guestScrPeer].filter(Boolean).filter((p,i,a)=>a.indexOf(p)===i);
@@ -1485,4 +1504,4 @@ export default function MeetRoom() {
       </div>
     </div>
   );
-} 
+}
