@@ -8,19 +8,21 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:8080', // ✅ corrigé (était 5000)
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('❌ Proxy Error:', err);
-          });
-        },
       },
     },
   },
   build: {
     chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/[name]-[hash]-[date].js',
+        chunkFileNames: 'assets/[name]-[hash]-[date].js',
+        assetFileNames: 'assets/[name]-[hash]-[date].[ext]',
+      }
+    }
   },
   optimizeDeps: {
     force: false,
