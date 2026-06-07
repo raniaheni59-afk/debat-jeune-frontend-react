@@ -410,6 +410,96 @@ function CustomTimePicker({ value, onChange, error }) {
   );
 }
 
+// ── Countdown Timer ───────────────────────────────────────────────
+function CountdownTimer({ targetDate, targetTime, onStart, title }) {
+  const [remaining, setRemaining] = useState(null);
+  const [started,   setStarted]   = useState(false);
+
+  useEffect(() => {
+    if (!targetDate || !targetTime) return;
+    const target = new Date(`${targetDate}T${targetTime}:00`);
+
+    const tick = () => {
+      const diff = target - new Date();
+      if (diff <= 0) {
+        setRemaining(null);
+        if (!started) { setStarted(true); onStart?.(); }
+        return;
+      }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      setRemaining({ h, m, s, total: diff });
+    };
+
+    tick();
+    const iv = setInterval(tick, 1000);
+    return () => clearInterval(iv);
+  }, [targetDate, targetTime]);
+
+  if (started || remaining === null) return null;
+
+  const unit = (v, label) => (
+    <div style={{ display:"flex",flexDirection:"column",alignItems:"center",gap:4 }}>
+      <div style={{
+        background:"rgba(255,255,255,.12)",border:"1px solid rgba(255,255,255,.2)",
+        borderRadius:14,padding:"14px 18px",minWidth:64,textAlign:"center",
+        backdropFilter:"blur(8px)",
+      }}>
+        <span style={{ fontSize:32,fontWeight:900,color:"#fff",fontFamily:"monospace",
+          textShadow:"0 2px 12px rgba(196,181,253,.5)",lineHeight:1 }}>
+          {String(v).padStart(2,"0")}
+        </span>
+      </div>
+      <span style={{ fontSize:10,fontWeight:700,color:"rgba(196,181,253,.7)",letterSpacing:1.5,textTransform:"uppercase" }}>{label}</span>
+    </div>
+  );
+
+  return (
+    <div style={{
+      background:"linear-gradient(135deg,rgba(124,106,191,.25),rgba(90,74,149,.2))",
+      border:"1px solid rgba(196,181,253,.3)",borderRadius:20,padding:"28px 24px",
+      textAlign:"center",animation:"fadeUp .4s ease",
+    }}>
+      {/* Icône + titre */}
+      <div style={{ fontSize:36,marginBottom:10 }}>⏳</div>
+      <p style={{ color:"rgba(255,255,255,.9)",fontWeight:700,fontSize:15,margin:"0 0 4px" }}>
+        Le live démarre dans…
+      </p>
+      <p style={{ color:"rgba(196,181,253,.6)",fontSize:12,margin:"0 0 20px" }}>
+        {title && <><strong style={{color:"#c4b5fd"}}>{title}</strong> · </>}
+        {new Date(`${targetDate}T${targetTime}:00`).toLocaleDateString("fr-FR",{
+          weekday:"long",day:"numeric",month:"long",year:"numeric"
+        })} à {targetTime}
+      </p>
+
+      {/* Digits */}
+      <div style={{ display:"flex",gap:10,justifyContent:"center",alignItems:"flex-start" }}>
+        {remaining.h > 0 && <>{unit(remaining.h,"heures")}<div style={{color:"rgba(255,255,255,.4)",fontSize:24,fontWeight:900,paddingTop:14}}>:</div></>}
+        {unit(remaining.m,"minutes")}
+        <div style={{color:"rgba(255,255,255,.4)",fontSize:24,fontWeight:900,paddingTop:14}}>:</div>
+        {unit(remaining.s,"secondes")}
+      </div>
+
+      {/* Barre de progression */}
+      {remaining.total < 3600000 && (
+        <div style={{ marginTop:20,background:"rgba(255,255,255,.1)",borderRadius:99,height:4,overflow:"hidden" }}>
+          <div style={{
+            height:"100%",borderRadius:99,
+            background:"linear-gradient(90deg,#7c6abf,#c4b5fd)",
+            width:`${Math.max(2, 100 - (remaining.total / 3600000) * 100)}%`,
+            transition:"width 1s linear",
+          }} />
+        </div>
+      )}
+
+      <p style={{ color:"rgba(196,181,253,.5)",fontSize:11,marginTop:14 }}>
+        🚀 Le live démarrera automatiquement à l'heure prévue
+      </p>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────
 export default function NewLive({ onCancel }) {
   const navigate = useNavigate();
@@ -425,6 +515,9 @@ export default function NewLive({ onCancel }) {
   const [sending, setSending] = useState(false);
   const [sentCount, setSentCount] = useState(0);
 
+  // ✅ Timer: scheduled data saved for countdown screen
+  const [scheduled, setScheduled] = useState(null); // { date, time, title, hostLink, hostAccessToken, viewerLink, roomCode }
+
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: "" })); };
 
   const validate = () => {
@@ -432,9 +525,17 @@ export default function NewLive({ onCancel }) {
     if (!form.title.trim())       e.title = "Titre obligatoire";
     if (!form.description.trim()) e.description = "Description obligatoire";
     if (!form.date)               e.date = "Date obligatoire";
-    else if (new Date(`${form.date}T${form.time || "00:00"}`) < new Date()) e.date = "Date future requise";
     if (!form.time)               e.time = "Heure obligatoire";
     if (!form.thematique)         e.thematique = "Thématique obligatoire";
+
+    // ✅ FIX: vérifier seulement si date+heure EST dans le passé (pas juste la date)
+    if (form.date && form.time) {
+      const scheduled = new Date(`${form.date}T${form.time}:00`);
+      if (scheduled < new Date()) {
+        e.time = "L'heure est déjà passée — choisissez une heure future";
+      }
+    }
+
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -476,6 +577,7 @@ export default function NewLive({ onCancel }) {
       localStorage.setItem("currentLiveViewerLink", viewerLink);
       setResult({ hostLink, viewerLink, roomCode });
 
+      // ✅ Envoyer les invitations email
       if (emails.length > 0) {
         setSending(true);
         try {
@@ -487,8 +589,20 @@ export default function NewLive({ onCancel }) {
         } catch {} finally { setSending(false); }
       }
 
-      setStep("success");
-      setTimeout(() => { navigate(`/meet/${roomCode}?at=${hostAccessToken}`); }, 2500);
+      // ✅ FIX: vérifier si l'heure est maintenant ou future
+      const scheduled_dt = new Date(`${form.date}T${form.time}:00`);
+      const now = new Date();
+      const diffMs = scheduled_dt - now;
+
+      if (diffMs <= 30000) {
+        // ✅ Maintenant (ou dans moins de 30 sec) → démarrer immédiatement
+        setStep("success");
+        setTimeout(() => { navigate(`/meet/${roomCode}?at=${hostAccessToken}`); }, 2000);
+      } else {
+        // ✅ Future → afficher le countdown timer
+        setScheduled({ date: form.date, time: form.time, title: form.title, hostAccessToken, viewerLink, roomCode });
+        setStep("countdown");
+      }
 
     } catch (err) {
       alert("❌ " + (err.response?.data?.message || err.message));
@@ -503,6 +617,49 @@ export default function NewLive({ onCancel }) {
       weekday: "long", day: "numeric", month: "long", year: "numeric",
     }) + (form.time ? ` à ${form.time}` : "");
   };
+
+  /* ── COUNTDOWN ── */
+  if (step === "countdown" && scheduled) return (
+    <div style={W.page}>
+      <style>{ANIM}</style>
+      <div style={{ ...W.card, maxWidth: 520 }}>
+        <div style={W.badge}><span style={W.dot}/> Live programmé</div>
+        <h2 style={W.h2}>Votre live est prêt !</h2>
+        <p style={W.sub}>Il démarrera automatiquement à l'heure prévue</p>
+
+        <CountdownTimer
+          targetDate={scheduled.date}
+          targetTime={scheduled.time}
+          title={scheduled.title}
+          onStart={() => {
+            // ✅ Démarrage automatique quand le timer atteint 0
+            navigate(`/meet/${scheduled.roomCode}?at=${scheduled.hostAccessToken}`);
+          }}
+        />
+
+        {/* Lien à partager */}
+        <div style={{ ...W.linkBox, marginTop: 20 }}>
+          <label style={W.linkLabel}>🔗 Lien pour les participants</label>
+          <div style={W.linkRow}>
+            <code style={W.linkCode}>{scheduled.viewerLink}</code>
+            <button onClick={() => navigator.clipboard.writeText(scheduled.viewerLink)} style={W.copyBtn}>📋</button>
+          </div>
+        </div>
+
+        {/* Bouton démarrer maintenant */}
+        <div style={{ display:"flex",gap:10,justifyContent:"center",marginTop:16 }}>
+          <button
+            onClick={() => navigate(`/meet/${scheduled.roomCode}?at=${scheduled.hostAccessToken}`)}
+            style={{ ...W.primary, background:"linear-gradient(135deg,#7c6abf,#5a4a95)", padding:"13px 32px" }}>
+            🚀 Démarrer maintenant
+          </button>
+          <button onClick={() => { setStep("form"); setScheduled(null); }} style={W.ghost}>
+            ← Modifier
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 
   /* ── SUCCESS ── */
   if (step === "success" && result) return (
