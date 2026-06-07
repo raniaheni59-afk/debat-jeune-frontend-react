@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 
@@ -8,15 +8,386 @@ const THEMATIQUES = [
   "Éducation & Formation", "Citoyenneté & Société", "Autre",
 ];
 
+const THEMATIQUE_ICONS = {
+  "Sciences & Innovation": "🔬",
+  "Environnement & Développement Durable": "🌿",
+  "Technologie & Numérique": "💻",
+  "Santé & Bien-être": "💊",
+  "Éducation & Formation": "📚",
+  "Citoyenneté & Société": "🏛️",
+  "Autre": "✨",
+};
+
+// ── Custom Date Picker ────────────────────────────────────────────
+function CustomDatePicker({ value, onChange, error }) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState("days"); // days | months | years
+  const ref = useRef(null);
+
+  const today = new Date();
+  const selected = value ? new Date(value + "T00:00:00") : null;
+
+  const [cursor, setCursor] = useState(() => {
+    const d = value ? new Date(value + "T00:00:00") : new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const MONTHS = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  const DAYS   = ["Lu","Ma","Me","Je","Ve","Sa","Di"];
+
+  const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+  const getFirstDay    = (y, m) => { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; };
+
+  const prevMonth = () => setCursor(c => c.month === 0 ? { year: c.year - 1, month: 11 } : { ...c, month: c.month - 1 });
+  const nextMonth = () => setCursor(c => c.month === 11 ? { year: c.year + 1, month: 0 } : { ...c, month: c.month + 1 });
+
+  const selectDay = (day) => {
+    const y = cursor.year, m = String(cursor.month + 1).padStart(2, "0"), d = String(day).padStart(2, "0");
+    onChange(`${y}-${m}-${d}`);
+    setOpen(false);
+  };
+
+  const isPast = (day) => {
+    const d = new Date(cursor.year, cursor.month, day);
+    d.setHours(0,0,0,0);
+    const t = new Date(); t.setHours(0,0,0,0);
+    return d < t;
+  };
+
+  const isSelected = (day) => selected &&
+    selected.getFullYear() === cursor.year &&
+    selected.getMonth() === cursor.month &&
+    selected.getDate() === day;
+
+  const isToday = (day) =>
+    today.getFullYear() === cursor.year &&
+    today.getMonth() === cursor.month &&
+    today.getDate() === day;
+
+  const displayValue = selected
+    ? selected.toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"short", year:"numeric" })
+    : "Sélectionner une date";
+
+  const firstDay = getFirstDay(cursor.year, cursor.month);
+  const daysInMonth = getDaysInMonth(cursor.year, cursor.month);
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  // Years range
+  const yearStart = Math.floor(cursor.year / 10) * 10;
+  const years = Array.from({ length: 12 }, (_, i) => yearStart + i);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Input trigger */}
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 16px", borderRadius: 12,
+        background: "rgba(255,255,255,.06)",
+        border: `1px solid ${error ? "#ef4444" : open ? "rgba(124,106,191,.8)" : "rgba(255,255,255,.12)"}`,
+        color: selected ? "#fff" : "rgba(255,255,255,.45)",
+        fontSize: 14, cursor: "pointer", textAlign: "left",
+        boxShadow: open ? "0 0 0 3px rgba(124,106,191,.2)" : error ? "0 0 0 3px rgba(239,68,68,.15)" : "none",
+        transition: "all .2s", fontFamily: "inherit",
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={selected ? "#c4b5fd" : "rgba(255,255,255,.4)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <span style={{ flex: 1 }}>{displayValue}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </button>
+
+      {/* Dropdown calendar */}
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 999,
+          background: "linear-gradient(135deg,#1e1540,#2a1a5e)",
+          border: "1px solid rgba(124,106,191,.35)",
+          borderRadius: 16, padding: 16,
+          boxShadow: "0 20px 60px rgba(0,0,0,.6)",
+          animation: "fadeUp .2s ease",
+        }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <button type="button" onClick={prevMonth} style={NAV_BTN}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button type="button" onClick={() => setView(v => v === "days" ? "months" : "days")}
+              style={{ background: "rgba(124,106,191,.15)", border: "1px solid rgba(124,106,191,.25)", borderRadius: 8, padding: "5px 12px", color: "#c4b5fd", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              {MONTHS[cursor.month]} {cursor.year}
+            </button>
+            <button type="button" onClick={nextMonth} style={NAV_BTN}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+
+          {view === "days" && (
+            <>
+              {/* Day names */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2, marginBottom: 6 }}>
+                {DAYS.map(d => (
+                  <div key={d} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, color: "rgba(196,181,253,.5)", padding: "4px 0" }}>{d}</div>
+                ))}
+              </div>
+              {/* Days grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2 }}>
+                {cells.map((day, i) => day === null ? (
+                  <div key={`e${i}`} />
+                ) : (
+                  <button key={day} type="button" onClick={() => !isPast(day) && selectDay(day)}
+                    disabled={isPast(day)}
+                    style={{
+                      width: "100%", aspectRatio: "1", borderRadius: 8, border: "none",
+                      background: isSelected(day)
+                        ? "linear-gradient(135deg,#7c6abf,#9c8fd4)"
+                        : isToday(day)
+                        ? "rgba(124,106,191,.2)"
+                        : "transparent",
+                      color: isSelected(day) ? "#fff" : isPast(day) ? "rgba(255,255,255,.2)" : isToday(day) ? "#c4b5fd" : "rgba(255,255,255,.85)",
+                      fontSize: 13, fontWeight: isSelected(day) || isToday(day) ? 700 : 400,
+                      cursor: isPast(day) ? "not-allowed" : "pointer",
+                      transition: "all .15s",
+                      outline: isToday(day) && !isSelected(day) ? "1px solid rgba(124,106,191,.5)" : "none",
+                    }}
+                    onMouseEnter={e => { if (!isPast(day) && !isSelected(day)) e.currentTarget.style.background = "rgba(124,106,191,.25)"; }}
+                    onMouseLeave={e => { if (!isSelected(day)) e.currentTarget.style.background = isToday(day) ? "rgba(124,106,191,.2)" : "transparent"; }}
+                  >{day}</button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {view === "months" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 6 }}>
+              {MONTHS.map((m, i) => (
+                <button key={m} type="button" onClick={() => { setCursor(c => ({ ...c, month: i })); setView("days"); }}
+                  style={{
+                    padding: "8px 4px", borderRadius: 8, border: "none", cursor: "pointer",
+                    background: cursor.month === i ? "linear-gradient(135deg,#7c6abf,#9c8fd4)" : "rgba(255,255,255,.05)",
+                    color: cursor.month === i ? "#fff" : "rgba(255,255,255,.75)",
+                    fontSize: 12, fontWeight: cursor.month === i ? 700 : 400,
+                    transition: "all .15s",
+                  }}>
+                  {m.slice(0, 3)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Quick: today / tomorrow */}
+          <div style={{ display: "flex", gap: 6, marginTop: 10, borderTop: "1px solid rgba(255,255,255,.07)", paddingTop: 10 }}>
+            {[["Aujourd'hui", 0], ["Demain", 1], ["Dans 7j", 7]].map(([label, days]) => {
+              const d = new Date(); d.setDate(d.getDate() + days);
+              const val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+              return (
+                <button key={label} type="button" onClick={() => { onChange(val); setCursor({ year: d.getFullYear(), month: d.getMonth() }); setOpen(false); }}
+                  style={{ flex: 1, padding: "6px 4px", borderRadius: 8, border: "1px solid rgba(124,106,191,.25)", background: "rgba(124,106,191,.1)", color: "#c4b5fd", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const NAV_BTN = {
+  background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)",
+  borderRadius: 8, padding: "6px 8px", color: "rgba(255,255,255,.7)",
+  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+};
+
+// ── Custom Thematique Select ──────────────────────────────────────
+function ThematiqueSelect({ value, onChange, error }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 16px", borderRadius: 12,
+        background: "rgba(255,255,255,.06)",
+        border: `1px solid ${error ? "#ef4444" : open ? "rgba(124,106,191,.8)" : "rgba(255,255,255,.12)"}`,
+        color: value ? "#fff" : "rgba(255,255,255,.45)",
+        fontSize: 14, cursor: "pointer", textAlign: "left",
+        boxShadow: open ? "0 0 0 3px rgba(124,106,191,.2)" : error ? "0 0 0 3px rgba(239,68,68,.15)" : "none",
+        transition: "all .2s", fontFamily: "inherit",
+      }}>
+        <span style={{ fontSize: 16 }}>{value ? THEMATIQUE_ICONS[value] : "🎯"}</span>
+        <span style={{ flex: 1 }}>{value || "-- Sélectionnez --"}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 999,
+          background: "linear-gradient(135deg,#1e1540,#2a1a5e)",
+          border: "1px solid rgba(124,106,191,.35)",
+          borderRadius: 14, overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,.6)",
+          animation: "fadeUp .2s ease",
+        }}>
+          {THEMATIQUES.map((t, i) => (
+            <button key={t} type="button" onClick={() => { onChange(t); setOpen(false); }}
+              style={{
+                width: "100%", display: "flex", alignItems: "center", gap: 10,
+                padding: "11px 16px", border: "none",
+                background: value === t ? "rgba(124,106,191,.25)" : "transparent",
+                color: value === t ? "#fff" : "rgba(255,255,255,.8)",
+                fontSize: 13, fontWeight: value === t ? 700 : 400,
+                cursor: "pointer", textAlign: "left",
+                borderBottom: i < THEMATIQUES.length - 1 ? "1px solid rgba(255,255,255,.05)" : "none",
+                transition: "background .15s",
+              }}
+              onMouseEnter={e => { if (value !== t) e.currentTarget.style.background = "rgba(124,106,191,.15)"; }}
+              onMouseLeave={e => { if (value !== t) e.currentTarget.style.background = "transparent"; }}
+            >
+              <span style={{ fontSize: 15 }}>{THEMATIQUE_ICONS[t]}</span>
+              <span style={{ flex: 1 }}>{t}</span>
+              {value === t && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" strokeWidth="2.5" strokeLinecap="round"><path d="M20 6 9 17l-5-5"/></svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Custom Time Picker ────────────────────────────────────────────
+function CustomTimePicker({ value, onChange, error }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const [h, setH] = useState(value ? value.split(":")[0] : "");
+  const [m, setM] = useState(value ? value.split(":")[1] : "");
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const apply = (hh, mm) => {
+    if (hh !== "" && mm !== "") onChange(`${String(hh).padStart(2,"0")}:${String(mm).padStart(2,"0")}`);
+  };
+
+  const hours   = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = [0, 15, 30, 45];
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 16px", borderRadius: 12,
+        background: "rgba(255,255,255,.06)",
+        border: `1px solid ${error ? "#ef4444" : open ? "rgba(124,106,191,.8)" : "rgba(255,255,255,.12)"}`,
+        color: value ? "#fff" : "rgba(255,255,255,.45)",
+        fontSize: 14, cursor: "pointer", textAlign: "left",
+        boxShadow: open ? "0 0 0 3px rgba(124,106,191,.2)" : error ? "0 0 0 3px rgba(239,68,68,.15)" : "none",
+        transition: "all .2s", fontFamily: "inherit",
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={value ? "#c4b5fd" : "rgba(255,255,255,.4)"} strokeWidth="2" strokeLinecap="round">
+          <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+        </svg>
+        <span style={{ flex: 1 }}>{value || "--:--"}</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" strokeWidth="2" strokeLinecap="round" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 999,
+          background: "linear-gradient(135deg,#1e1540,#2a1a5e)",
+          border: "1px solid rgba(124,106,191,.35)",
+          borderRadius: 14, padding: 14,
+          boxShadow: "0 20px 60px rgba(0,0,0,.6)",
+          animation: "fadeUp .2s ease",
+        }}>
+          <div style={{ display: "flex", gap: 10 }}>
+            {/* Hours */}
+            <div style={{ flex: 1 }}>
+              <p style={{ color: "rgba(196,181,253,.6)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Heure</p>
+              <div style={{ maxHeight: 160, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+                {hours.map(hv => (
+                  <button key={hv} type="button" onClick={() => { setH(hv); apply(hv, m); }}
+                    style={{
+                      padding: "6px 10px", borderRadius: 7, border: "none", cursor: "pointer",
+                      background: String(hv).padStart(2,"0") === String(h).padStart(2,"0") ? "linear-gradient(135deg,#7c6abf,#9c8fd4)" : "rgba(255,255,255,.04)",
+                      color: String(hv).padStart(2,"0") === String(h).padStart(2,"0") ? "#fff" : "rgba(255,255,255,.75)",
+                      fontSize: 13, fontWeight: 600, textAlign: "center", transition: "all .1s",
+                    }}>
+                    {String(hv).padStart(2, "0")}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Minutes */}
+            <div style={{ flex: 1 }}>
+              <p style={{ color: "rgba(196,181,253,.6)", fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", marginBottom: 6 }}>Minute</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                {minutes.map(mv => (
+                  <button key={mv} type="button" onClick={() => { setM(mv); apply(h, mv); if (h !== "") setOpen(false); }}
+                    style={{
+                      padding: "8px 10px", borderRadius: 7, border: "none", cursor: "pointer",
+                      background: String(mv).padStart(2,"0") === String(m).padStart(2,"0") ? "linear-gradient(135deg,#7c6abf,#9c8fd4)" : "rgba(255,255,255,.04)",
+                      color: String(mv).padStart(2,"0") === String(m).padStart(2,"0") ? "#fff" : "rgba(255,255,255,.75)",
+                      fontSize: 13, fontWeight: 600, textAlign: "center", transition: "all .1s",
+                    }}>
+                    :{String(mv).padStart(2, "0")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {/* Quick times */}
+          <div style={{ borderTop: "1px solid rgba(255,255,255,.07)", paddingTop: 10, marginTop: 10 }}>
+            <p style={{ color: "rgba(196,181,253,.5)", fontSize: 10, fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>RAPIDE</p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {["09:00","10:00","14:00","15:00","18:00","20:00"].map(t => (
+                <button key={t} type="button" onClick={() => { onChange(t); setH(t.split(":")[0]); setM(t.split(":")[1]); setOpen(false); }}
+                  style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid rgba(124,106,191,.25)", background: value===t?"rgba(124,106,191,.3)":"rgba(124,106,191,.1)", color: "#c4b5fd", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ────────────────────────────────────────────────
 export default function NewLive({ onCancel }) {
   const navigate = useNavigate();
   const [form, setForm] = useState({ title: "", description: "", date: "", time: "", thematique: "" });
   const [errors, setErrors] = useState({});
-  const [step, setStep] = useState("form");   // form | confirm | success
+  const [step, setStep] = useState("form");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  // Email invites
   const [emailInput, setEmailInput] = useState("");
   const [emails, setEmails] = useState([]);
   const [emailError, setEmailError] = useState("");
@@ -27,12 +398,12 @@ export default function NewLive({ onCancel }) {
 
   const validate = () => {
     const e = {};
-    if (!form.title.trim())      e.title = "Titre obligatoire";
+    if (!form.title.trim())       e.title = "Titre obligatoire";
     if (!form.description.trim()) e.description = "Description obligatoire";
-    if (!form.date)              e.date = "Date obligatoire";
+    if (!form.date)               e.date = "Date obligatoire";
     else if (new Date(`${form.date}T${form.time || "00:00"}`) < new Date()) e.date = "Date future requise";
-    if (!form.time)              e.time = "Heure obligatoire";
-    if (!form.thematique)        e.thematique = "Thématique obligatoire";
+    if (!form.time)               e.time = "Heure obligatoire";
+    if (!form.thematique)         e.thematique = "Thématique obligatoire";
     setErrors(e);
     return !Object.keys(e).length;
   };
@@ -70,32 +441,19 @@ export default function NewLive({ onCancel }) {
       localStorage.setItem("currentLiveViewerLink", viewerLink);
       setResult({ hostLink, viewerLink, roomCode });
 
-      // Send email invitations if any
       if (emails.length > 0) {
         setSending(true);
         try {
           const emailRes = await API.post("/lives/invite", {
-            emails,
-            viewerLink,
-            title: form.title,
-            date: form.date,
-            time: form.time,
-            thematique: form.thematique,
-            description: form.description,
+            emails, viewerLink, title: form.title, date: form.date,
+            time: form.time, thematique: form.thematique, description: form.description,
           });
           setSentCount(emailRes.data?.sent || emails.length);
-        } catch {
-          // non-blocking: continue even if email fails
-        } finally {
-          setSending(false);
-        }
+        } catch {} finally { setSending(false); }
       }
 
       setStep("success");
-
-      setTimeout(() => {
-        navigate(`/meet/${roomCode}?at=${hostAccessToken}`);
-      }, 2500);
+      setTimeout(() => { navigate(`/meet/${roomCode}?at=${hostAccessToken}`); }, 2500);
 
     } catch (err) {
       alert("❌ " + (err.response?.data?.message || err.message));
@@ -146,9 +504,9 @@ export default function NewLive({ onCancel }) {
         <h2 style={W.h2}>Confirmer le live</h2>
         <div style={W.detailBox}>
           {[
-            ["📌 Titre",      form.title],
-            ["📅 Date",       fmtDate()],
-            ["🎯 Thématique", form.thematique],
+            ["📌 Titre", form.title],
+            ["📅 Date", fmtDate()],
+            [`${THEMATIQUE_ICONS[form.thematique]} Thématique`, form.thematique],
           ].map(([k, v]) => (
             <div key={k} style={W.detailRow}>
               <span style={W.detailKey}>{k}</span>
@@ -166,9 +524,7 @@ export default function NewLive({ onCancel }) {
           <div style={W.invitePreview}>
             <p style={{ color: "rgba(255,255,255,.45)", fontSize: 11, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>Invitations à envoyer</p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {emails.map(e => (
-                <span key={e} style={W.emailTag}>{e}</span>
-              ))}
+              {emails.map(e => <span key={e} style={W.emailTag}>{e}</span>)}
             </div>
           </div>
         )}
@@ -206,21 +562,18 @@ export default function NewLive({ onCancel }) {
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <Field label="📅 Date" error={errors.date}>
-              <input type="date" style={inp(errors.date)} value={form.date} onChange={e => set("date", e.target.value)} />
+              <CustomDatePicker value={form.date} onChange={v => set("date", v)} error={errors.date} />
             </Field>
             <Field label="🕐 Heure" error={errors.time}>
-              <input type="time" style={inp(errors.time)} value={form.time} onChange={e => set("time", e.target.value)} />
+              <CustomTimePicker value={form.time} onChange={v => set("time", v)} error={errors.time} />
             </Field>
           </div>
 
           <Field label="🎯 Thématique" error={errors.thematique}>
-            <select style={inp(errors.thematique)} value={form.thematique} onChange={e => set("thematique", e.target.value)}>
-              <option value="">-- Sélectionnez --</option>
-              {THEMATIQUES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
+            <ThematiqueSelect value={form.thematique} onChange={v => set("thematique", v)} error={errors.thematique} />
           </Field>
 
-          {/* ── EMAIL INVITES ── */}
+          {/* EMAIL INVITES */}
           <div style={W.inviteSection}>
             <div style={W.inviteHeader}>
               <div style={W.inviteIconWrap}>
@@ -231,28 +584,16 @@ export default function NewLive({ onCancel }) {
                 <p style={{ color: "rgba(255,255,255,.4)", fontSize: 11, margin: "2px 0 0" }}>Optionnel — Le lien live sera envoyé automatiquement</p>
               </div>
             </div>
-
             <div style={W.emailInputRow}>
-              <input
-                style={{ ...inp(emailError), flex: 1 }}
-                type="email"
-                placeholder="exemple@email.com"
-                value={emailInput}
-                onChange={e => { setEmailInput(e.target.value); setEmailError(""); }}
-                onKeyDown={handleEmailKeyDown}
-              />
-              <button
-                type="button"
-                onClick={addEmail}
-                style={W.addEmailBtn}
-                disabled={!emailInput.trim()}
-              >
+              <input style={{ ...inp(emailError), flex: 1 }} type="email" placeholder="exemple@email.com"
+                value={emailInput} onChange={e => { setEmailInput(e.target.value); setEmailError(""); }}
+                onKeyDown={handleEmailKeyDown} />
+              <button type="button" onClick={addEmail} style={W.addEmailBtn} disabled={!emailInput.trim()}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                 Ajouter
               </button>
             </div>
             {emailError && <p style={{ color: "#f87171", fontSize: 12, marginTop: 4 }}>⚠ {emailError}</p>}
-
             {emails.length > 0 && (
               <div style={W.emailList}>
                 {emails.map(email => (
@@ -266,7 +607,7 @@ export default function NewLive({ onCancel }) {
                 ))}
                 <div style={W.emailCount}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-                  {emails.length} invitation{emails.length > 1 ? "s" : ""} sera{emails.length > 1 ? "ont" : ""} envoyée{emails.length > 1 ? "s" : ""} à la création
+                  {emails.length} invitation{emails.length > 1 ? "s" : ""} sera{emails.length > 1 ? "ont" : ""} envoyée{emails.length > 1 ? "s" : ""}
                 </div>
               </div>
             )}
@@ -274,9 +615,7 @@ export default function NewLive({ onCancel }) {
 
           <div style={W.actions}>
             <button type="button" onClick={() => onCancel ? onCancel() : navigate(-1)} style={W.ghost}>Annuler</button>
-            <button onClick={() => validate() && setStep("confirm")} style={W.primary}>
-              Créer le Live →
-            </button>
+            <button onClick={() => validate() && setStep("confirm")} style={W.primary}>Créer le Live →</button>
           </div>
         </div>
       </div>
@@ -295,10 +634,12 @@ function Field({ label, error, children }) {
 }
 
 const inp = (err) => ({
-  background: "rgba(255,255,255,.06)", border: `1px solid ${err ? "#ef4444" : "rgba(255,255,255,.12)"}`,
+  background: "rgba(255,255,255,.06)",
+  border: `1px solid ${err ? "#ef4444" : "rgba(255,255,255,.12)"}`,
   borderRadius: 12, color: "#fff", fontSize: 14, padding: "12px 16px",
   outline: "none", width: "100%", fontFamily: "inherit",
   boxShadow: err ? "0 0 0 3px rgba(239,68,68,.15)" : "none",
+  transition: "all .2s",
 });
 
 const ANIM = `
@@ -306,45 +647,43 @@ const ANIM = `
   @keyframes spin { to{transform:rotate(360deg)} }
   @keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
   @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 `;
 
 const W = {
-  page:      { minHeight: "100vh", background: "linear-gradient(135deg,#0f0c29,#1e0a4a,#0f0c29)", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", fontFamily: "'DM Sans',sans-serif" },
-  card:      { background: "rgba(255,255,255,.04)", backdropFilter: "blur(24px)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 24, width: "100%", maxWidth: 680, padding: "44px 40px", boxShadow: "0 30px 80px rgba(0,0,0,.5)", animation: "fadeUp .4s ease", textAlign: "center" },
-  badge:     { display: "inline-flex", alignItems: "center", gap: 8, background: "linear-gradient(135deg,#7c3aed,#c026d3)", color: "#fff", padding: "7px 20px", borderRadius: 50, fontSize: 11, fontWeight: 800, letterSpacing: 2, textTransform: "uppercase", marginBottom: 18 },
+  page:      { minHeight: "100vh", background: "linear-gradient(135deg,#7c6abf 0%,#6a58a8 40%,#5a4a95 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", fontFamily: "ui-sans-serif,system-ui,sans-serif" },
+  card:      { background: "rgba(255,255,255,.12)", backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 24, width: "100%", maxWidth: 680, padding: "44px 40px", boxShadow: "0 25px 60px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.3)", animation: "fadeUp .4s ease", textAlign: "center" },
+  badge:     { display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.3)", color: "#fff", padding: "7px 20px", borderRadius: 50, fontSize: 11, fontWeight: 800, letterSpacing: 2, textTransform: "uppercase", marginBottom: 18 },
   dot:       { width: 9, height: 9, background: "#f87171", borderRadius: "50%", animation: "pulse 1.5s infinite", display: "inline-block" },
-  h1:        { fontSize: 28, fontWeight: 900, color: "#fff", margin: "0 0 10px", background: "linear-gradient(135deg,#fff,#c4b5fd)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" },
-  h2:        { fontSize: 22, fontWeight: 800, color: "#f1f5f9", margin: "0 0 10px" },
-  sub:       { color: "rgba(255,255,255,.5)", fontSize: 14, marginBottom: 28 },
+  h1:        { fontSize: 28, fontWeight: 900, color: "#fff", margin: "0 0 10px" },
+  h2:        { fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 10px" },
+  sub:       { color: "rgba(255,255,255,.7)", fontSize: 14, marginBottom: 28 },
   form:      { display: "flex", flexDirection: "column", gap: 20, textAlign: "left" },
-  actions:   { display: "flex", justifyContent: "flex-end", gap: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,.07)" },
-  primary:   { background: "linear-gradient(135deg,#7c3aed,#3b82f6)", border: "none", borderRadius: 12, padding: "13px 28px", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", boxShadow: "0 4px 20px rgba(124,58,237,.4)", display: "flex", alignItems: "center", gap: 8 },
-  ghost:     { background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.15)", borderRadius: 12, padding: "13px 24px", color: "rgba(255,255,255,.75)", fontWeight: 600, fontSize: 14, cursor: "pointer" },
-  detailBox: { background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 14, padding: "16px 20px", margin: "20px 0", textAlign: "left" },
+  actions:   { display: "flex", justifyContent: "flex-end", gap: 12, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,.15)" },
+  primary:   { background: "linear-gradient(135deg,#1f1a33,#2d2550)", border: "none", borderRadius: 12, padding: "13px 28px", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", boxShadow: "0 8px 20px rgba(0,0,0,.25)", display: "flex", alignItems: "center", gap: 8 },
+  ghost:     { background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 12, padding: "13px 24px", color: "rgba(255,255,255,.85)", fontWeight: 600, fontSize: 14, cursor: "pointer" },
+  detailBox: { background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.15)", borderRadius: 14, padding: "16px 20px", margin: "20px 0", textAlign: "left" },
   detailRow: { display: "flex", gap: 12, marginBottom: 10, fontSize: 13 },
-  detailKey: { color: "rgba(255,255,255,.4)", minWidth: 110 },
-  detailVal: { color: "rgba(255,255,255,.85)", fontWeight: 600, wordBreak: "break-all" },
-  linkBox:   { background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 14, padding: 16, marginBottom: 20, textAlign: "left" },
-  linkLabel: { color: "rgba(255,255,255,.5)", fontSize: 11, fontWeight: 700, display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 },
+  detailKey: { color: "rgba(255,255,255,.55)", minWidth: 110 },
+  detailVal: { color: "#fff", fontWeight: 600, wordBreak: "break-all" },
+  linkBox:   { background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.15)", borderRadius: 14, padding: 16, marginBottom: 20, textAlign: "left" },
+  linkLabel: { color: "rgba(255,255,255,.6)", fontSize: 11, fontWeight: 700, display: "block", marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 },
   linkRow:   { display: "flex", gap: 8, alignItems: "center" },
-  linkCode:  { flex: 1, color: "#a78bfa", fontSize: 11, wordBreak: "break-all", background: "rgba(167,139,250,.08)", padding: "6px 10px", borderRadius: 8 },
-  copyBtn:   { background: "#7c3aed", border: "none", borderRadius: 8, padding: "6px 10px", color: "#fff", cursor: "pointer", flexShrink: 0 },
+  linkCode:  { flex: 1, color: "#fff", fontSize: 11, wordBreak: "break-all", background: "rgba(255,255,255,.1)", padding: "6px 10px", borderRadius: 8 },
+  copyBtn:   { background: "rgba(255,255,255,.2)", border: "none", borderRadius: 8, padding: "6px 10px", color: "#fff", cursor: "pointer", flexShrink: 0 },
   spinner:   { width: 20, height: 20, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin .7s linear infinite", display: "inline-block" },
   spinnerInline: { width: 14, height: 14, border: "2px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin .7s linear infinite", display: "inline-block" },
-  successBadge: { display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(52,211,153,.12)", border: "1px solid rgba(52,211,153,.25)", color: "#34d399", padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, marginBottom: 16 },
-
-  // Email invite
-  inviteSection: { background: "rgba(124,58,237,.08)", border: "1px solid rgba(124,58,237,.2)", borderRadius: 16, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 12, animation: "fadeIn .3s ease" },
+  successBadge: { display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.3)", color: "#fff", padding: "6px 16px", borderRadius: 20, fontSize: 13, fontWeight: 600, marginBottom: 16 },
+  inviteSection: { background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 16, padding: "18px 20px", display: "flex", flexDirection: "column", gap: 12 },
   inviteHeader:  { display: "flex", gap: 12, alignItems: "flex-start" },
-  inviteIconWrap:{ width: 36, height: 36, borderRadius: 10, background: "rgba(124,58,237,.25)", display: "flex", alignItems: "center", justifyContent: "center", color: "#a78bfa", flexShrink: 0 },
+  inviteIconWrap:{ width: 36, height: 36, borderRadius: 10, background: "rgba(255,255,255,.15)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", flexShrink: 0 },
   emailInputRow: { display: "flex", gap: 8 },
-  addEmailBtn:   { display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg,#7c3aed,#6d28d9)", border: "none", borderRadius: 10, padding: "10px 16px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" },
+  addEmailBtn:   { display: "flex", alignItems: "center", gap: 6, background: "linear-gradient(135deg,#1f1a33,#2d2550)", border: "none", borderRadius: 10, padding: "10px 16px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap" },
   emailList:     { display: "flex", flexDirection: "column", gap: 6 },
-  emailPill:     { display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 10, padding: "8px 12px" },
-  emailDot:      { width: 7, height: 7, borderRadius: "50%", background: "#a78bfa", flexShrink: 0 },
-  removePillBtn: { background: "rgba(239,68,68,.15)", border: "none", borderRadius: 6, padding: "3px 5px", color: "#f87171", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center" },
-  emailCount:    { display: "flex", alignItems: "center", gap: 5, color: "rgba(167,139,250,.7)", fontSize: 11, fontWeight: 600 },
-  emailTag:      { background: "rgba(124,58,237,.2)", color: "#c4b5fd", fontSize: 11, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(124,58,237,.3)" },
-  invitePreview: { background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.07)", borderRadius: 12, padding: "14px 16px", textAlign: "left", marginTop: 4 },
+  emailPill:     { display: "flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 10, padding: "8px 12px" },
+  emailDot:      { width: 7, height: 7, borderRadius: "50%", background: "#fff", flexShrink: 0 },
+  removePillBtn: { background: "rgba(239,68,68,.2)", border: "none", borderRadius: 6, padding: "3px 5px", color: "#fca5a5", cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center" },
+  emailCount:    { display: "flex", alignItems: "center", gap: 5, color: "rgba(255,255,255,.6)", fontSize: 11, fontWeight: 600 },
+  emailTag:      { background: "rgba(255,255,255,.15)", color: "#fff", fontSize: 11, padding: "3px 10px", borderRadius: 20, border: "1px solid rgba(255,255,255,.25)" },
+  invitePreview: { background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, padding: "14px 16px", textAlign: "left", marginTop: 4 },
 }; 
- 
