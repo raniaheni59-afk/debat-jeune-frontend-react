@@ -5,6 +5,210 @@ import "./Register.css";
 
 
 // ── Custom Date Picker (Date de naissance) ───────────────────────
+function BirthDatePicker({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState("days");
+  const ref = useRef(null);
+
+  const today = new Date();
+  const selected = value ? new Date(value + "T00:00:00") : null;
+  const [cursor, setCursor] = useState(() => {
+    if (value) {
+      const d = new Date(value + "T00:00:00");
+      return { year: d.getFullYear(), month: d.getMonth() };
+    }
+    return { year: 2005, month: 0 };
+  });
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const MONTHS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+  const MONTHS_FULL = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
+  const DAYS = ["Lu","Ma","Me","Je","Ve","Sa","Di"];
+
+  const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+  const getFirstDay = (y, m) => { const d = new Date(y, m, 1).getDay(); return d === 0 ? 6 : d - 1; };
+
+  const prevMonth = () => setCursor(c => c.month === 0 ? { year: c.year - 1, month: 11 } : { ...c, month: c.month - 1 });
+  const nextMonth = () => setCursor(c => c.month === 11 ? { year: c.year + 1, month: 0 } : { ...c, month: c.month + 1 });
+
+  const selectDay = (day) => {
+    const y = cursor.year, m = String(cursor.month + 1).padStart(2, "0"), d = String(day).padStart(2, "0");
+    onChange(`${y}-${m}-${d}`);
+    setOpen(false);
+  };
+
+  const isFuture = (day) => {
+    const d = new Date(cursor.year, cursor.month, day);
+    d.setHours(0,0,0,0);
+    const t = new Date(); t.setHours(0,0,0,0);
+    return d > t;
+  };
+
+  const isSelected = (day) => selected &&
+    selected.getFullYear() === cursor.year &&
+    selected.getMonth() === cursor.month &&
+    selected.getDate() === day;
+
+  const isToday = (day) =>
+    today.getFullYear() === cursor.year &&
+    today.getMonth() === cursor.month &&
+    today.getDate() === day;
+
+  const displayValue = selected
+    ? selected.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+    : "Sélectionner votre date de naissance";
+
+  const firstDay = getFirstDay(cursor.year, cursor.month);
+  const daysInMonth = getDaysInMonth(cursor.year, cursor.month);
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  // Years from 1940 to today
+  const currentDecadeStart = Math.floor(cursor.year / 12) * 12;
+  const years = Array.from({ length: 12 }, (_, i) => currentDecadeStart + i).filter(y => y >= 1940 && y <= today.getFullYear());
+
+  const NAV = {
+    background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+    borderRadius: 8, padding: "5px 8px", color: "rgba(255,255,255,.8)",
+    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* ✅ Bouton trigger — affiche la date choisie */}
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "11px 16px", borderRadius: 11,
+        background: "rgba(255,255,255,.15)",
+        border: `1.5px solid ${open ? "rgba(255,255,255,.65)" : "rgba(255,255,255,.22)"}`,
+        color: selected ? "#fff" : "rgba(255,255,255,.45)",
+        fontSize: 14, cursor: "pointer", textAlign: "left",
+        boxShadow: open ? "0 0 0 3px rgba(255,255,255,.12)" : "none",
+        transition: "all .2s", fontFamily: "inherit",
+      }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={selected ? "rgba(255,255,255,.8)" : "rgba(255,255,255,.4)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <span style={{ flex: 1 }}>
+          {selected
+            ? selected.toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+            : "Sélectionner votre date de naissance"}
+        </span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="2" strokeLinecap="round"
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </button>
+
+      {open && (
+        <div style={{
+          position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 9999,
+          background: "linear-gradient(160deg,#3d2f7a 0%,#5a4a95 50%,#6a58a8 100%)",
+          border: "1px solid rgba(255,255,255,.18)",
+          borderRadius: 20, padding: 16,
+          boxShadow: "0 24px 64px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.15)",
+          animation: "fadeIn .2s cubic-bezier(.16,1,.3,1)",
+          backdropFilter: "blur(12px)",
+        }}>
+          {/* Header nav */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+            <button type="button" onClick={prevMonth} style={NAV}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div style={{ display: "flex", gap: 5 }}>
+              <button type="button" onClick={() => setView(v => v === "months" ? "days" : "months")}
+                style={{ ...NAV, padding: "5px 10px", fontSize: 12, fontWeight: 700, color: "#fff" }}>
+                {MONTHS_FULL[cursor.month]}
+              </button>
+              <button type="button" onClick={() => setView(v => v === "years" ? "days" : "years")}
+                style={{ ...NAV, padding: "5px 10px", fontSize: 12, fontWeight: 700, color: "#fff" }}>
+                {cursor.year}
+              </button>
+            </div>
+            <button type="button" onClick={nextMonth} style={NAV}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+          </div>
+
+          {view === "days" && (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2, marginBottom: 4 }}>
+                {DAYS.map(d => (
+                  <div key={d} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: "rgba(255,255,255,.5)", padding: "3px 0" }}>{d}</div>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 2 }}>
+                {cells.map((day, i) => day === null ? <div key={"e"+i} /> : (
+                  <button key={day} type="button" onClick={() => !isFuture(day) && selectDay(day)}
+                    disabled={isFuture(day)}
+                    style={{
+                      width: "100%", aspectRatio: "1", borderRadius: 8, border: "none",
+                      background: isSelected(day)
+                        ? "linear-gradient(135deg,#fff 0%,rgba(255,255,255,.85) 100%)"
+                        : isToday(day) ? "rgba(255,255,255,.18)" : "transparent",
+                      color: isSelected(day) ? "#4a3a8a" : isFuture(day) ? "rgba(255,255,255,.18)" : "rgba(255,255,255,.9)",
+                      fontSize: 12, fontWeight: isSelected(day) ? 800 : isToday(day) ? 700 : 400,
+                      cursor: isFuture(day) ? "not-allowed" : "pointer",
+                      transition: "all .12s",
+                      boxShadow: isSelected(day) ? "0 2px 8px rgba(0,0,0,.25)" : "none",
+                      outline: isToday(day) && !isSelected(day) ? "1px solid rgba(255,255,255,.35)" : "none",
+                    }}
+                    onMouseEnter={e => { if (!isFuture(day) && !isSelected(day)) e.currentTarget.style.background = "rgba(255,255,255,.2)"; }}
+                    onMouseLeave={e => { if (!isSelected(day)) e.currentTarget.style.background = isToday(day) ? "rgba(255,255,255,.15)" : "transparent"; }}
+                  >{day}</button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {view === "months" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5 }}>
+              {MONTHS.map((m, i) => (
+                <button key={m} type="button" onClick={() => { setCursor(c => ({ ...c, month: i })); setView("days"); }}
+                  style={{
+                    padding: "8px 4px", borderRadius: 9, border: "none", cursor: "pointer",
+                    background: cursor.month === i
+                      ? "linear-gradient(135deg,#fff,rgba(255,255,255,.85))"
+                      : "rgba(255,255,255,.08)",
+                    color: cursor.month === i ? "#4a3a8a" : "rgba(255,255,255,.85)",
+                    fontSize: 11, fontWeight: cursor.month === i ? 800 : 400,
+                    transition: "all .15s",
+                    boxShadow: cursor.month === i ? "0 2px 8px rgba(0,0,0,.2)" : "none",
+                  }}>{m}</button>
+              ))}
+            </div>
+          )}
+
+          {view === "years" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5 }}>
+              <button type="button" onClick={() => setCursor(c => ({ ...c, year: c.year - 12 }))}
+                style={{ gridColumn: "1/-1", ...NAV, justifyContent: "center", padding: "5px", marginBottom: 4, fontSize: 11 }}>← Années précédentes</button>
+              {years.map(y => (
+                <button key={y} type="button" onClick={() => { setCursor(c => ({ ...c, year: y })); setView("months"); }}
+                  style={{
+                    padding: "7px 4px", borderRadius: 8, border: "none", cursor: "pointer",
+                    background: cursor.year === y ? "rgba(255,255,255,.9)" : "rgba(255,255,255,.1)",
+                    color: cursor.year === y ? "#5a4a95" : "#fff",
+                    fontSize: 11, fontWeight: cursor.year === y ? 800 : 400, transition: "all .12s",
+                  }}>{y}</button>
+              ))}
+              {cursor.year + 12 <= today.getFullYear() && (
+                <button type="button" onClick={() => setCursor(c => ({ ...c, year: c.year + 12 }))}
+                  style={{ gridColumn: "1/-1", ...NAV, justifyContent: "center", padding: "5px", marginTop: 4, fontSize: 11 }}>Années suivantes →</button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Register() {
   const navigate = useNavigate();
@@ -222,14 +426,9 @@ export default function Register() {
 
                 <div className="input-group full-width">
                   <label>Date Naissance *</label>
-                  <input
-                    type="date"
-                    name="date_naissance"
-                    max={new Date().toISOString().split("T")[0]}
+                  <BirthDatePicker
                     value={form.date_naissance}
-                    onChange={handleChange}
-                    required
-                    style={{ colorScheme: "dark" }}
+                    onChange={(val) => setForm(p => ({ ...p, date_naissance: val }))}
                   />
                   {age !== null && <span className="age-badge">🎂 {age} ans</span>}
                 </div>
