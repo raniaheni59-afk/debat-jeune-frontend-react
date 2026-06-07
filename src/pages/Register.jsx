@@ -81,7 +81,7 @@ function BirthDatePicker({ value, onChange }) {
 
   const handleManualDate = (e) => {
     const raw = e.target.value.trim();
-    const match = raw.match(/^(\d{1,2})[\/-\.](\d{1,2})[\/-\.](\d{4})$/);
+    const match = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
     if (match) {
       const [, d, m, y] = match;
       const iso = `${y}-${m.padStart(2,"0")}-${d.padStart(2,"0")}`;
