@@ -9,12 +9,12 @@ const THEMATIQUES = [
 ];
 
 const THEMATIQUE_ICONS = {
-  "Sciences & Innovation": "🔬",
-  "Environnement & Développement Durable": "🌿",
-  "Technologie & Numérique": "💻",
-  "Santé & Bien-être": "💊",
-  "Éducation & Formation": "📚",
-  "Citoyenneté & Société": "🏛️",
+  "Sciences & Innovation": "",
+  "Environnement & Développement Durable": "",
+  "Technologie & Numérique": "",
+  "Santé & Bien-être": "",
+  "Éducation & Formation": "",
+  "Citoyenneté & Société": "",
   "Autre": "✨",
 };
 
