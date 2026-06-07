@@ -87,54 +87,41 @@ function CustomDatePicker({ value, onChange, error }) {
   // ✅ parse dd/mm/yyyy typed manually
   return (
     <div ref={ref} style={{ position: "relative" }}>
-      <div style={{
-        display: "flex", alignItems: "center",
+      {/* ✅ Bouton trigger unique */}
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        width: "100%", display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 16px", borderRadius: 12,
         background: "rgba(255,255,255,.06)",
         border: `1px solid ${error ? "#ef4444" : open ? "rgba(124,106,191,.8)" : "rgba(255,255,255,.12)"}`,
-        borderRadius: 12,
+        color: selected ? "#fff" : "rgba(255,255,255,.45)",
+        fontSize: 14, cursor: "pointer", textAlign: "left",
         boxShadow: open ? "0 0 0 3px rgba(124,106,191,.2)" : error ? "0 0 0 3px rgba(239,68,68,.15)" : "none",
-        transition: "all .2s",
+        transition: "all .2s", fontFamily: "inherit",
       }}>
-        {/* ✅ input type=date natif */}
-        <input
-          type="date"
-          min={new Date().toISOString().split("T")[0]}
-          value={value || ""}
-          onChange={e => {
-            const val = e.target.value;
-            if (val) {
-              const dt = new Date(val + "T00:00:00");
-              onChange(val);
-              setCursor({ year: dt.getFullYear(), month: dt.getMonth() });
-            } else { onChange(""); }
-          }}
-          style={{
-            flex: 1, background: "transparent", border: "none", outline: "none",
-            color: value ? "#fff" : "rgba(255,255,255,.45)",
-            fontSize: 14, padding: "12px 16px", fontFamily: "inherit", minWidth: 0,
-            colorScheme: "dark",
-          }}
-        />
-        <button type="button" onClick={() => setOpen(o => !o)} style={{
-          background: "transparent", border: "none", cursor: "pointer",
-          padding: "12px 14px", display: "flex", alignItems: "center",
-          color: open ? "#c4b5fd" : "rgba(255,255,255,.4)",
-        }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-          </svg>
-        </button>
-      </div>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={selected ? "#c4b5fd" : "rgba(255,255,255,.4)"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <span style={{ flex: 1 }}>
+          {selected
+            ? selected.toLocaleDateString("fr-FR", { weekday:"short", day:"numeric", month:"long", year:"numeric" })
+            : "Sélectionner une date"}
+        </span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="2" strokeLinecap="round"
+          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .2s" }}>
+          <path d="m6 9 6 6 6-6"/>
+        </svg>
+      </button>
 
       {/* Dropdown calendar */}
       {open && (
         <div style={{
           position: "absolute", top: "calc(100% + 8px)", left: 0, right: 0, zIndex: 999,
-          background: "linear-gradient(135deg,#1e1540,#2a1a5e)",
-          border: "1px solid rgba(124,106,191,.35)",
-          borderRadius: 16, padding: 16,
-          boxShadow: "0 20px 60px rgba(0,0,0,.6)",
-          animation: "fadeUp .2s ease",
+          background: "linear-gradient(160deg,#1a1040 0%,#2a1a5e 50%,#3d2f7a 100%)",
+          border: "1px solid rgba(124,106,191,.3)",
+          borderRadius: 20, padding: 16,
+          boxShadow: "0 24px 64px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.08)",
+          animation: "fadeUp .2s cubic-bezier(.16,1,.3,1)",
+          backdropFilter: "blur(12px)",
         }}>
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
