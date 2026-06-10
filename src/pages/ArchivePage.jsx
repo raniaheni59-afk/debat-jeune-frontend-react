@@ -92,18 +92,16 @@ export default function ArchivePage() {
         .catch(err => console.error("lives fallback error:", err));
     });
 
-  // ✅ ENQUÊTES ARCHIVÉES — filtre par date_fin ou date_creation < aujourd'hui
+  // ✅ ENQUÊTES ARCHIVÉES — toutes les enquêtes triées par date desc
   API.get("/enquetes")
     .then(res => {
-      const today = new Date().setHours(0, 0, 0, 0);
       const data = Array.isArray(res.data) ? res.data : [];
-      const archived = data.filter(item => {
-        // Priorité: date_fin si elle existe
-        const dateRef = item.date_fin || item.date_creation;
-        if (!dateRef) return false;
-        return new Date(dateRef).setHours(0, 0, 0, 0) < today;
+      const sorted = [...data].sort((a, b) => {
+        const dateA = new Date(a.date_fin || a.date_creation || 0);
+        const dateB = new Date(b.date_fin || b.date_creation || 0);
+        return dateB - dateA;
       });
-      setEnquetes(archived);
+      setEnquetes(sorted);
     })
     .catch(err => console.error("enquetes error:", err));
 }, []);
@@ -121,7 +119,6 @@ export default function ArchivePage() {
     const participants = item.participants_count != null ? `👥 ${item.participants_count} participants` : null;
     const host = item.host_name ? `🎙 ${item.host_name}` : null;
 
-    const [showAI, setShowAI] = false; // handled per card below
     return (
       <ArchiveCard
         key={item.id || item.id_live || item.id_enquete || idx}

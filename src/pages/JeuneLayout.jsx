@@ -1676,7 +1676,7 @@ const JeuneLayout = () => {
               <span className="jl-nav-icon"><Icon name={item.icon} size={20}/></span>
               <span className="jl-nav-label">{item.label}</span>
               {item.badge && <span className="jl-badge">{item.badge}</span>}
-              {item.live  && <span className="jl-badge-live">LIVE</span>}
+              {item.live && activeLiveLink && <span className="jl-badge-live">LIVE</span>}
             </button>
           ))}
         </nav>
