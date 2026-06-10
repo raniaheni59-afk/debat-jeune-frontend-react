@@ -430,16 +430,6 @@ const LiveHomeBanner = ({ liveInfo, onJoin }) => {
 const LiveEvWidget = ({ goToLive, activeLiveLink, liveInfo }) => {
   const navigate  = useNavigate();
   const timerStr  = useLiveTimer(liveInfo?.created_at || liveInfo?.startedAt);
-  const [viewers, setViewers] = React.useState(Math.floor(Math.random() * 40) + 12);
-
-  // Simuler variation de viewers pour le réalisme
-  React.useEffect(() => {
-    if (!activeLiveLink && !liveInfo) return;
-    const iv = setInterval(() => {
-      setViewers(v => Math.max(8, v + Math.floor(Math.random() * 5) - 2));
-    }, 7000);
-    return () => clearInterval(iv);
-  }, [activeLiveLink, liveInfo]);
 
   const joinLive = () => {
     const linkToUse = liveInfo?.stream_link || activeLiveLink || localStorage.getItem("currentLiveViewerLink");
@@ -494,20 +484,6 @@ const LiveEvWidget = ({ goToLive, activeLiveLink, liveInfo }) => {
           <span style={{ color:"#a78bfa", fontSize:11, fontWeight:600 }}>{liveInfo.thematique}</span>
         </div>
       )}
-
-      {/* Viewers count */}
-      <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:12 }}>
-        <div style={{ display:"flex" }}>
-          {["#7c3aed","#3b82f6","#10b981"].map((c,i) => (
-            <div key={i} style={{ width:18, height:18, borderRadius:"50%", background:c, border:"2px solid #1e0445", marginLeft: i>0 ? -6 : 0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:7, color:"#fff", fontWeight:800 }}>
-              {["J","S","M"][i]}
-            </div>
-          ))}
-        </div>
-        <span style={{ color:"rgba(255,255,255,.5)", fontSize:11 }}>
-          <span style={{ color:"rgba(255,255,255,.8)", fontWeight:700 }}>{viewers}</span> participants
-        </span>
-      </div>
 
       {/* CTA button */}
       <button onClick={joinLive} style={{
@@ -1549,27 +1525,6 @@ const JeuneLayout = () => {
                 </div>
               ))}
             </div>
-
-            {/* ── LIVE EN COURS BANNER (home feed) ── */}
-            {activeLiveLink && (
-              <LiveHomeBanner
-                liveInfo={activeLiveInfo}
-                activeLiveLink={activeLiveLink}
-                onJoin={() => {
-                  const linkToUse = activeLiveInfo?.stream_link || activeLiveLink || localStorage.getItem("currentLiveViewerLink");
-                  if (linkToUse) {
-                    try {
-                      const url = new URL(linkToUse);
-                      const parts = url.pathname.split("/").filter(Boolean);
-                      const rc = parts[parts.length - 1];
-                      const vt = url.searchParams.get("vt");
-                      if (rc && vt) { navigate(`/meet/${rc}?vt=${vt}`); return; }
-                    } catch {}
-                  }
-                  goTo(PAGES.LIVE);
-                }}
-              />
-            )}
 
             {/* Banners */}
             <div className="jl-banners">
